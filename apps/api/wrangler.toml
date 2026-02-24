@@ -1,0 +1,17 @@
+name = "openschedule-api"
+main = "src/index.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[observability.logs]
+enabled = true
+
+# Local fallback when Hyperdrive is not configured yet.
+[vars]
+DATABASE_URL = ""
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "YOUR_HYPERDRIVE_ID"
+localConnectionString = "postgresql://postgres:postgres@localhost:5432/openschedule"

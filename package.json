@@ -1,0 +1,43 @@
+{
+  "name": "openschedule-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source scheduling platform (MVP monorepo)",
+  "license": "AGPL-3.0-only",
+  "packageManager": "npm@11.7.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w apps/web",
+    "dev:api": "npm run dev -w apps/api",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --ext .ts,.tsx,.js,.mjs",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "npm run generate -w packages/db",
+    "db:migrate": "npm run migrate -w packages/db",
+    "db:seed": "npm run seed -w packages/db",
+    "ci": "npm run lint && npm run test && npm run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.21.0",
+    "@types/node": "^22.13.10",
+    "@types/pg": "^8.16.0",
+    "eslint": "^9.21.0",
+    "eslint-config-prettier": "^10.1.1",
+    "globals": "^15.15.0",
+    "prettier": "^3.5.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.25.0",
+    "vitest": "^3.0.7"
+  }
+}

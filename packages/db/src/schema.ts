@@ -1,0 +1,98 @@
+import {
+  boolean,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 320 }).notNull().unique(),
+  username: varchar('username', { length: 64 }).notNull().unique(),
+  displayName: varchar('display_name', { length: 120 }).notNull(),
+  timezone: varchar('timezone', { length: 80 }).notNull().default('UTC'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const sessions = pgTable('sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const eventTypes = pgTable(
+  'event_types',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    slug: varchar('slug', { length: 80 }).notNull(),
+    name: varchar('name', { length: 120 }).notNull(),
+    description: text('description'),
+    durationMinutes: integer('duration_minutes').notNull(),
+    locationType: varchar('location_type', { length: 32 }).notNull().default('video'),
+    locationValue: text('location_value'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueSlugPerUser: unique('event_types_user_slug_unique').on(table.userId, table.slug),
+  }),
+);
+
+export const availabilityRules = pgTable('availability_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  dayOfWeek: integer('day_of_week').notNull(),
+  startMinute: integer('start_minute').notNull(),
+  endMinute: integer('end_minute').notNull(),
+  bufferBeforeMinutes: integer('buffer_before_minutes').notNull().default(0),
+  bufferAfterMinutes: integer('buffer_after_minutes').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const availabilityOverrides = pgTable('availability_overrides', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  startAt: timestamp('start_at', { withTimezone: true }).notNull(),
+  endAt: timestamp('end_at', { withTimezone: true }).notNull(),
+  isAvailable: boolean('is_available').notNull().default(false),
+  reason: text('reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const bookings = pgTable(
+  'bookings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventTypeId: uuid('event_type_id')
+      .notNull()
+      .references(() => eventTypes.id, { onDelete: 'cascade' }),
+    organizerId: uuid('organizer_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    inviteeName: varchar('invitee_name', { length: 120 }).notNull(),
+    inviteeEmail: varchar('invitee_email', { length: 320 }).notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    status: varchar('status', { length: 20 }).notNull().default('confirmed'),
+    metadata: text('metadata'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueSlot: unique('bookings_unique_slot').on(table.eventTypeId, table.startsAt, table.endsAt),
+  }),
+);

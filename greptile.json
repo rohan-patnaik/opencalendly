@@ -1,0 +1,38 @@
+{
+  "strictness": 2,
+  "commentTypes": ["logic", "syntax", "style"],
+  "triggerOnUpdates": true,
+  "statusCheck": true,
+  "statusCommentsEnabled": true,
+  "instructions": "Prioritize correctness, race-condition safety, idempotency, and free-tier cost constraints. Use docs/ARCHITECTURE.md and docs/STACK.md as architectural context.",
+  "ignorePatterns": "dist/\ncoverage/\n.next/\n.wrangler/\nnode_modules/\npackages/db/drizzle/meta/",
+  "customContext": {
+    "files": [
+      {
+        "scope": ["**/*.ts", "**/*.tsx"],
+        "path": "docs/ARCHITECTURE.md",
+        "description": "System design and correctness constraints"
+      },
+      {
+        "scope": ["**/*.ts", "**/*.tsx"],
+        "path": "docs/STACK.md",
+        "description": "Infrastructure and cost constraints"
+      },
+      {
+        "scope": ["**/*.ts", "**/*.tsx", "**/*.md"],
+        "path": "docs/API.md",
+        "description": "API and webhook contract"
+      }
+    ],
+    "rules": [
+      {
+        "scope": ["**/*.ts", "**/*.tsx"],
+        "rule": "For booking flows, enforce transactional writes and DB-level uniqueness to prevent double booking."
+      },
+      {
+        "scope": ["apps/api/**/*.ts"],
+        "rule": "When using Hyperdrive, use native Postgres driver and avoid Neon serverless driver or double pooling."
+      }
+    ]
+  }
+}
