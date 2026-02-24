@@ -1,5 +1,5 @@
 {
-  "name": "@openschedule/api",
+  "name": "@opencalendly/api",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,8 +8,8 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@openschedule/db": "0.1.0",
-    "@openschedule/shared": "0.1.0",
+    "@opencalendly/db": "0.1.0",
+    "@opencalendly/shared": "0.1.0",
     "hono": "^4.7.4",
     "pg": "^8.13.3"
   },

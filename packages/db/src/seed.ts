@@ -14,7 +14,7 @@ const seed = async (): Promise<void> => {
     const [existingUser] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.email, 'demo@openschedule.dev'))
+      .where(eq(users.email, 'demo@opencalendly.dev'))
       .limit(1);
 
     let userId = existingUser?.id;
@@ -23,7 +23,7 @@ const seed = async (): Promise<void> => {
       const inserted = await db
         .insert(users)
         .values({
-          email: 'demo@openschedule.dev',
+          email: 'demo@opencalendly.dev',
           username: 'demo',
           displayName: 'Demo Organizer',
           timezone: 'UTC',

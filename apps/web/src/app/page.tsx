@@ -10,7 +10,7 @@ export default function HomePage() {
   return (
     <main className="page">
       <section className="hero">
-        <p className="kicker">OpenSchedule</p>
+        <p className="kicker">OpenCalendly</p>
         <h1>Open-source scheduling, built for free-tier constraints.</h1>
         <p>
           This baseline includes the core monorepo, infrastructure wiring, and docs needed to build

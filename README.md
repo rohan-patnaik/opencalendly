@@ -1,6 +1,6 @@
-# OpenSchedule
+# OpenCalendly
 
-OpenSchedule is an open-source scheduling platform focused on practical MVP functionality and strict free-tier infrastructure budgeting.
+OpenCalendly is an open-source scheduling platform focused on practical MVP functionality and strict free-tier infrastructure budgeting.
 
 ## What This Project Is
 
@@ -74,7 +74,7 @@ Details: [docs/STACK.md](docs/STACK.md)
 
 ## Demo Credits Pool Policy (Daily Passes)
 
-To keep usage within free-tier limits, OpenSchedule will enforce a Demo Credits Pool:
+To keep usage within free-tier limits, OpenCalendly will enforce a Demo Credits Pool:
 
 - A fixed number of daily passes is available per UTC day.
 - Trial actions consume one pass each.

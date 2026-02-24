@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { Client } from 'pg';
 
-import { healthCheckSchema } from '@openschedule/shared';
+import { healthCheckSchema } from '@opencalendly/shared';
 
 type HyperdriveBinding = {
   connectionString: string;
