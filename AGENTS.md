@@ -4,6 +4,8 @@
 - One PR = one feature. No multi-feature PRs.
 - Acceptance criteria must exist before coding.
 - Correctness > “instant UI”. Always re-check availability at booking commit.
+- Every change starts from a new feature branch created from the latest `main`.
+- Direct commits/pushes to `main` are not allowed; merge to `main` happens only via PR.
 
 ## Required workflow (every feature)
 1) Plan
@@ -21,9 +23,9 @@
    - Codex self-review checklist
    - Open PR
    - Greptile PR review must run
-   - Resolve feedback (or document why not)
+   - Resolve all Greptile review comments before merge
 5) Merge
-   - Merge PR
+   - Merge PR only after Greptile review has run and comments are resolved
    - Update docs/PRD.md and docs/ARCHITECTURE.md only if the feature changes plan/architecture
 6) Handoff
    - After merge, produce NEXT_CHAT_PROMPT including:
