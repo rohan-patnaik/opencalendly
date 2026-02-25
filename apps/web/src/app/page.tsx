@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 const checklist = [
   'Next.js web app (App Router) in apps/web',
   'Cloudflare Worker API in apps/api',
@@ -25,6 +27,14 @@ export default function HomePage() {
             <li key={item}>{item}</li>
           ))}
         </ul>
+      </section>
+
+      <section className="card">
+        <h2>Feature 1 preview</h2>
+        <p>
+          Public booking route (seeded demo user/event):{' '}
+          <Link href="/demo/intro-call">/demo/intro-call</Link>
+        </p>
       </section>
     </main>
   );

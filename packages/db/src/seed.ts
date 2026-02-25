@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { eq } from 'drizzle-orm';
 
 import { createDb } from './client';
-import { eventTypes, users } from './schema';
+import { availabilityRules, eventTypes, users } from './schema';
 
 const seed = async (): Promise<void> => {
   const { client, db } = createDb();
@@ -50,7 +50,58 @@ const seed = async (): Promise<void> => {
       })
       .onConflictDoNothing({ target: [eventTypes.userId, eventTypes.slug] });
 
-    console.log('Seed complete: demo user and event type are ready.');
+    const existingRules = await db
+      .select({ id: availabilityRules.id })
+      .from(availabilityRules)
+      .where(eq(availabilityRules.userId, userId))
+      .limit(1);
+
+    if (existingRules.length === 0) {
+      await db.insert(availabilityRules).values([
+        {
+          userId,
+          dayOfWeek: 1,
+          startMinute: 540,
+          endMinute: 1020,
+          bufferBeforeMinutes: 10,
+          bufferAfterMinutes: 10,
+        },
+        {
+          userId,
+          dayOfWeek: 2,
+          startMinute: 540,
+          endMinute: 1020,
+          bufferBeforeMinutes: 10,
+          bufferAfterMinutes: 10,
+        },
+        {
+          userId,
+          dayOfWeek: 3,
+          startMinute: 540,
+          endMinute: 1020,
+          bufferBeforeMinutes: 10,
+          bufferAfterMinutes: 10,
+        },
+        {
+          userId,
+          dayOfWeek: 4,
+          startMinute: 540,
+          endMinute: 1020,
+          bufferBeforeMinutes: 10,
+          bufferAfterMinutes: 10,
+        },
+        {
+          userId,
+          dayOfWeek: 5,
+          startMinute: 540,
+          endMinute: 1020,
+          bufferBeforeMinutes: 10,
+          bufferAfterMinutes: 10,
+        },
+      ]);
+    }
+
+    console.log('Seed complete: demo user, event type, and baseline availability are ready.');
   } finally {
     await client.end();
   }

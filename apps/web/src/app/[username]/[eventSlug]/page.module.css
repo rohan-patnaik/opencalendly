@@ -1,0 +1,97 @@
+.page {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 3.5rem 1.25rem 4.5rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #dbe4f4;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+  padding: 1.5rem;
+}
+
+.kicker {
+  margin: 0 0 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0369a1;
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.select,
+.input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.64rem 0.75rem;
+  font: inherit;
+}
+
+.slotGrid {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.slot,
+.slotActive {
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  cursor: pointer;
+}
+
+.slotActive {
+  border-color: #0ea5e9;
+  background: #e0f2fe;
+}
+
+.form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.primaryButton {
+  border: 1px solid #0ea5e9;
+  background: #0284c7;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 0.72rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: #334155;
+}
+
+.error {
+  margin-top: 0.8rem;
+  color: #b91c1c;
+}
+
+.confirmation {
+  margin-top: 0.8rem;
+  color: #047857;
+}

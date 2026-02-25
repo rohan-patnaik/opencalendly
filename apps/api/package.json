@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev --config wrangler.toml",
+    "dev": "node ./scripts/dev-with-local-hyperdrive.mjs",
     "deploy": "wrangler deploy --config wrangler.toml",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
@@ -11,10 +11,12 @@
     "@opencalendly/db": "0.1.0",
     "@opencalendly/shared": "0.1.0",
     "hono": "^4.7.4",
+    "luxon": "^3.7.2",
     "pg": "^8.13.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250310.0",
+    "@types/luxon": "^3.7.1",
     "wrangler": "^4.3.0"
   }
 }

@@ -8,6 +8,8 @@ node_modules/
 dist/
 coverage/
 .wrangler/
+apps/api/.dev.vars
+apps/api/.dev.vars.*
 
 # local env
 .env

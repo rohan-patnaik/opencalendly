@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -8,6 +9,14 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+
+type EventQuestionRecord = {
+  id: string;
+  label: string;
+  required: boolean;
+  placeholder?: string | undefined;
+};
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -41,6 +50,10 @@ export const eventTypes = pgTable(
     durationMinutes: integer('duration_minutes').notNull(),
     locationType: varchar('location_type', { length: 32 }).notNull().default('video'),
     locationValue: text('location_value'),
+    questions: jsonb('questions')
+      .$type<EventQuestionRecord[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
