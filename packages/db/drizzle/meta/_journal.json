@@ -15,6 +15,13 @@
       "when": 1772046515325,
       "tag": "0001_wet_the_hood",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772061532351,
+      "tag": "0002_brown_xorn",
+      "breakpoints": true
     }
   ]
 }

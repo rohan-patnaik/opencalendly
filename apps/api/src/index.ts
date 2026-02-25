@@ -791,7 +791,7 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
         .from(bookings)
         .where(
           and(
-            eq(bookings.eventTypeId, eventType.id),
+            eq(bookings.organizerId, eventType.userId),
             eq(bookings.status, 'confirmed'),
             lt(bookings.startsAt, rangeEnd.toJSDate()),
             gt(bookings.endsAt, rangeStart.toJSDate()),
@@ -878,7 +878,7 @@ app.post('/v0/bookings', async (context) => {
                       ),
                     );
                 },
-                listConfirmedBookings: async (bookedEventTypeId, rangeStart, rangeEnd) => {
+                listConfirmedBookings: async (organizerId, rangeStart, rangeEnd) => {
                   return transaction
                     .select({
                       startsAt: bookings.startsAt,
@@ -888,7 +888,7 @@ app.post('/v0/bookings', async (context) => {
                     .from(bookings)
                     .where(
                       and(
-                        eq(bookings.eventTypeId, bookedEventTypeId),
+                        eq(bookings.organizerId, organizerId),
                         eq(bookings.status, 'confirmed'),
                         lt(bookings.startsAt, rangeEnd),
                         gt(bookings.endsAt, rangeStart),
@@ -954,6 +954,7 @@ app.post('/v0/bookings', async (context) => {
         timezone,
         locationType: result.eventType.locationType,
         locationValue: result.eventType.locationValue,
+        idempotencyKey: `booking-confirmation:${result.booking.id}`,
       });
 
       return context.json({

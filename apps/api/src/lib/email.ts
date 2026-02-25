@@ -14,6 +14,7 @@ export type BookingConfirmationEmailInput = {
   timezone: string;
   locationType: string;
   locationValue: string | null;
+  idempotencyKey?: string;
 };
 
 export type EmailSendResult = {
@@ -58,40 +59,68 @@ export const sendBookingConfirmationEmail = async (
     `Location: ${location}`,
   ].join('\n');
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: [input.inviteeEmail],
-      subject,
-      text,
-    }),
-  });
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
 
-  if (!response.ok) {
-    const bodyText = await response.text();
-    return {
-      sent: false,
-      provider: 'resend',
-      error: bodyText || `Resend send failed with status ${response.status}.`,
-    };
+  const idempotencyKey = input.idempotencyKey?.trim();
+  if (idempotencyKey) {
+    headers['Idempotency-Key'] = idempotencyKey;
   }
 
-  const body = (await response.json()) as { id?: string };
-  if (body.id) {
-    return {
-      sent: true,
-      provider: 'resend',
-      messageId: body.id,
-    };
+  let lastError = 'Resend send failed.';
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          from,
+          to: [input.inviteeEmail],
+          subject,
+          text,
+        }),
+      });
+
+      if (response.ok) {
+        const body = (await response.json()) as { id?: string };
+        return {
+          sent: true,
+          provider: 'resend',
+          ...(body.id ? { messageId: body.id } : {}),
+        };
+      }
+
+      const bodyText = await response.text();
+      lastError = bodyText || `Resend send failed with status ${response.status}.`;
+
+      if (response.status >= 500 && attempt < 2) {
+        continue;
+      }
+
+      return {
+        sent: false,
+        provider: 'resend',
+        error: lastError,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'Resend send failed.';
+      if (attempt < 2) {
+        continue;
+      }
+      return {
+        sent: false,
+        provider: 'resend',
+        error: lastError,
+      };
+    }
   }
 
   return {
-    sent: true,
+    sent: false,
     provider: 'resend',
+    error: lastError,
   };
 };

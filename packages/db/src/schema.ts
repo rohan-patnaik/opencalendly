@@ -106,6 +106,6 @@ export const bookings = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    uniqueSlot: unique('bookings_unique_slot').on(table.eventTypeId, table.startsAt, table.endsAt),
+    uniqueSlot: unique('bookings_unique_slot').on(table.organizerId, table.startsAt, table.endsAt),
   }),
 );

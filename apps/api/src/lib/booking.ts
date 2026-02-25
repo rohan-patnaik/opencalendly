@@ -52,7 +52,7 @@ export type BookingTransaction = {
   listRules(userId: string): Promise<WeeklyAvailabilityRule[]>;
   listOverrides(userId: string, rangeStart: Date, rangeEnd: Date): Promise<AvailabilityOverrideWindow[]>;
   listConfirmedBookings(
-    eventTypeId: string,
+    organizerId: string,
     rangeStart: Date,
     rangeEnd: Date,
   ): Promise<ExistingBooking[]>;
@@ -118,7 +118,7 @@ export const commitBooking = async (
     const [rules, overrides, confirmedBookings] = await Promise.all([
       transaction.listRules(eventType.userId),
       transaction.listOverrides(eventType.userId, rangeStart, rangeEnd),
-      transaction.listConfirmedBookings(eventType.id, rangeStart, rangeEnd),
+      transaction.listConfirmedBookings(eventType.userId, rangeStart, rangeEnd),
     ]);
 
     const slots = computeAvailabilitySlots({
