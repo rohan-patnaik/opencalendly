@@ -92,6 +92,13 @@
       "when": 1772130218056,
       "tag": "0012_early_expediter",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1772132322239,
+      "tag": "0013_typical_the_hand",
+      "breakpoints": true
     }
   ]
 }

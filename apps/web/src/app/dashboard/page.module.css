@@ -1,0 +1,116 @@
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 4rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d6deea;
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: #075985;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.8rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.input {
+  border: 1px solid #b6c4d6;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.95rem;
+  background: #fff;
+  color: #0f172a;
+}
+
+.primaryButton {
+  border: none;
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+  background: #0f766e;
+  color: #fff;
+  cursor: pointer;
+}
+
+.primaryButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.error {
+  margin-top: 0.7rem;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.statGrid > div {
+  background: #f8fbff;
+  border: 1px solid #d8e3f2;
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.statGrid strong {
+  font-size: 1.1rem;
+}
+
+.statGrid span {
+  font-size: 0.84rem;
+  color: #475569;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  padding: 0.55rem 0.4rem;
+  font-size: 0.9rem;
+}
+
+.table th {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+}

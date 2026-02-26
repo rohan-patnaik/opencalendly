@@ -114,6 +114,15 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       }
 
       setEventData(payload);
+      void fetch(`${apiBaseUrl}/v0/analytics/funnel/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          eventSlug,
+          stage: 'page_view',
+        }),
+      }).catch(() => undefined);
     } catch {
       setPageError('Unable to load event details.');
       setEventData(null);
@@ -275,7 +284,18 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
               key={slot.startsAt}
               type="button"
               className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
-              onClick={() => setSelectedSlot(slot.startsAt)}
+              onClick={() => {
+                setSelectedSlot(slot.startsAt);
+                void fetch(`${apiBaseUrl}/v0/analytics/funnel/events`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    username,
+                    eventSlug,
+                    stage: 'slot_selection',
+                  }),
+                }).catch(() => undefined);
+              }}
             >
               {formatSlot(slot.startsAt, timezone)}
             </button>

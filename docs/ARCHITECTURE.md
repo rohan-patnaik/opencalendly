@@ -30,6 +30,8 @@ flowchart LR
 - `booking_external_events`: provider writeback state per booking (`create`/`cancel`/`reschedule`) with retry metadata.
 - `webhook_subscriptions`: organizer-managed outbound webhook endpoints/secrets/event filters.
 - `webhook_deliveries`: queued delivery attempts with retry state and final status.
+- `analytics_funnel_events`: page/slot/booking funnel stages keyed by organizer + event type.
+- `email_deliveries`: best-effort delivery telemetry for confirmation/cancellation/reschedule emails.
 
 ## Critical flows
 
@@ -91,6 +93,17 @@ flowchart LR
 3. Provider adapters (Google + Microsoft) execute external event writes using encrypted connection tokens.
 4. Failures retry with bounded exponential backoff (`next_attempt_at`) until `max_attempts`.
 5. Final failed rows remain visible through writeback status endpoints for operator action.
+
+### Analytics + operator dashboard (Feature 8)
+
+1. Public booking page emits `page_view` and `slot_selection` events.
+2. Booking commit path emits `booking_confirmed` funnel event server-side.
+3. Booking lifecycle email sends write telemetry rows to `email_deliveries`.
+4. Analytics endpoints aggregate:
+   - funnel progression + booking status distribution
+   - team round-robin assignment distribution + collective booking volume
+   - webhook/email delivery health summaries
+5. Web dashboard reads those authenticated endpoints with date/event/team filters.
 
 ## Correctness and idempotency notes
 

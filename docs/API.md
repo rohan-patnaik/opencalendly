@@ -1231,3 +1231,191 @@ Notes:
 - Writeback operations are `create`, `cancel`, and `reschedule`.
 - Retries use bounded exponential backoff.
 - Final failures are visible through `GET /v0/calendar/writeback/status`.
+
+## Feature 8 Endpoints (Analytics + Operator Dashboard v1)
+
+### `POST /v0/analytics/funnel/events`
+
+Public endpoint for booking-page funnel tracking.
+
+Request:
+
+```json
+{
+  "username": "demo",
+  "eventSlug": "intro-call",
+  "stage": "page_view"
+}
+```
+
+Notes:
+
+- Allowed `stage` values here: `page_view`, `slot_selection`.
+- `booking_confirmed` is written server-side on booking commit.
+
+Success response:
+
+```json
+{
+  "ok": true
+}
+```
+
+### `GET /v0/analytics/funnel`
+
+Auth required.
+
+Query params:
+
+- `startDate` (optional, `YYYY-MM-DD`)
+- `endDate` (optional, `YYYY-MM-DD`)
+- `eventTypeId` (optional UUID)
+
+Constraints:
+
+- Default range is the latest 30 days.
+- Maximum range is 90 days.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "range": {
+    "startDate": "2026-02-01",
+    "endDate": "2026-03-01"
+  },
+  "summary": {
+    "pageViews": 140,
+    "slotSelections": 68,
+    "bookingConfirmations": 31,
+    "confirmed": 24,
+    "canceled": 5,
+    "rescheduled": 2,
+    "conversionRate": 0.2214
+  },
+  "byEventType": [
+    {
+      "eventTypeId": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+      "eventTypeName": "Intro Call",
+      "pageViews": 140,
+      "slotSelections": 68,
+      "bookingConfirmations": 31,
+      "confirmed": 24,
+      "canceled": 5,
+      "rescheduled": 2
+    }
+  ],
+  "daily": [
+    {
+      "date": "2026-02-28",
+      "eventTypeId": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+      "eventTypeName": "Intro Call",
+      "pageViews": 8,
+      "slotSelections": 3,
+      "bookingConfirmations": 2,
+      "confirmed": 1,
+      "canceled": 1,
+      "rescheduled": 0
+    }
+  ]
+}
+```
+
+### `GET /v0/analytics/team`
+
+Auth required.
+
+Query params:
+
+- `startDate` (optional, `YYYY-MM-DD`)
+- `endDate` (optional, `YYYY-MM-DD`)
+- `eventTypeId` (optional UUID)
+- `teamId` (optional UUID)
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "range": {
+    "startDate": "2026-02-01",
+    "endDate": "2026-03-01"
+  },
+  "roundRobinAssignments": [
+    {
+      "teamEventTypeId": "4f06b5a0-a3d9-4e96-9d90-2f9ec5d4d2f7",
+      "teamId": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+      "teamName": "Customer Success",
+      "eventTypeId": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+      "eventTypeName": "Team Intro",
+      "memberUserId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+      "memberDisplayName": "Owner User",
+      "assignments": 12
+    }
+  ],
+  "collectiveBookings": [
+    {
+      "teamEventTypeId": "aa5ad9c4-9b29-49c8-95bb-3826fef3d083",
+      "teamId": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+      "teamName": "Customer Success",
+      "eventTypeId": "28135af7-88e7-4b2a-8f39-2ab0c8ca333a",
+      "eventTypeName": "Panel Intro",
+      "bookings": 4
+    }
+  ]
+}
+```
+
+### `GET /v0/analytics/operator/health`
+
+Auth required.
+
+Query params:
+
+- `startDate` (optional, `YYYY-MM-DD`)
+- `endDate` (optional, `YYYY-MM-DD`)
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "range": {
+    "startDate": "2026-02-01",
+    "endDate": "2026-03-01"
+  },
+  "webhookDeliveries": {
+    "total": 20,
+    "pending": 2,
+    "succeeded": 16,
+    "failed": 2
+  },
+  "emailDeliveries": {
+    "total": 30,
+    "succeeded": 27,
+    "failed": 3,
+    "byType": [
+      {
+        "emailType": "booking_confirmation",
+        "total": 18,
+        "succeeded": 17,
+        "failed": 1
+      },
+      {
+        "emailType": "booking_cancellation",
+        "total": 7,
+        "succeeded": 6,
+        "failed": 1
+      },
+      {
+        "emailType": "booking_rescheduled",
+        "total": 5,
+        "succeeded": 4,
+        "failed": 1
+      }
+    ]
+  }
+}
+```
+

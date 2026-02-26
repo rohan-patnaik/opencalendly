@@ -28,6 +28,9 @@ type WebhookDeliveryStatusRecord = 'pending' | 'succeeded' | 'failed';
 type CalendarProviderRecord = 'google' | 'microsoft';
 type CalendarWritebackOperationRecord = 'create' | 'cancel' | 'reschedule';
 type CalendarWritebackStatusRecord = 'pending' | 'succeeded' | 'failed';
+type AnalyticsFunnelStageRecord = 'page_view' | 'slot_selection' | 'booking_confirmed';
+type EmailDeliveryTypeRecord = 'booking_confirmation' | 'booking_cancellation' | 'booking_rescheduled';
+type EmailDeliveryStatusRecord = 'succeeded' | 'failed';
 type WebhookEventPayloadRecord = {
   id: string;
   type: WebhookEventTypeRecord;
@@ -57,6 +60,17 @@ export const calendarWritebackStatusEnum = pgEnum('calendar_writeback_status', [
   'succeeded',
   'failed',
 ]);
+export const analyticsFunnelStageEnum = pgEnum('analytics_funnel_stage', [
+  'page_view',
+  'slot_selection',
+  'booking_confirmed',
+]);
+export const emailDeliveryTypeEnum = pgEnum('email_delivery_type', [
+  'booking_confirmation',
+  'booking_cancellation',
+  'booking_rescheduled',
+]);
+export const emailDeliveryStatusEnum = pgEnum('email_delivery_status', ['succeeded', 'failed']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -225,6 +239,76 @@ export const bookings = pgTable(
   },
   (table) => ({
     uniqueSlot: unique('bookings_unique_slot').on(table.organizerId, table.startsAt, table.endsAt),
+  }),
+);
+
+export const analyticsFunnelEvents = pgTable(
+  'analytics_funnel_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizerId: uuid('organizer_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    eventTypeId: uuid('event_type_id')
+      .notNull()
+      .references(() => eventTypes.id, { onDelete: 'cascade' }),
+    teamEventTypeId: uuid('team_event_type_id').references(() => teamEventTypes.id, {
+      onDelete: 'set null',
+    }),
+    stage: analyticsFunnelStageEnum('stage').$type<AnalyticsFunnelStageRecord>().notNull(),
+    metadata: jsonb('metadata')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    organizerOccurredAtIndex: index('analytics_funnel_events_organizer_occurred_at_idx').on(
+      table.organizerId,
+      table.occurredAt,
+    ),
+    organizerStageOccurredAtIndex: index(
+      'analytics_funnel_events_organizer_stage_occurred_at_idx',
+    ).on(table.organizerId, table.stage, table.occurredAt),
+    eventTypeOccurredAtIndex: index('analytics_funnel_events_event_type_occurred_at_idx').on(
+      table.eventTypeId,
+      table.occurredAt,
+    ),
+  }),
+);
+
+export const emailDeliveries = pgTable(
+  'email_deliveries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizerId: uuid('organizer_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookingId: uuid('booking_id').references(() => bookings.id, { onDelete: 'set null' }),
+    eventTypeId: uuid('event_type_id').references(() => eventTypes.id, { onDelete: 'set null' }),
+    recipientEmail: varchar('recipient_email', { length: 320 }).notNull(),
+    emailType: emailDeliveryTypeEnum('email_type').$type<EmailDeliveryTypeRecord>().notNull(),
+    status: emailDeliveryStatusEnum('status').$type<EmailDeliveryStatusRecord>().notNull(),
+    provider: varchar('provider', { length: 32 }).notNull().default('none'),
+    providerMessageId: varchar('provider_message_id', { length: 255 }),
+    error: text('error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    organizerCreatedAtIndex: index('email_deliveries_organizer_created_at_idx').on(
+      table.organizerId,
+      table.createdAt,
+    ),
+    organizerStatusCreatedAtIndex: index('email_deliveries_organizer_status_created_at_idx').on(
+      table.organizerId,
+      table.status,
+      table.createdAt,
+    ),
+    bookingCreatedAtIndex: index('email_deliveries_booking_created_at_idx').on(
+      table.bookingId,
+      table.createdAt,
+    ),
   }),
 );
 

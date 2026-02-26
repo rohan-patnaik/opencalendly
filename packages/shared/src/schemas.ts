@@ -7,6 +7,7 @@ export const healthCheckSchema = z.object({
 const usernamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const questionIdPattern = /^[a-zA-Z0-9_-]+$/;
+const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 export const timezoneSchema = z.string().min(1).max(80);
 export const usernameSchema = z.string().min(3).max(64).regex(usernamePattern);
@@ -194,6 +195,33 @@ export const calendarWritebackRunSchema = z.object({
   limit: z.number().int().min(1).max(100).optional(),
 });
 
+export const analyticsFunnelStageSchema = z.enum(['page_view', 'slot_selection', 'booking_confirmed']);
+export const analyticsTrackFunnelEventSchema = z.object({
+  username: usernameSchema,
+  eventSlug: eventSlugSchema,
+  stage: analyticsFunnelStageSchema.exclude(['booking_confirmed']),
+});
+
+export const analyticsRangeQuerySchema = z
+  .object({
+    startDate: z.string().regex(isoDatePattern).optional(),
+    endDate: z.string().regex(isoDatePattern).optional(),
+    eventTypeId: z.string().uuid().optional(),
+    teamId: z.string().uuid().optional(),
+  })
+  .refine(
+    (value) => {
+      if (!value.startDate || !value.endDate) {
+        return true;
+      }
+      return value.endDate >= value.startDate;
+    },
+    {
+      message: 'endDate must be on or after startDate.',
+      path: ['endDate'],
+    },
+  );
+
 export const webhookSubscriptionCreateSchema = z.object({
   url: z.string().url().max(2000),
   events: z.array(webhookEventTypeSchema).min(1).max(3),
@@ -261,3 +289,6 @@ export type CalendarConnectStartInput = z.infer<typeof calendarConnectStartSchem
 export type CalendarConnectCompleteInput = z.infer<typeof calendarConnectCompleteSchema>;
 export type CalendarSyncRequestInput = z.infer<typeof calendarSyncRequestSchema>;
 export type CalendarWritebackRunInput = z.infer<typeof calendarWritebackRunSchema>;
+export type AnalyticsFunnelStage = z.infer<typeof analyticsFunnelStageSchema>;
+export type AnalyticsTrackFunnelEventInput = z.infer<typeof analyticsTrackFunnelEventSchema>;
+export type AnalyticsRangeQueryInput = z.infer<typeof analyticsRangeQuerySchema>;

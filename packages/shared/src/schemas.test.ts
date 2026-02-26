@@ -8,6 +8,8 @@ import {
   calendarConnectStartSchema,
   calendarSyncRequestSchema,
   calendarWritebackRunSchema,
+  analyticsRangeQuerySchema,
+  analyticsTrackFunnelEventSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
   demoCreditsConsumeSchema,
@@ -217,5 +219,34 @@ describe('shared schemas', () => {
     });
 
     expect(payload.limit).toBe(25);
+  });
+
+  it('accepts analytics funnel tracking payload', () => {
+    const payload = analyticsTrackFunnelEventSchema.parse({
+      username: 'demo',
+      eventSlug: 'intro-call',
+      stage: 'page_view',
+    });
+
+    expect(payload.stage).toBe('page_view');
+  });
+
+  it('rejects booking_confirmed stage in public funnel tracking payload', () => {
+    const result = analyticsTrackFunnelEventSchema.safeParse({
+      username: 'demo',
+      eventSlug: 'intro-call',
+      stage: 'booking_confirmed',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects invalid analytics range filters', () => {
+    const result = analyticsRangeQuerySchema.safeParse({
+      startDate: '2026-04-30',
+      endDate: '2026-04-01',
+    });
+
+    expect(result.success).toBe(false);
   });
 });
