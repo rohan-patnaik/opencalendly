@@ -64,6 +64,10 @@ describe('calendar-sync', () => {
     expect(range.startIso).toBe('2026-03-02T00:00:00.000Z');
     expect(range.endIso).toBe('2026-04-01T00:00:00.000Z');
 
+    const futureRange = resolveGoogleSyncRange(now, '2026-05-10T00:00:00.000Z', undefined);
+    expect(futureRange.startIso).toBe('2026-05-10T00:00:00.000Z');
+    expect(futureRange.endIso).toBe('2026-06-09T00:00:00.000Z');
+
     const windows = await syncGoogleBusyWindows(
       {
         accessToken: 'token',

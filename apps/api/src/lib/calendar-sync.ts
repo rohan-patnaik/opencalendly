@@ -26,14 +26,13 @@ export const resolveGoogleSyncRange = (
   requestedEndIso?: string,
 ): { startIso: string; endIso: string } => {
   const defaultStart = DateTime.fromJSDate(now, { zone: 'utc' });
-  const defaultEnd = defaultStart.plus({ days: 30 });
 
   const start = requestedStartIso
     ? DateTime.fromISO(requestedStartIso, { zone: 'utc' })
     : defaultStart;
   const end = requestedEndIso
     ? DateTime.fromISO(requestedEndIso, { zone: 'utc' })
-    : defaultEnd;
+    : start.plus({ days: 30 });
 
   if (!start.isValid || !end.isValid) {
     throw new Error('Sync range start/end is invalid.');

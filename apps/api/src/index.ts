@@ -1725,7 +1725,16 @@ app.post('/v0/calendar/google/sync', async (context) => {
       return jsonError(context, 401, 'Unauthorized.');
     }
 
-    const body = await context.req.json().catch(() => ({}));
+    let body: unknown = {};
+    const rawBody = await context.req.text();
+    if (rawBody.trim().length > 0) {
+      try {
+        body = JSON.parse(rawBody) as unknown;
+      } catch {
+        return jsonError(context, 400, 'Malformed JSON body.');
+      }
+    }
+
     const parsed = calendarSyncRequestSchema.safeParse(body);
     if (!parsed.success) {
       return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
@@ -1795,6 +1804,8 @@ app.post('/v0/calendar/google/sync', async (context) => {
       );
 
       await db.transaction(async (transaction) => {
+        await transaction.execute(sql`select id from users where id = ${authedUser.id} for update`);
+
         await transaction
           .delete(calendarBusyWindows)
           .where(
