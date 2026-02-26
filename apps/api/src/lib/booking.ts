@@ -6,11 +6,16 @@ import {
   type ExistingBooking,
   type WeeklyAvailabilityRule,
 } from './availability';
+import { createRawToken, hashToken } from './auth';
 
 export class BookingValidationError extends Error {}
 export class BookingNotFoundError extends Error {}
 export class BookingConflictError extends Error {}
 export class BookingUniqueConstraintError extends Error {}
+
+export const BOOKING_ACTION_TOKEN_TTL_DAYS = 30;
+export const BOOKING_ACTION_TYPES = ['cancel', 'reschedule'] as const;
+export type BookingActionType = (typeof BOOKING_ACTION_TYPES)[number];
 
 export type PublicEventType = {
   id: string;
@@ -47,6 +52,18 @@ export type InsertedBooking = {
   inviteeName: string;
 };
 
+export type BookingActionTokenWrite = {
+  actionType: BookingActionType;
+  tokenHash: string;
+  expiresAt: Date;
+};
+
+export type BookingActionTokenPublic = {
+  actionType: BookingActionType;
+  token: string;
+  expiresAt: string;
+};
+
 export type BookingTransaction = {
   lockEventType(eventTypeId: string): Promise<void>;
   listRules(userId: string): Promise<WeeklyAvailabilityRule[]>;
@@ -65,6 +82,7 @@ export type BookingTransaction = {
     endsAt: Date;
     metadata: string | null;
   }): Promise<InsertedBooking>;
+  insertActionTokens(bookingId: string, tokens: BookingActionTokenWrite[]): Promise<void>;
 };
 
 export type BookingDataAccess = {
@@ -78,9 +96,37 @@ export type BookingDataAccess = {
 export type CommitBookingResult = {
   eventType: PublicEventType;
   booking: InsertedBooking;
+  actionTokens: BookingActionTokenPublic[];
 };
 
 const slotKey = (startsAt: string, endsAt: string): string => `${startsAt}|${endsAt}`;
+
+export const createBookingActionTokenSet = (
+  now: Date = new Date(),
+): {
+  tokenWrites: BookingActionTokenWrite[];
+  publicTokens: BookingActionTokenPublic[];
+} => {
+  const expiresAt = new Date(now.getTime() + BOOKING_ACTION_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+  const rawTokens = BOOKING_ACTION_TYPES.map((actionType) => ({
+    actionType,
+    token: createRawToken(),
+  }));
+
+  return {
+    tokenWrites: rawTokens.map((token) => ({
+      actionType: token.actionType,
+      tokenHash: hashToken(token.token),
+      expiresAt,
+    })),
+    publicTokens: rawTokens.map((token) => ({
+      actionType: token.actionType,
+      token: token.token,
+      expiresAt: expiresAt.toISOString(),
+    })),
+  };
+};
 
 export const commitBooking = async (
   dataAccess: BookingDataAccess,
@@ -112,7 +158,7 @@ export const commitBooking = async (
     throw new BookingValidationError('Unable to build slot validation range.');
   }
 
-  const booking = await dataAccess.withEventTypeTransaction(eventType.id, async (transaction) => {
+  const result = await dataAccess.withEventTypeTransaction(eventType.id, async (transaction) => {
     await transaction.lockEventType(eventType.id);
 
     const [rules, overrides, confirmedBookings] = await Promise.all([
@@ -145,8 +191,10 @@ export const commitBooking = async (
       bufferAfterMinutes: matchingSlot.bufferAfterMinutes,
     });
 
+    const actionTokenSet = createBookingActionTokenSet();
+
     try {
-      return await transaction.insertBooking({
+      const booking = await transaction.insertBooking({
         eventTypeId: eventType.id,
         organizerId: eventType.userId,
         inviteeName: input.inviteeName,
@@ -155,6 +203,13 @@ export const commitBooking = async (
         endsAt: endsAt.toJSDate(),
         metadata,
       });
+
+      await transaction.insertActionTokens(booking.id, actionTokenSet.tokenWrites);
+
+      return {
+        booking,
+        actionTokens: actionTokenSet.publicTokens,
+      };
     } catch (error) {
       if (error instanceof BookingUniqueConstraintError) {
         throw new BookingConflictError('Selected slot is no longer available.');
@@ -163,5 +218,5 @@ export const commitBooking = async (
     }
   });
 
-  return { eventType, booking };
+  return { eventType, booking: result.booking, actionTokens: result.actionTokens };
 };

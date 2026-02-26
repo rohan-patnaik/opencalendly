@@ -2,6 +2,7 @@ import {
   boolean,
   integer,
   jsonb,
+  type AnyPgColumn,
   pgTable,
   text,
   timestamp,
@@ -102,10 +103,43 @@ export const bookings = pgTable(
     startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
     endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
     status: varchar('status', { length: 20 }).notNull().default('confirmed'),
+    rescheduledFromBookingId: uuid('rescheduled_from_booking_id').references(
+      (): AnyPgColumn => bookings.id,
+      {
+        onDelete: 'set null',
+      },
+    ),
+    canceledAt: timestamp('canceled_at', { withTimezone: true }),
+    canceledBy: varchar('canceled_by', { length: 32 }),
+    cancellationReason: text('cancellation_reason'),
     metadata: text('metadata'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     uniqueSlot: unique('bookings_unique_slot').on(table.organizerId, table.startsAt, table.endsAt),
+  }),
+);
+
+export const bookingActionTokens = pgTable(
+  'booking_action_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bookingId: uuid('booking_id')
+      .notNull()
+      .references(() => bookings.id, { onDelete: 'cascade' }),
+    actionType: varchar('action_type', { length: 20 }).notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    consumedBookingId: uuid('consumed_booking_id').references((): AnyPgColumn => bookings.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueBookingAction: unique('booking_action_tokens_booking_action_unique').on(
+      table.bookingId,
+      table.actionType,
+    ),
   }),
 );
