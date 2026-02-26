@@ -2222,6 +2222,7 @@ app.get('/v0/analytics/funnel', async (context) => {
       eq(bookings.organizerId, authedUser.id),
       gte(bookings.createdAt, range.start),
       lt(bookings.createdAt, range.endExclusive),
+      inArray(bookings.status, ['confirmed', 'canceled']),
     ];
     if (parsed.data.eventTypeId) {
       bookingWhere.push(eq(bookings.eventTypeId, parsed.data.eventTypeId));
@@ -2229,6 +2230,10 @@ app.get('/v0/analytics/funnel', async (context) => {
 
     const funnelDateBucket = sql<string>`to_char(timezone('utc', ${analyticsFunnelEvents.occurredAt}), 'YYYY-MM-DD')`;
     const bookingDateBucket = sql<string>`to_char(timezone('utc', ${bookings.createdAt}), 'YYYY-MM-DD')`;
+    const bookingStatusBucket = sql<string>`case
+      when ${bookings.rescheduledFromBookingId} is not null then 'rescheduled'
+      else ${bookings.status}
+    end`;
 
     const [funnelRows, bookingRows] = await Promise.all([
       db
@@ -2244,13 +2249,13 @@ app.get('/v0/analytics/funnel', async (context) => {
       db
         .select({
           eventTypeId: bookings.eventTypeId,
-          status: bookings.status,
+          status: bookingStatusBucket.as('status'),
           date: bookingDateBucket.as('date'),
           count: sql<number>`count(*)::int`.as('count'),
         })
         .from(bookings)
         .where(and(...bookingWhere))
-        .groupBy(bookings.eventTypeId, bookings.status, bookingDateBucket),
+        .groupBy(bookings.eventTypeId, bookingStatusBucket, bookingDateBucket),
     ]);
 
     const eventTypeIds = Array.from(
