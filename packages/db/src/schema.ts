@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
@@ -408,6 +409,10 @@ export const calendarBusyWindows = pgTable(
       table.userId,
       table.provider,
       table.startsAt,
+    ),
+    timeOrderCheck: check(
+      'calendar_busy_windows_time_order_check',
+      sql`${table.endsAt} > ${table.startsAt}`,
     ),
   }),
 );

@@ -1,0 +1,1 @@
+ALTER TABLE "calendar_busy_windows" ADD CONSTRAINT "calendar_busy_windows_time_order_check" CHECK ("calendar_busy_windows"."ends_at" > "calendar_busy_windows"."starts_at");

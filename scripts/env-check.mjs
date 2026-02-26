@@ -102,6 +102,11 @@ if (demoDailyPassLimit) {
   }
 }
 
+const sessionSecret = parsed.SESSION_SECRET;
+if (sessionSecret && sessionSecret.length < 32) {
+  errors.push('SESSION_SECRET must be at least 32 characters.');
+}
+
 if (apiBaseUrl && publicApiBaseUrl && apiBaseUrl !== publicApiBaseUrl) {
   warnings.push('API_BASE_URL and NEXT_PUBLIC_API_BASE_URL differ.');
 }

@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 const STATE_VERSION = 'v1';
+const MIN_STATE_SECRET_BYTES = 32;
 
 type CalendarOAuthStatePayload = {
   v: typeof STATE_VERSION;
@@ -28,6 +29,10 @@ const signPayload = (payload: string, secret: string): string => {
   return createHmac('sha256', secret).update(payload).digest('base64url');
 };
 
+const hasStrongStateSecret = (secret: string): boolean => {
+  return Buffer.byteLength(secret, 'utf8') >= MIN_STATE_SECRET_BYTES;
+};
+
 export const createCalendarOAuthState = (input: {
   userId: string;
   provider: 'google';
@@ -35,6 +40,10 @@ export const createCalendarOAuthState = (input: {
   expiresAt: Date;
   secret: string;
 }): string => {
+  if (!hasStrongStateSecret(input.secret)) {
+    throw new Error('Calendar OAuth state secret must be at least 32 bytes.');
+  }
+
   const payload: CalendarOAuthStatePayload = {
     v: STATE_VERSION,
     userId: input.userId,
@@ -53,6 +62,10 @@ export const verifyCalendarOAuthState = (input: {
   secret: string;
   now: Date;
 }): Omit<CalendarOAuthStatePayload, 'v'> | null => {
+  if (!hasStrongStateSecret(input.secret)) {
+    return null;
+  }
+
   const parts = input.token.split('.');
   if (parts.length !== 2) {
     return null;

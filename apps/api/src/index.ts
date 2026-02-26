@@ -333,9 +333,11 @@ const normalizeTimezone = (timezone: string | undefined): string => {
   return parsed.isValid ? timezone : 'UTC';
 };
 
+const MIN_CALENDAR_SECRET_LENGTH = 32;
+
 const resolveCalendarEncryptionSecret = (env: Bindings): string | null => {
   const secret = env.SESSION_SECRET?.trim();
-  if (!secret || secret.length < 16) {
+  if (!secret || secret.length < MIN_CALENDAR_SECRET_LENGTH) {
     return null;
   }
   return secret;

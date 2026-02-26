@@ -4,7 +4,7 @@ import { createCalendarOAuthState, verifyCalendarOAuthState } from './calendar-o
 
 describe('calendar-oauth-state', () => {
   it('creates and verifies signed OAuth state payload', () => {
-    const secret = 'oauth-state-secret-for-tests';
+    const secret = 'oauth-state-secret-for-tests-012345';
     const expiresAt = new Date('2026-03-02T00:10:00.000Z');
     const token = createCalendarOAuthState({
       userId: 'user-1',
@@ -29,7 +29,7 @@ describe('calendar-oauth-state', () => {
   });
 
   it('rejects expired or tampered state', () => {
-    const secret = 'oauth-state-secret-for-tests';
+    const secret = 'oauth-state-secret-for-tests-012345';
     const token = createCalendarOAuthState({
       userId: 'user-1',
       provider: 'google',
@@ -50,6 +50,26 @@ describe('calendar-oauth-state', () => {
       verifyCalendarOAuthState({
         token: `${token}x`,
         secret,
+        now: new Date('2026-03-02T00:00:00.000Z'),
+      }),
+    ).toBeNull();
+  });
+
+  it('rejects weak state secrets', () => {
+    expect(() =>
+      createCalendarOAuthState({
+        userId: 'user-1',
+        provider: 'google',
+        redirectUri: 'http://localhost:3000/settings/calendar/google/callback',
+        expiresAt: new Date('2026-03-02T00:10:00.000Z'),
+        secret: 'too-short-secret',
+      }),
+    ).toThrow('Calendar OAuth state secret must be at least 32 bytes.');
+
+    expect(
+      verifyCalendarOAuthState({
+        token: 'invalid.token',
+        secret: 'too-short-secret',
         now: new Date('2026-03-02T00:00:00.000Z'),
       }),
     ).toBeNull();

@@ -104,7 +104,7 @@ npm run dev:web
 1. Deploy `apps/api` via Wrangler as a Cloudflare Worker.
 2. Create Hyperdrive binding to Neon Postgres and attach it to the Worker.
 3. Deploy `apps/web` to Cloudflare Pages using the Next.js adapter build (`npm run pages:build -w apps/web`).
-4. Set environment variables in both Worker and Pages projects.
+4. Set environment variables in both Worker and Pages projects. For Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`), use `wrangler secret put`.
 
 Details: [docs/STACK.md](docs/STACK.md)
 
