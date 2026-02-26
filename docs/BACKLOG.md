@@ -57,7 +57,13 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- Inline widget embed script.
-- Webhooks: `booking.created`, `booking.canceled`, `booking.rescheduled`.
-- Retry delivery with exponential backoff.
-- API + embed docs updated.
+- Public embed script endpoint serves an embeddable booking widget bootstrap for a given organizer/event slug.
+- Widget supports host page configuration (timezone, theme/lightweight style options) and calls existing booking APIs.
+- Authenticated webhook management endpoints can create/list/update webhook subscriptions.
+- Outbound webhook events are emitted for `booking.created`, `booking.canceled`, and `booking.rescheduled`.
+- Delivery attempts are stored and retried with exponential backoff on non-2xx responses and transient failures.
+- Retry loop enforces bounded attempts and marks deliveries as `succeeded`/`failed`.
+- Signature header is included for webhook authenticity validation.
+- Feature includes tests for event payload shape, signature generation, and retry scheduling logic.
+- `docs/API.md` includes webhook subscription and delivery contracts.
+- Embed documentation is added/updated in `README.md` (or dedicated docs page).

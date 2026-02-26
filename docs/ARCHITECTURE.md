@@ -18,6 +18,8 @@ flowchart LR
 - `availability_rules`: recurring weekly availability windows.
 - `availability_overrides`: date-specific changes.
 - `bookings`: confirmed/canceled/rescheduled booking records.
+- `webhook_subscriptions`: organizer-managed outbound webhook endpoints/secrets/event filters.
+- `webhook_deliveries`: queued delivery attempts with retry state and final status.
 
 ## Critical flows
 
@@ -43,9 +45,17 @@ flowchart LR
 3. API updates booking status/history atomically.
 4. API sends reschedule/cancel email notification.
 
+### Webhook delivery loop (Feature 4)
+
+1. Booking lifecycle writes enqueue delivery rows for subscribed organizers.
+2. Runner endpoint selects due `pending` deliveries.
+3. API signs payload (`X-OpenCalendly-Signature`) and posts to target URL.
+4. Non-2xx / transient failures reschedule with exponential backoff.
+5. Delivery marks `succeeded` or `failed` after bounded attempts.
+
 ## Correctness and idempotency notes
 
 - Booking writes must be transactional.
 - Slot uniqueness is enforced in DB (not only in app logic).
 - Email sends should be keyed by idempotency token to avoid duplicates on retries.
-- Webhooks should use exponential backoff and dedupe by event id.
+- Webhooks use exponential backoff and dedupe by subscription + event id.

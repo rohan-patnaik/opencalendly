@@ -316,6 +316,9 @@ Success response:
     "sent": true,
     "provider": "resend",
     "messageId": "re_123"
+  },
+  "webhooks": {
+    "queued": 1
   }
 }
 ```
@@ -407,7 +410,10 @@ Success response:
       "sent": true,
       "provider": "resend"
     }
-  ]
+  ],
+  "webhooks": {
+    "queued": 1
+  }
 }
 ```
 
@@ -419,6 +425,14 @@ Idempotent replay response:
   "booking": {
     "id": "ff7e6f67-9d26-4ed6-9db5-f6f9fe00dc2e",
     "status": "canceled"
+  },
+  "email": {
+    "sent": false,
+    "provider": "none",
+    "error": "Idempotent replay: cancellation already processed."
+  },
+  "webhooks": {
+    "queued": 0
   }
 }
 ```
@@ -476,7 +490,10 @@ Success response:
       "sent": true,
       "provider": "resend"
     }
-  ]
+  ],
+  "webhooks": {
+    "queued": 1
+  }
 }
 ```
 
@@ -613,6 +630,132 @@ Success response:
 }
 ```
 
-## Webhook event schema (v0)
+## Feature 4 Endpoints (Embeds + Webhooks v1)
+
+### `GET /v0/embed/widget.js`
+
+Public JavaScript bootstrap for inline booking widget.
+
+Query params:
+
+- `username` (required)
+- `eventSlug` (required)
+- `timezone` (optional)
+- `theme` (optional: `light` | `dark`)
+
+Response:
+
+- `200` JavaScript asset (`content-type: application/javascript`)
+- Script renders an iframe/widget container and bootstraps booking UI.
+- Script accepts style options via script tag `data-*` attributes: `data-width`, `data-height`, `data-radius`, `data-shadow`, `data-target`, `data-title`.
+
+Usage example:
+
+```html
+<script
+  src="http://127.0.0.1:8787/v0/embed/widget.js?username=demo&eventSlug=intro-call&timezone=Asia/Kolkata&theme=light"
+  data-width="100%"
+  data-height="760px"
+></script>
+```
+
+### `GET /v0/webhooks`
+
+Auth required. Lists webhook subscriptions for current organizer.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "webhooks": [
+    {
+      "id": "a9ec5dc9-bef5-4f11-9699-a6f28a31feda",
+      "url": "https://example.com/webhooks/opencalendly",
+      "isActive": true,
+      "events": ["booking.created", "booking.canceled", "booking.rescheduled"],
+      "createdAt": "2026-02-26T08:00:00.000Z",
+      "updatedAt": "2026-02-26T08:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `POST /v0/webhooks`
+
+Auth required. Creates webhook subscription.
+
+Request:
+
+```json
+{
+  "url": "https://example.com/webhooks/opencalendly",
+  "events": ["booking.created", "booking.canceled", "booking.rescheduled"],
+  "secret": "whsec_..."
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "webhook": {
+    "id": "a9ec5dc9-bef5-4f11-9699-a6f28a31feda",
+    "url": "https://example.com/webhooks/opencalendly",
+    "events": ["booking.created", "booking.canceled", "booking.rescheduled"],
+    "isActive": true,
+    "createdAt": "2026-02-26T08:00:00.000Z",
+    "updatedAt": "2026-02-26T08:00:00.000Z"
+  }
+}
+```
+
+### `PATCH /v0/webhooks/:id`
+
+Auth required. Supports partial updates for:
+
+- `url`
+- `events`
+- `secret`
+- `isActive`
+
+Success response shape matches `POST /v0/webhooks`.
+
+### `POST /v0/webhooks/deliveries/run`
+
+Auth required. Processes pending deliveries and retries for the authenticated organizer's webhook subscriptions.
+
+Query params:
+
+- `limit` (optional integer `1..100`, default `25`)
+
+Behavior:
+
+- Picks eligible due deliveries.
+- Sends signed payloads with retry backoff.
+- Updates attempt count + next attempt timestamp.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "processed": 3,
+  "succeeded": 1,
+  "retried": 1,
+  "failed": 1
+}
+```
+
+Delivery request headers:
+
+- `X-OpenCalendly-Signature` (`t=<unix>,v1=<hmac_sha256>`)
+- `X-OpenCalendly-Signature-Timestamp`
+- `X-OpenCalendly-Delivery-Id`
+- `X-OpenCalendly-Event`
+- `X-OpenCalendly-Event-Id`
+
+## Webhook Event Schema (v0)
 
 Source of truth: `packages/shared/src/schemas.ts` (`webhookEventSchema`).

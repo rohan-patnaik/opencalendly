@@ -115,6 +115,31 @@ Feature 3 API endpoints:
 - `POST /v0/waitlist`
 - `POST /v0/dev/demo-credits/reset` (authenticated)
 
+## Embeds + Webhooks (Feature 4)
+
+Embed script endpoint (public):
+
+- `GET /v0/embed/widget.js?username=demo&eventSlug=intro-call&timezone=Asia/Kolkata&theme=light`
+
+Example host-page snippet:
+
+```html
+<script
+  src="http://127.0.0.1:8787/v0/embed/widget.js?username=demo&eventSlug=intro-call"
+  data-width="100%"
+  data-height="760px"
+></script>
+```
+
+Webhook management endpoints (authenticated):
+
+- `GET /v0/webhooks`
+- `POST /v0/webhooks`
+- `PATCH /v0/webhooks/:id`
+- `POST /v0/webhooks/deliveries/run`
+
+Delivery includes `X-OpenCalendly-Signature` (HMAC-SHA256) and retries with exponential backoff until bounded max attempts.
+
 ## Documentation Index
 
 - [docs/STACK.md](docs/STACK.md)
