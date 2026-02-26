@@ -682,6 +682,7 @@ app.post('/v0/demo-credits/consume', async (context) => {
     if (!parsed.success) {
       return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
     }
+    const normalizedEmail = parsed.data.email.trim().toLowerCase();
 
     const now = new Date();
     const dateKey = toUtcDateKey(now);
@@ -719,13 +720,6 @@ app.post('/v0/demo-credits/consume', async (context) => {
       });
 
       if (!consumed.consumed) {
-        await transaction
-          .update(demoCreditsDaily)
-          .set({
-            dailyLimit,
-            updatedAt: now,
-          })
-          .where(eq(demoCreditsDaily.dateKey, dateKey));
         return consumed;
       }
 
@@ -746,6 +740,7 @@ app.post('/v0/demo-credits/consume', async (context) => {
         {
           ok: false,
           error: 'Daily demo passes are exhausted.',
+          email: normalizedEmail,
           ...result.status,
         },
         429,
@@ -755,6 +750,7 @@ app.post('/v0/demo-credits/consume', async (context) => {
     return context.json({
       ok: true,
       consumed: true,
+      email: normalizedEmail,
       ...result.status,
     });
   });

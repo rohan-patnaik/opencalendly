@@ -532,6 +532,7 @@ Success response:
 {
   "ok": true,
   "consumed": true,
+  "email": "pat@example.com",
   "date": "2026-02-26",
   "dailyLimit": 25,
   "used": 11,
@@ -545,6 +546,7 @@ Exhausted response (`429`):
 {
   "ok": false,
   "error": "Daily demo passes are exhausted.",
+  "email": "pat@example.com",
   "date": "2026-02-26",
   "dailyLimit": 25,
   "used": 25,
