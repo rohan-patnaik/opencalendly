@@ -82,3 +82,92 @@ Acceptance criteria:
 - Team mode logic is covered by tests for slot computation and booking assignment correctness.
 - `docs/API.md` includes team and team-event draft/final contracts.
 - `docs/ARCHITECTURE.md` is updated if data model/flow changes materially.
+
+## Feature 6 (PR#10): Calendar Sync Hardening v1 (Google Busy Sync + Conflict Blocking)
+
+Acceptance criteria:
+
+- Organizers can connect/disconnect a Google Calendar account via OAuth for conflict sync.
+- Provider credentials are stored encrypted-at-rest in DB (no raw tokens in logs/responses).
+- Background/manual sync loads busy windows into local storage and applies them to availability computation.
+- Availability and booking commit both enforce external busy-window conflicts.
+- Sync status endpoint shows `connected`, `lastSyncedAt`, `lastError`, and `nextSyncAt`.
+- Tests cover token refresh, sync conflict blocking, and degraded provider behavior.
+- `docs/API.md` is updated with calendar connect/sync/status contracts.
+
+## Feature 7 (PR#11): Calendar Sync Hardening v2 (Outlook + Calendar Writeback)
+
+Acceptance criteria:
+
+- Microsoft Outlook connection is supported with the same credential handling model.
+- Booking lifecycle writeback works for connected provider calendars:
+  - booking create -> external calendar event create
+  - booking cancel -> external calendar event cancel/delete
+  - booking reschedule -> external calendar event update
+- External event IDs are persisted and linked to booking records for idempotent retries.
+- Provider call failures are retried with bounded backoff; final failures are visible in ops status.
+- Tests cover create/cancel/reschedule writeback success and retry/error paths.
+- `docs/API.md` and `docs/ARCHITECTURE.md` are updated for provider abstraction + writeback flow.
+
+## Feature 8 (PR#12): Analytics + Operator Dashboard v1
+
+Acceptance criteria:
+
+- Authenticated organizer analytics endpoints provide booking funnel metrics:
+  - page views -> slot selections -> booking confirmations
+  - confirmed/canceled/rescheduled counts by day and event type
+- Team analytics include round-robin assignment distribution and collective booking volume.
+- Operator endpoints expose webhook and email delivery health metrics.
+- Web app includes a minimal dashboard for these analytics (filters: date range, event/team).
+- Tests cover analytics query correctness and authorization boundaries.
+- `docs/API.md` is updated with analytics contracts.
+
+## Feature 9 (PR#13): Reliability + Platform Hardening
+
+Acceptance criteria:
+
+- GitHub branch protection is fully configured to enforce required checks and no direct `main` pushes.
+- API adds request-level rate limiting for public booking/availability routes.
+- Idempotency keys are enforced for booking-create and booking-reschedule mutation endpoints.
+- Platform warning debt is resolved or documented with a tracked migration plan:
+  - evaluate and decide migration path from `@cloudflare/next-on-pages` to OpenNext
+  - document lockfile warning strategy for local dev
+- Smoke + regression test suite runs in CI for critical booking flows.
+- `docs/STACK.md`/`docs/ARCHITECTURE.md` are updated for operational guardrails.
+
+## Feature 10 (PR#14): Launch Readiness + v1.0 Release
+
+Acceptance criteria:
+
+- End-to-end happy path tests pass for:
+  - one-on-one booking lifecycle
+  - team round-robin booking lifecycle
+  - team collective booking lifecycle
+  - webhook delivery + retries
+  - calendar sync conflict handling
+- Security checklist is completed (secrets handling, auth/session expiry, token misuse checks, webhook signature validation).
+- Operator runbook is complete (incident triage, failed delivery replay, calendar sync recovery, DB restore drill).
+- Versioned release notes and migration notes are published for `v1.0.0`.
+- Production deployment checklist is executable end-to-end with zero manual ambiguity.
+
+## Post-Feature-5 Delivery Plan (Until Done)
+
+1. Lock baseline after Feature 5 merge:
+   - pull latest `main`
+   - verify env + migrations + seed + app boot in local dev
+2. Execute Feature 6 through Feature 10 in strict order:
+   - one feature branch per feature from latest `main`
+   - open draft PR on first push
+   - implement to acceptance criteria only
+   - make PR ready only when criteria are implemented and tests are passing
+3. Enforce review gates on every feature PR:
+   - CodeRabbit review must run and all comments must be resolved
+   - Greptile review must run and all comments must be resolved
+   - CI must be fully green
+4. Merge discipline:
+   - merge only after both review bots + CI pass
+   - keep source feature branches after merge (no branch deletion)
+5. Done state for this roadmap:
+   - Feature 6, 7, 8, 9, and 10 merged to `main`
+   - docs/API.md, docs/ARCHITECTURE.md, docs/STACK.md, and docs/PRD.md updated per feature
+   - release `v1.0.0` tagged with final handoff summary
