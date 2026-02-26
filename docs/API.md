@@ -257,6 +257,12 @@ Success response:
 }
 ```
 
+Behavior:
+
+- Computes slots from organizer rules + date overrides.
+- Removes conflicts from confirmed bookings.
+- Applies synced external busy windows (Feature 6) as non-available blocks.
+
 ### `POST /v0/bookings`
 
 Public booking commit endpoint.
@@ -280,6 +286,7 @@ Request:
 Behavior:
 
 - Re-validates slot availability inside a DB transaction.
+- Includes synced external busy windows in the final write-time conflict check.
 - Uses DB unique slot constraint to avoid duplicate commits.
 - Creates secure cancel/reschedule action tokens (stored hashed server-side).
 - Sends booking confirmation email after successful write.
@@ -898,6 +905,12 @@ Success response:
 }
 ```
 
+Behavior:
+
+- Computes per-member schedules from rules + overrides.
+- Applies confirmed booking conflicts per member.
+- Applies each member's synced external busy windows (Feature 6) before slot assignment.
+
 ### `POST /v0/team-bookings`
 
 Public booking commit endpoint for team event types.
@@ -962,4 +975,158 @@ Notes:
 
 - Booking write remains transaction-safe.
 - Team assignment rows enforce per-member slot uniqueness.
+- Member selection and commit checks include synced external busy windows.
 - Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.
+
+## Feature 6 Endpoints (Calendar Sync Hardening v1)
+
+Auth required for all endpoints in this section.
+
+### `GET /v0/calendar/sync/status`
+
+Returns provider-level sync connection state for the authenticated user.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "providers": [
+    {
+      "provider": "google",
+      "connected": true,
+      "externalEmail": "owner@example.com",
+      "lastSyncedAt": "2026-03-01T10:15:00.000Z",
+      "nextSyncAt": "2026-03-01T10:45:00.000Z",
+      "lastError": null
+    }
+  ]
+}
+```
+
+Notes:
+
+- If Google is not connected, response still includes a `google` provider row with `connected: false`.
+
+### `POST /v0/calendar/google/connect/start`
+
+Starts Google OAuth by minting a signed state token and returning the authorization URL.
+
+Request:
+
+```json
+{
+  "redirectUri": "http://localhost:3000/settings/calendar/google/callback"
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "provider": "google",
+  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?...",
+  "state": "signed-state-token",
+  "expiresAt": "2026-03-01T10:20:00.000Z"
+}
+```
+
+Error responses:
+
+- `400` invalid request body.
+- `500` Google OAuth env config missing (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`).
+
+### `POST /v0/calendar/google/connect/complete`
+
+Completes Google OAuth code exchange and upserts encrypted connection tokens.
+
+Request:
+
+```json
+{
+  "code": "4/0AX4XfWj...",
+  "state": "signed-state-token",
+  "redirectUri": "http://localhost:3000/settings/calendar/google/callback"
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "connection": {
+    "provider": "google",
+    "connected": true,
+    "externalEmail": "owner@example.com",
+    "lastSyncedAt": null,
+    "nextSyncAt": null,
+    "lastError": null
+  }
+}
+```
+
+Error responses:
+
+- `400` invalid body / invalid or expired state / no refresh token returned.
+- `500` Google OAuth env config missing.
+- `502` provider exchange/profile fetch failure.
+
+### `POST /v0/calendar/google/disconnect`
+
+Deletes Google connection(s) and associated cached busy windows for the authenticated user.
+
+Request body: empty object `{}` or omitted body.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "provider": "google",
+  "disconnected": true
+}
+```
+
+### `POST /v0/calendar/google/sync`
+
+Fetches Google free/busy windows and stores normalized busy blocks for conflict detection.
+
+Request:
+
+```json
+{
+  "start": "2026-03-01T00:00:00.000Z",
+  "end": "2026-03-08T00:00:00.000Z"
+}
+```
+
+Request notes:
+
+- `start`/`end` are optional.
+- If omitted, API uses default rolling sync window.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "provider": "google",
+  "syncWindow": {
+    "startIso": "2026-03-01T00:00:00.000Z",
+    "endIso": "2026-03-08T00:00:00.000Z"
+  },
+  "busyWindowCount": 6,
+  "refreshedAccessToken": false,
+  "lastSyncedAt": "2026-03-01T10:15:00.000Z",
+  "nextSyncAt": "2026-03-01T10:45:00.000Z"
+}
+```
+
+Error responses:
+
+- `400` invalid body or invalid sync range.
+- `404` Google calendar not connected.
+- `500` Google OAuth env config missing.
+- `502` provider sync failure (also records `lastError` + `nextSyncAt`).

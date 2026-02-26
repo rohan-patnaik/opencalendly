@@ -65,10 +65,23 @@ if (!process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE) {
 const wranglerCommand = process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler';
 const wranglerArgs = ['dev', '--config', 'wrangler.toml'];
 
-const databaseUrl = process.env.DATABASE_URL?.trim();
-if (databaseUrl) {
-  // Ensure Worker env.DATABASE_URL stays aligned with root .env during local dev.
-  wranglerArgs.push('--var', `DATABASE_URL:${databaseUrl}`);
+const passThroughVarKeys = [
+  'DATABASE_URL',
+  'APP_BASE_URL',
+  'RESEND_API_KEY',
+  'RESEND_FROM_EMAIL',
+  'DEMO_DAILY_PASS_LIMIT',
+  'SESSION_SECRET',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+];
+
+for (const key of passThroughVarKeys) {
+  const value = process.env[key]?.trim();
+  if (!value) {
+    continue;
+  }
+  wranglerArgs.push('--var', `${key}:${value}`);
 }
 
 const child = spawn(wranglerCommand, wranglerArgs, {

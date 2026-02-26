@@ -7,6 +7,7 @@ flowchart LR
   U["User Browser"] --> W["Web App (Next.js on Pages)"]
   W --> A["API (Hono on Workers)"]
   A -->|"Hyperdrive"| D["Neon Postgres"]
+  A --> G["Google OAuth + Calendar API"]
   A --> E["Resend"]
 ```
 
@@ -23,6 +24,8 @@ flowchart LR
 - `availability_overrides`: date-specific changes.
 - `bookings`: confirmed/canceled/rescheduled booking records.
 - `team_booking_assignments`: per-member slot assignment rows for team bookings (enforces member-level uniqueness).
+- `calendar_connections`: encrypted OAuth credentials + sync cursor/status per user/provider.
+- `calendar_busy_windows`: normalized external busy windows used for slot conflict blocking.
 - `webhook_subscriptions`: organizer-managed outbound webhook endpoints/secrets/event filters.
 - `webhook_deliveries`: queued delivery attempts with retry state and final status.
 
@@ -33,15 +36,17 @@ flowchart LR
 1. Load weekly availability rules for organizer.
 2. Apply date overrides for query range.
 3. Remove windows blocked by existing bookings and buffers.
-4. Return timezone-aware slots in paginated form.
+4. Remove windows blocked by synced external busy windows (Feature 6).
+5. Return timezone-aware slots in paginated form.
 
 ### Book slot (no double-book)
 
 1. Client selects slot and submits booking request.
 2. API validates payload with Zod.
 3. API runs DB transaction and inserts booking.
-4. Unique slot constraint rejects race-condition duplicates.
-5. API returns success and sends confirmation email.
+4. Transaction re-check includes external busy windows.
+5. Unique slot constraint rejects race-condition duplicates.
+6. API returns success and sends confirmation email.
 
 ### Reschedule/cancel
 
@@ -68,10 +73,20 @@ flowchart LR
 6. Unique constraints prevent double-booking races at member slot level.
 7. Cancel/reschedule keeps token flow unchanged and updates/deletes assignment rows accordingly.
 
+### Calendar sync hardening (Feature 6)
+
+1. Authenticated organizer starts Google OAuth (`/calendar/google/connect/start`).
+2. API signs state with `SESSION_SECRET` and returns provider auth URL.
+3. OAuth completion exchanges code, encrypts tokens, and upserts `calendar_connections`.
+4. Sync endpoint fetches Google free/busy and writes normalized rows into `calendar_busy_windows`.
+5. Availability + booking commit paths treat those windows as hard conflict blocks.
+6. Disconnect removes connection + busy-window cache atomically.
+
 ## Correctness and idempotency notes
 
 - Booking writes must be transactional.
 - Slot uniqueness is enforced in DB (not only in app logic).
 - Team bookings additionally enforce per-member slot uniqueness through `team_booking_assignments`.
+- External calendar conflicts are enforced at compute-time and re-checked at commit-time.
 - Email sends should be keyed by idempotency token to avoid duplicates on retries.
 - Webhooks use exponential backoff and dedupe by subscription + event id.

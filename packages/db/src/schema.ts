@@ -24,6 +24,7 @@ type EventQuestionRecord = {
 
 type WebhookEventTypeRecord = 'booking.created' | 'booking.canceled' | 'booking.rescheduled';
 type WebhookDeliveryStatusRecord = 'pending' | 'succeeded' | 'failed';
+type CalendarProviderRecord = 'google' | 'microsoft';
 type WebhookEventPayloadRecord = {
   id: string;
   type: WebhookEventTypeRecord;
@@ -42,6 +43,7 @@ type WebhookEventPayloadRecord = {
 
 export const teamMemberRoleEnum = pgEnum('team_member_role', ['owner', 'member']);
 export const teamSchedulingModeEnum = pgEnum('team_scheduling_mode', ['round_robin', 'collective']);
+export const calendarProviderEnum = pgEnum('calendar_provider', ['google', 'microsoft']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -345,6 +347,67 @@ export const webhookDeliveries = pgTable(
     uniqueSubscriptionEvent: unique('webhook_deliveries_subscription_event_unique').on(
       table.subscriptionId,
       table.eventId,
+    ),
+  }),
+);
+
+export const calendarConnections = pgTable(
+  'calendar_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: calendarProviderEnum('provider').$type<CalendarProviderRecord>().notNull(),
+    externalAccountId: varchar('external_account_id', { length: 255 }),
+    externalEmail: varchar('external_email', { length: 320 }),
+    accessTokenEncrypted: text('access_token_encrypted').notNull(),
+    refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
+    accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }).notNull(),
+    scope: text('scope'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    nextSyncAt: timestamp('next_sync_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueUserProvider: unique('calendar_connections_user_provider_unique').on(
+      table.userId,
+      table.provider,
+    ),
+    userProviderIndex: index('calendar_connections_user_provider_idx').on(table.userId, table.provider),
+  }),
+);
+
+export const calendarBusyWindows = pgTable(
+  'calendar_busy_windows',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    connectionId: uuid('connection_id')
+      .notNull()
+      .references(() => calendarConnections.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: calendarProviderEnum('provider').$type<CalendarProviderRecord>().notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    sourceId: varchar('source_id', { length: 255 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueConnectionSlot: unique('calendar_busy_windows_connection_slot_unique').on(
+      table.connectionId,
+      table.startsAt,
+      table.endsAt,
+    ),
+    userRangeIndex: index('calendar_busy_windows_user_starts_at_idx').on(table.userId, table.startsAt),
+    userProviderRangeIndex: index('calendar_busy_windows_user_provider_starts_at_idx').on(
+      table.userId,
+      table.provider,
+      table.startsAt,
     ),
   }),
 );

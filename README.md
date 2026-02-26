@@ -53,9 +53,18 @@ Populate required values in `.env` once, up front:
 | `HYPERDRIVE_ID` | Cloudflare dashboard -> Hyperdrive -> created config ID |
 | `RESEND_API_KEY` | Resend dashboard -> API Keys |
 | `RESEND_FROM_EMAIL` | Resend dashboard -> verified sender identity |
+| `GOOGLE_CLIENT_ID` | Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID (Web application) |
+| `GOOGLE_CLIENT_SECRET` | Same Google OAuth credential as above |
 | `DEMO_DAILY_PASS_LIMIT` | Optional integer daily cap for Feature 3 demo credits (default `25`) |
-| `GITHUB_CLIENT_ID` | GitHub -> Settings -> Developer settings -> OAuth Apps |
-| `GITHUB_CLIENT_SECRET` | GitHub -> Settings -> Developer settings -> OAuth Apps |
+
+Optional (not required for current feature set):
+
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+
+Google OAuth setup note (for local dev):
+
+- In Google Cloud OAuth app, add your callback URL under Authorized redirect URIs (for example `http://localhost:3000/settings/calendar/google/callback`).
 
 Then validate before doing feature work:
 
@@ -139,6 +148,14 @@ Webhook management endpoints (authenticated):
 - `POST /v0/webhooks/deliveries/run`
 
 Delivery includes `X-OpenCalendly-Signature` (HMAC-SHA256) and retries with exponential backoff until bounded max attempts.
+
+Calendar sync endpoints (authenticated, Feature 6):
+
+- `GET /v0/calendar/sync/status`
+- `POST /v0/calendar/google/connect/start`
+- `POST /v0/calendar/google/connect/complete`
+- `POST /v0/calendar/google/disconnect`
+- `POST /v0/calendar/google/sync`
 
 ## Documentation Index
 

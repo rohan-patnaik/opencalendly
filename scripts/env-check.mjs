@@ -12,6 +12,8 @@ const REQUIRED = {
   HYPERDRIVE_ID: 'Cloudflare dashboard -> Hyperdrive configuration ID.',
   RESEND_API_KEY: 'Resend dashboard -> API Keys.',
   RESEND_FROM_EMAIL: 'Verified sender address in Resend, e.g. OpenCalendly <no-reply@yourdomain.com>.',
+  GOOGLE_CLIENT_ID: 'Google Cloud Console -> Credentials -> OAuth 2.0 Client IDs.',
+  GOOGLE_CLIENT_SECRET: 'Google Cloud Console -> Credentials -> OAuth 2.0 Client Secret.',
 };
 
 const OPTIONAL = {

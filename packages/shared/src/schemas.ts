@@ -161,6 +161,35 @@ export const webhookEventTypeSchema = z.enum([
   'booking.rescheduled',
 ]);
 
+export const calendarProviderSchema = z.enum(['google', 'microsoft']);
+
+export const calendarConnectStartSchema = z.object({
+  redirectUri: z.string().url().max(2000),
+});
+
+export const calendarConnectCompleteSchema = z.object({
+  code: z.string().min(8).max(4096),
+  state: z.string().min(32).max(4096),
+  redirectUri: z.string().url().max(2000),
+});
+
+export const calendarSyncRequestSchema = z
+  .object({
+    start: z.string().datetime({ offset: true }).optional(),
+    end: z.string().datetime({ offset: true }).optional(),
+  })
+  .refine(
+    (value) => {
+      if (!value.start || !value.end) {
+        return true;
+      }
+      return Date.parse(value.end) > Date.parse(value.start);
+    },
+    {
+      message: 'end must be after start.',
+    },
+  );
+
 export const webhookSubscriptionCreateSchema = z.object({
   url: z.string().url().max(2000),
   events: z.array(webhookEventTypeSchema).min(1).max(3),
@@ -223,3 +252,7 @@ export type WebhookSubscriptionCreateInput = z.infer<typeof webhookSubscriptionC
 export type WebhookSubscriptionUpdateInput = z.infer<typeof webhookSubscriptionUpdateSchema>;
 export type WebhookEventPayload = z.infer<typeof webhookEventPayloadSchema>;
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;
+export type CalendarProvider = z.infer<typeof calendarProviderSchema>;
+export type CalendarConnectStartInput = z.infer<typeof calendarConnectStartSchema>;
+export type CalendarConnectCompleteInput = z.infer<typeof calendarConnectCompleteSchema>;
+export type CalendarSyncRequestInput = z.infer<typeof calendarSyncRequestSchema>;
