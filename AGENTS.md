@@ -62,6 +62,7 @@
 ## CodeRabbit config
 - CodeRabbit behavior is configured via `.coderabbit.yaml` in repo root.
 - Auto review is enabled (`reviews.auto_review.enabled: true`).
+- GitHub Action `.github/workflows/coderabbit-review-trigger.yml` posts `@coderabbitai review` on every PR open/update/ready-for-review event to force review trigger even when dashboard auto settings are restrictive.
 - One-time setup requirement (GitHub side):
   - CodeRabbit GitHub App must be installed for this repository.
   - Repository access must include this repo for PR review events.
