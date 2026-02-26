@@ -6,11 +6,20 @@
 - Correctness > “instant UI”. Always re-check availability at booking commit.
 - Every change starts from a new feature branch created from the latest `main`.
 - Direct commits/pushes to `main` are not allowed; merge to `main` happens only via PR.
+- Do not delete feature branches after merge; retain them for auditability and history.
+- Use IST (`Asia/Kolkata`) for timestamps in handoffs, PR notes, and status reporting.
+- Initialize local `.env` with all required variables at setup time, before starting feature work.
+- Neon is the only supported database provider for this repository.
 
 ## Required workflow (every feature)
+0) Environment bootstrap (mandatory once per clone/machine)
+   - Copy `.env.example` to `.env`
+   - Populate all required env values (DB, Cloudflare, email, app URLs) before feature work
+   - Run `npm run env:check` and fix all reported errors
 1) Plan
    - Update docs/BACKLOG.md with scope + acceptance criteria
    - If API changes: update docs/API.md (draft-first)
+   - Confirm `npm run env:check` passes
 2) Implement
    - Keep changes minimal and scoped
    - Add/update tests
@@ -26,12 +35,14 @@
    - Resolve all Greptile review comments before merge
 5) Merge
    - Merge PR only after Greptile review has run and comments are resolved
+   - Do not delete the source feature branch after merge
    - Update docs/PRD.md and docs/ARCHITECTURE.md only if the feature changes plan/architecture
 6) Handoff
    - After merge, produce NEXT_CHAT_PROMPT including:
      - what shipped
      - what’s next
      - commands/env vars
+     - local app run commands
      - links to updated docs
 
 ## Greptile config

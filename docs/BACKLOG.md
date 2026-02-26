@@ -1,6 +1,6 @@
 # Ordered Backlog (One Feature per PR)
 
-## Feature 0 (PR#1): Bootstrap + docs + infra + Greptile config
+## Feature 0 (PR#2): Bootstrap + docs + infra + Greptile config
 
 Acceptance criteria:
 
@@ -12,20 +12,21 @@ Acceptance criteria:
 - `greptile.json` exists with sensible defaults.
 - CI runs lint + unit tests.
 
-## Feature 1 (PR#2): One-on-one event types + public booking link + timezone + buffers
+## Feature 1 (PR#3): One-on-one event types + public booking link + timezone + buffers
 
 Acceptance criteria:
 
-- Auth works.
-- Create/edit event type fields: name, slug, duration, location, questions.
-- Public URL `/<username>/<event-slug>` shows timezone-aware availability picker.
-- Availability rules include weekly schedule + date overrides + buffers.
-- Booking correctness: transaction + unique timeslot constraint.
-- Booking record created and confirmation email sent.
-- Unit tests for availability computation + booking transaction.
-- `docs/API.md` updated.
+- Magic-link auth works end-to-end (`/v0/auth/magic-link`, `/v0/auth/verify`) and authenticated routes reject missing/expired bearer sessions.
+- Authenticated organizer routes can create and edit one-on-one event types with `name`, `slug`, `durationMinutes`, `location`, and `questions`.
+- Organizer availability rules support weekly schedule windows plus date overrides and per-rule buffers.
+- Public booking URL `/<username>/<event-slug>` renders event details with a timezone-aware availability picker.
+- Public availability API returns slots computed from weekly rules + date overrides, minus booked windows and buffers.
+- Booking commit is correctness-safe: DB transaction + slot re-check + unique slot constraint guard against double booking.
+- Successful booking stores the record and triggers a confirmation email send path.
+- Tests cover availability computation and booking transaction correctness/error paths.
+- `docs/API.md` is updated to match the implemented Feature 1 contract.
 
-## Feature 2 (PR#3): Reschedule + cancel + secure tokens + emails
+## Feature 2 (PR#4): Reschedule + cancel + secure tokens + emails
 
 Acceptance criteria:
 
@@ -34,7 +35,7 @@ Acceptance criteria:
 - Booking history maintained.
 - Tests and docs updated.
 
-## Feature 3 (PR#4): Demo Credits Pool (daily passes) + waitlist
+## Feature 3 (PR#5): Demo Credits Pool (daily passes) + waitlist
 
 Acceptance criteria:
 
@@ -44,7 +45,7 @@ Acceptance criteria:
 - Admin/dev route can reset passes.
 - README + PRD updates.
 
-## Feature 4 (PR#5): Embeds + Webhooks v1
+## Feature 4 (PR#6): Embeds + Webhooks v1
 
 Acceptance criteria:
 

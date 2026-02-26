@@ -22,9 +22,10 @@
     "format:write": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:generate": "npm run generate -w packages/db",
-    "db:migrate": "npm run migrate -w packages/db",
-    "db:seed": "npm run seed -w packages/db",
+    "env:check": "node scripts/env-check.mjs",
+    "db:generate": "node ./scripts/run-with-root-env.mjs npm run generate -w packages/db",
+    "db:migrate": "node ./scripts/run-with-root-env.mjs npm run migrate -w packages/db",
+    "db:seed": "node ./scripts/run-with-root-env.mjs npm run seed -w packages/db",
     "ci": "npm run lint && npm run test && npm run typecheck"
   },
   "devDependencies": {

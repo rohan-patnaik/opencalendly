@@ -25,7 +25,7 @@ packages/
 
 - Node.js 20+ (Node 22 tested)
 - npm 11+
-- Postgres connection string (Neon or local)
+- Neon account + Neon Postgres project (Neon is required)
 
 ### 2) Install
 
@@ -39,7 +39,28 @@ npm install
 cp .env.example .env
 ```
 
-Fill in at least `DATABASE_URL`.
+Populate required values in `.env` once, up front:
+
+| Variable | How to get it |
+| --- | --- |
+| `DATABASE_URL` | Neon dashboard -> project -> connection details -> direct Postgres URL (`*.neon.tech`) |
+| `SESSION_SECRET` | Run `openssl rand -hex 32` |
+| `APP_BASE_URL` | Local web URL (`http://localhost:3000`) |
+| `API_BASE_URL` | Local API URL (`http://127.0.0.1:8787`) |
+| `NEXT_PUBLIC_API_BASE_URL` | Same as `API_BASE_URL` for local web calls |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard -> right sidebar account ID |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard -> My Profile -> API Tokens (token with Workers/Pages/Hyperdrive permissions) |
+| `HYPERDRIVE_ID` | Cloudflare dashboard -> Hyperdrive -> created config ID |
+| `RESEND_API_KEY` | Resend dashboard -> API Keys |
+| `RESEND_FROM_EMAIL` | Resend dashboard -> verified sender identity |
+| `GITHUB_CLIENT_ID` | GitHub -> Settings -> Developer settings -> OAuth Apps |
+| `GITHUB_CLIENT_SECRET` | GitHub -> Settings -> Developer settings -> OAuth Apps |
+
+Then validate before doing feature work:
+
+```bash
+npm run env:check
+```
 
 ### 4) Run database migration + seed
 
@@ -62,6 +83,11 @@ In terminal 2:
 ```bash
 npm run dev:web
 ```
+
+### 6) Feature 1 smoke test
+
+- Open `http://localhost:3000/demo/intro-call`
+- Use the timezone picker, select an available slot, and submit a booking.
 
 ## Deploy Overview (Cloudflare Pages + Workers)
 

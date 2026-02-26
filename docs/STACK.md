@@ -35,6 +35,7 @@ flowchart LR
 - Use native Postgres drivers (`pg` or `postgres`) with Hyperdrive connection strings.
 - Do not use Neon serverless driver with Hyperdrive.
 - Do not stack Hyperdrive pooling with Neon pooled connection endpoints.
+- Neon is the only supported database provider for this repository.
 
 Current code example: `apps/api/src/index.ts` uses `pg.Client` with `env.HYPERDRIVE.connectionString`.
 
@@ -43,7 +44,7 @@ Current code example: `apps/api/src/index.ts` uses `pg.Client` with `env.HYPERDR
 1. Create Neon project and copy the direct Postgres URL.
 2. Create Cloudflare Hyperdrive config pointed at Neon.
 3. Bind Hyperdrive in `apps/api/wrangler.toml` as `HYPERDRIVE`.
-4. Set `DATABASE_URL` locally for migrations and seed scripts.
+4. Set `DATABASE_URL` locally to the Neon direct Postgres URL for migrations and seed scripts.
 5. Deploy API Worker, then deploy web app to Pages.
 
 Useful references:

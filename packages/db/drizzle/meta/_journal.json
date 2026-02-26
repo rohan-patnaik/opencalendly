@@ -8,6 +8,20 @@
       "when": 1771962994834,
       "tag": "0000_fluffy_blue_shield",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772046515325,
+      "tag": "0001_wet_the_hood",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772061532351,
+      "tag": "0002_brown_xorn",
+      "breakpoints": true
     }
   ]
 }
