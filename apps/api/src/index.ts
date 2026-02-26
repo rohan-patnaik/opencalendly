@@ -441,9 +441,12 @@ const CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT = 25;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_MAX = 100;
 const CALENDAR_WRITEBACK_LEASE_MINUTES = 3;
 const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
-const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS = 120;
+const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE = 120;
+const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP = 300;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS = 5_000;
+const PUBLIC_ANALYTICS_RATE_LIMIT_CLEANUP_INTERVAL = 50;
 const publicAnalyticsRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
+let publicAnalyticsRateLimitRequestCounter = 0;
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -500,40 +503,61 @@ const isPublicAnalyticsRateLimited = (input: {
   const nowMs = input.nowMs ?? Date.now();
   const cutoffMs = nowMs - PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS;
 
-  for (const [key, state] of publicAnalyticsRateLimitState) {
-    if (state.windowStartMs < cutoffMs) {
-      publicAnalyticsRateLimitState.delete(key);
+  const pruneRateLimitState = () => {
+    const shouldCleanup =
+      publicAnalyticsRateLimitState.size > PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS ||
+      publicAnalyticsRateLimitRequestCounter % PUBLIC_ANALYTICS_RATE_LIMIT_CLEANUP_INTERVAL === 0;
+    if (!shouldCleanup) {
+      return;
     }
-  }
 
-  if (publicAnalyticsRateLimitState.size > PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS) {
-    const overflow = publicAnalyticsRateLimitState.size - PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS;
-    let removed = 0;
-    for (const key of publicAnalyticsRateLimitState.keys()) {
-      publicAnalyticsRateLimitState.delete(key);
-      removed += 1;
-      if (removed >= overflow) {
-        break;
+    for (const [key, state] of publicAnalyticsRateLimitState) {
+      if (state.windowStartMs < cutoffMs) {
+        publicAnalyticsRateLimitState.delete(key);
       }
     }
-  }
 
-  const key = `${input.ip}|${input.username}|${input.eventSlug}`;
-  const existing = publicAnalyticsRateLimitState.get(key);
-  if (!existing || existing.windowStartMs < cutoffMs) {
-    publicAnalyticsRateLimitState.set(key, {
-      windowStartMs: nowMs,
-      count: 1,
-    });
+    if (publicAnalyticsRateLimitState.size > PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS) {
+      const overflow = publicAnalyticsRateLimitState.size - PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS;
+      let removed = 0;
+      for (const key of publicAnalyticsRateLimitState.keys()) {
+        publicAnalyticsRateLimitState.delete(key);
+        removed += 1;
+        if (removed >= overflow) {
+          break;
+        }
+      }
+    }
+  };
+
+  const consumeRateLimitKey = (key: string, maxRequests: number): boolean => {
+    const existing = publicAnalyticsRateLimitState.get(key);
+    if (!existing || existing.windowStartMs < cutoffMs) {
+      publicAnalyticsRateLimitState.set(key, {
+        windowStartMs: nowMs,
+        count: 1,
+      });
+      return false;
+    }
+
+    if (existing.count >= maxRequests) {
+      return true;
+    }
+
+    existing.count += 1;
     return false;
-  }
+  };
 
-  if (existing.count >= PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS) {
+  publicAnalyticsRateLimitRequestCounter += 1;
+  pruneRateLimitState();
+
+  const ipKey = `ip:${input.ip}`;
+  if (consumeRateLimitKey(ipKey, PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP)) {
     return true;
   }
 
-  existing.count += 1;
-  return false;
+  const scopedKey = `scope:${input.ip}|${input.username}|${input.eventSlug}`;
+  return consumeRateLimitKey(scopedKey, PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE);
 };
 
 const recordAnalyticsFunnelEvent = async (

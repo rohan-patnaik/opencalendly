@@ -1,3 +1,7 @@
+-- Legacy rows may include plaintext (very old) or SHA-256 hex (recent).
+-- Migrations cannot access TELEMETRY_HMAC_KEY, so plaintext is normalized to SHA-256.
+-- New writes use HMAC-SHA256 in application code. Mixed legacy/new hash strategies are
+-- acceptable because recipient_email_hash is telemetry-only and not used for lookups.
 ALTER TABLE "email_deliveries" RENAME COLUMN "recipient_email" TO "recipient_email_hash";
 ALTER TABLE "email_deliveries"
   ALTER COLUMN "recipient_email_hash" TYPE varchar(64)
