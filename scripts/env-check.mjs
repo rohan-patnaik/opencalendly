@@ -18,6 +18,8 @@ const REQUIRED = {
 
 const OPTIONAL = {
   DEMO_DAILY_PASS_LIMIT: 'Optional integer daily pass limit (Feature 3).',
+  TELEMETRY_HMAC_KEY:
+    'Recommended dedicated secret for telemetry HMAC; fallback uses SESSION_SECRET if unset.',
   MICROSOFT_CLIENT_ID: 'Microsoft Entra -> App registrations -> client ID (Feature 7).',
   MICROSOFT_CLIENT_SECRET: 'Microsoft Entra -> App registrations -> client secret (Feature 7).',
   GITHUB_CLIENT_ID: 'GitHub Developer Settings -> OAuth Apps.',
@@ -107,6 +109,11 @@ if (demoDailyPassLimit) {
 const sessionSecret = parsed.SESSION_SECRET;
 if (sessionSecret && sessionSecret.length < 32) {
   errors.push('SESSION_SECRET must be at least 32 characters.');
+}
+
+const telemetryHmacKey = parsed.TELEMETRY_HMAC_KEY;
+if (telemetryHmacKey && telemetryHmacKey.length < 32) {
+  errors.push('TELEMETRY_HMAC_KEY must be at least 32 characters when provided.');
 }
 
 if (apiBaseUrl && publicApiBaseUrl && apiBaseUrl !== publicApiBaseUrl) {

@@ -4439,13 +4439,19 @@ app.post('/v0/analytics/funnel/events', async (context) => {
       return jsonError(context, 404, 'Event type not found.');
     }
 
-    tryRecordAnalyticsFunnelEvent(db, {
+    await recordAnalyticsFunnelEvent(db, {
       organizerId: eventType.userId,
       eventTypeId: eventType.id,
       stage: parsed.data.stage,
       metadata: {
         source: 'public_booking_page',
       },
+    }).catch((error) => {
+      console.warn('analytics_funnel_event_write_failed', {
+        eventTypeId: eventType.id,
+        stage: parsed.data.stage,
+        error: error instanceof Error ? error.message : 'unknown',
+      });
     });
 
     return context.json({ ok: true });
