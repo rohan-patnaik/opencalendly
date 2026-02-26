@@ -14,6 +14,13 @@ export type BookingActionTokenState = 'usable' | 'idempotent-replay' | 'gone';
 export type BookingMetadata = {
   answers: Record<string, string>;
   timezone?: string;
+  team?: {
+    teamId: string;
+    teamSlug?: string;
+    teamEventTypeId: string;
+    mode: 'round_robin' | 'collective';
+    assignmentUserIds: string[];
+  };
 };
 
 type BookingWithOptionalId = ExistingBooking & {
@@ -32,6 +39,7 @@ export const parseBookingMetadata = (
     const parsed = JSON.parse(metadata) as {
       answers?: unknown;
       timezone?: unknown;
+      team?: unknown;
     };
 
     const answers =
@@ -46,9 +54,46 @@ export const parseBookingMetadata = (
         ? normalizeTimezone(parsed.timezone)
         : undefined;
 
+    const rawAssignmentUserIds =
+      parsed.team &&
+      typeof parsed.team === 'object' &&
+      !Array.isArray(parsed.team) &&
+      Array.isArray((parsed.team as Record<string, unknown>).assignmentUserIds)
+        ? ((parsed.team as Record<string, unknown>).assignmentUserIds as unknown[])
+        : null;
+
+    const hasValidAssignmentUserIds =
+      rawAssignmentUserIds !== null &&
+      rawAssignmentUserIds.length > 0 &&
+      rawAssignmentUserIds.every(
+        (value) => typeof value === 'string' && value.trim().length > 0,
+      );
+
+    const team =
+      parsed.team &&
+      typeof parsed.team === 'object' &&
+      !Array.isArray(parsed.team) &&
+      typeof (parsed.team as Record<string, unknown>).teamId === 'string' &&
+      typeof (parsed.team as Record<string, unknown>).teamEventTypeId === 'string' &&
+      ((parsed.team as Record<string, unknown>).mode === 'round_robin' ||
+        (parsed.team as Record<string, unknown>).mode === 'collective') &&
+      hasValidAssignmentUserIds
+        ? {
+            teamId: (parsed.team as Record<string, unknown>).teamId as string,
+            teamEventTypeId: (parsed.team as Record<string, unknown>).teamEventTypeId as string,
+            mode: (parsed.team as Record<string, unknown>).mode as 'round_robin' | 'collective',
+            assignmentUserIds: rawAssignmentUserIds as string[],
+            ...((parsed.team as Record<string, unknown>).teamSlug &&
+            typeof (parsed.team as Record<string, unknown>).teamSlug === 'string'
+              ? { teamSlug: (parsed.team as Record<string, unknown>).teamSlug as string }
+              : {}),
+          }
+        : undefined;
+
     return {
       answers,
       ...(timezone ? { timezone } : {}),
+      ...(team ? { team } : {}),
     };
   } catch {
     return { answers: {} };

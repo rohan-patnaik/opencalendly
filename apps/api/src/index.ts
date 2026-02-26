@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { Hono } from 'hono';
 
@@ -11,6 +11,11 @@ import {
   demoCreditsDaily,
   eventTypes,
   sessions,
+  teamBookingAssignments,
+  teamEventTypeMembers,
+  teamEventTypes,
+  teamMembers,
+  teams,
   users,
   waitlistEntries,
   webhookDeliveries,
@@ -30,12 +35,17 @@ import {
   magicLinkRequestSchema,
   setAvailabilityOverridesSchema,
   setAvailabilityRulesSchema,
+  teamAddMemberSchema,
+  teamBookingCreateSchema,
+  teamCreateSchema,
+  teamEventTypeCreateSchema,
   waitlistJoinSchema,
   webhookEventSchema,
   webhookSubscriptionCreateSchema,
   webhookSubscriptionUpdateSchema,
   verifyMagicLinkRequestSchema,
   type EventQuestion,
+  type TeamSchedulingMode,
   type WebhookEvent,
   type WebhookEventType,
 } from '@opencalendly/shared';
@@ -82,6 +92,11 @@ import {
   normalizeWebhookEvents,
   parseWebhookEventTypes,
 } from './lib/webhooks';
+import {
+  chooseRoundRobinAssignee,
+  computeTeamAvailabilitySlots,
+  computeTeamSlotMatrix,
+} from './lib/team-scheduling';
 
 type HyperdriveBinding = {
   connectionString: string;
@@ -102,6 +117,7 @@ type ContextLike = {
 };
 
 type Database = ReturnType<typeof createDb>['db'];
+type QueryableDb = Pick<Database, 'select'>;
 
 type AuthenticatedUser = {
   id: string;
@@ -197,6 +213,49 @@ type PublicEventView = {
     displayName: string;
     timezone: string;
   };
+};
+
+type TeamRecord = {
+  id: string;
+  ownerUserId: string;
+  slug: string;
+  name: string;
+};
+
+type TeamMemberRecord = {
+  userId: string;
+  role: 'owner' | 'member';
+};
+
+type TeamEventTypeContext = {
+  team: TeamRecord;
+  eventType: EventTypeProfile;
+  mode: TeamSchedulingMode;
+  roundRobinCursor: number;
+  members: TeamMemberRecord[];
+};
+
+type TeamMemberScheduleRecord = {
+  userId: string;
+  timezone: string;
+  rules: Array<{
+    dayOfWeek: number;
+    startMinute: number;
+    endMinute: number;
+    bufferBeforeMinutes: number;
+    bufferAfterMinutes: number;
+  }>;
+  overrides: Array<{
+    startAt: Date;
+    endAt: Date;
+    isAvailable: boolean;
+  }>;
+  bookings: Array<{
+    startsAt: Date;
+    endsAt: Date;
+    status: string;
+    metadata: string | null;
+  }>;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -665,6 +724,309 @@ const findPublicEventView = async (
       displayName: organizer.displayName,
       timezone: normalizeTimezone(organizer.timezone),
     },
+  };
+};
+
+const resolveTeamMode = (rawMode: string): TeamSchedulingMode | null => {
+  if (rawMode === 'round_robin' || rawMode === 'collective') {
+    return rawMode;
+  }
+  return null;
+};
+
+const findTeamEventTypeContext = async (
+  db: Database,
+  teamSlug: string,
+  eventSlug: string,
+): Promise<TeamEventTypeContext | null> => {
+  const [row] = await db
+    .select({
+      teamId: teams.id,
+      teamOwnerUserId: teams.ownerUserId,
+      teamSlug: teams.slug,
+      teamName: teams.name,
+      teamEventTypeId: teamEventTypes.id,
+      mode: teamEventTypes.mode,
+      roundRobinCursor: teamEventTypes.roundRobinCursor,
+      eventTypeId: eventTypes.id,
+      eventTypeUserId: eventTypes.userId,
+      eventTypeSlug: eventTypes.slug,
+      eventTypeName: eventTypes.name,
+      durationMinutes: eventTypes.durationMinutes,
+      locationType: eventTypes.locationType,
+      locationValue: eventTypes.locationValue,
+      isActive: eventTypes.isActive,
+    })
+    .from(teamEventTypes)
+    .innerJoin(teams, eq(teams.id, teamEventTypes.teamId))
+    .innerJoin(eventTypes, eq(eventTypes.id, teamEventTypes.eventTypeId))
+    .where(and(eq(teams.slug, teamSlug), eq(eventTypes.slug, eventSlug)))
+    .limit(1);
+
+  if (!row || !row.isActive) {
+    return null;
+  }
+
+  const mode = resolveTeamMode(row.mode);
+  if (!mode) {
+    return null;
+  }
+
+  const requiredMembers = await db
+    .select({
+      userId: teamMembers.userId,
+      role: teamMembers.role,
+    })
+    .from(teamEventTypeMembers)
+    .innerJoin(
+      teamMembers,
+      and(
+        eq(teamMembers.teamId, row.teamId),
+        eq(teamMembers.userId, teamEventTypeMembers.userId),
+      ),
+    )
+    .where(
+      and(
+        eq(teamEventTypeMembers.teamEventTypeId, row.teamEventTypeId),
+        eq(teamEventTypeMembers.isRequired, true),
+      ),
+    )
+    .orderBy(asc(teamMembers.createdAt), asc(teamMembers.userId));
+
+  if (requiredMembers.length === 0) {
+    return null;
+  }
+
+  return {
+    team: {
+      id: row.teamId,
+      ownerUserId: row.teamOwnerUserId,
+      slug: row.teamSlug,
+      name: row.teamName,
+    },
+    eventType: {
+      id: row.eventTypeId,
+      userId: row.eventTypeUserId,
+      slug: row.eventTypeSlug,
+      name: row.eventTypeName,
+      durationMinutes: row.durationMinutes,
+      locationType: row.locationType,
+      locationValue: row.locationValue,
+      isActive: row.isActive,
+    },
+    mode,
+    roundRobinCursor: row.roundRobinCursor,
+    members: requiredMembers.map((member) => ({
+      userId: member.userId,
+      role: member.role,
+    })),
+  };
+};
+
+const listTeamMemberSchedules = async (
+  db: QueryableDb,
+  memberIds: string[],
+  rangeStart: Date,
+  rangeEnd: Date,
+): Promise<TeamMemberScheduleRecord[]> => {
+  if (memberIds.length === 0) {
+    return [];
+  }
+
+  const uniqueMemberIds = Array.from(new Set(memberIds));
+  const memberUsers = await db
+    .select({
+      id: users.id,
+      timezone: users.timezone,
+    })
+    .from(users)
+    .where(inArray(users.id, uniqueMemberIds));
+
+  const timezoneByUserId = new Map(
+    memberUsers.map((memberUser) => [memberUser.id, normalizeTimezone(memberUser.timezone)]),
+  );
+
+  const schedules: TeamMemberScheduleRecord[] = [];
+
+  for (const userId of uniqueMemberIds) {
+    if (!timezoneByUserId.has(userId)) {
+      continue;
+    }
+
+    const [rules, overrides, directBookings, assignedBookings] = await Promise.all([
+      db
+        .select({
+          dayOfWeek: availabilityRules.dayOfWeek,
+          startMinute: availabilityRules.startMinute,
+          endMinute: availabilityRules.endMinute,
+          bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
+          bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
+        })
+        .from(availabilityRules)
+        .where(eq(availabilityRules.userId, userId)),
+      db
+        .select({
+          startAt: availabilityOverrides.startAt,
+          endAt: availabilityOverrides.endAt,
+          isAvailable: availabilityOverrides.isAvailable,
+        })
+        .from(availabilityOverrides)
+        .where(
+          and(
+            eq(availabilityOverrides.userId, userId),
+            lt(availabilityOverrides.startAt, rangeEnd),
+            gt(availabilityOverrides.endAt, rangeStart),
+          ),
+        ),
+      db
+        .select({
+          startsAt: bookings.startsAt,
+          endsAt: bookings.endsAt,
+          status: bookings.status,
+          metadata: bookings.metadata,
+        })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.organizerId, userId),
+            eq(bookings.status, 'confirmed'),
+            lt(bookings.startsAt, rangeEnd),
+            gt(bookings.endsAt, rangeStart),
+          ),
+        ),
+      db
+        .select({
+          startsAt: teamBookingAssignments.startsAt,
+          endsAt: teamBookingAssignments.endsAt,
+          status: bookings.status,
+          metadata: bookings.metadata,
+        })
+        .from(teamBookingAssignments)
+        .innerJoin(bookings, eq(bookings.id, teamBookingAssignments.bookingId))
+        .where(
+          and(
+            eq(teamBookingAssignments.userId, userId),
+            eq(bookings.status, 'confirmed'),
+            lt(teamBookingAssignments.startsAt, rangeEnd),
+            gt(teamBookingAssignments.endsAt, rangeStart),
+          ),
+        ),
+    ]);
+
+    const dedupedBookings = new Map<
+      string,
+      { startsAt: Date; endsAt: Date; status: string; metadata: string | null }
+    >();
+    for (const booking of [...directBookings, ...assignedBookings]) {
+      const key = `${booking.startsAt.toISOString()}|${booking.endsAt.toISOString()}|${booking.metadata ?? ''}`;
+      dedupedBookings.set(key, booking);
+    }
+
+    schedules.push({
+      userId,
+      timezone: timezoneByUserId.get(userId) ?? 'UTC',
+      rules,
+      overrides,
+      bookings: Array.from(dedupedBookings.values()),
+    });
+  }
+
+  return schedules;
+};
+
+const resolveTeamRequestedSlot = (input: {
+  mode: TeamSchedulingMode;
+  memberSchedules: TeamMemberScheduleRecord[];
+  requestedStartsAtIso: string;
+  durationMinutes: number;
+  rangeStartIso: string;
+  days: number;
+  roundRobinCursor: number;
+}): {
+  assignmentUserIds: string[];
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
+  nextRoundRobinCursor: number;
+  requestedEndsAtIso: string;
+} | null => {
+  const startsAt = DateTime.fromISO(input.requestedStartsAtIso, { zone: 'utc' });
+  if (!startsAt.isValid) {
+    return null;
+  }
+
+  const endsAt = startsAt.plus({ minutes: input.durationMinutes });
+  const requestedEndsAtIso = endsAt.toUTC().toISO();
+  if (!requestedEndsAtIso) {
+    return null;
+  }
+
+  const matrix = computeTeamSlotMatrix({
+    members: input.memberSchedules,
+    rangeStartIso: input.rangeStartIso,
+    days: input.days,
+    durationMinutes: input.durationMinutes,
+  });
+
+  const slotKey = `${input.requestedStartsAtIso}|${requestedEndsAtIso}`;
+  const requestedSlot = matrix.get(slotKey);
+  if (!requestedSlot) {
+    return null;
+  }
+
+  const orderedMemberIds = input.memberSchedules
+    .map((memberSchedule) => memberSchedule.userId)
+    .sort((left, right) => left.localeCompare(right));
+  const availableMemberIds = orderedMemberIds.filter((memberId) => requestedSlot.byUserId.has(memberId));
+
+  if (input.mode === 'collective') {
+    if (availableMemberIds.length !== orderedMemberIds.length) {
+      return null;
+    }
+
+    let bufferBeforeMinutes = 0;
+    let bufferAfterMinutes = 0;
+    for (const memberId of orderedMemberIds) {
+      const memberSlot = requestedSlot.byUserId.get(memberId);
+      if (!memberSlot) {
+        continue;
+      }
+      if (memberSlot.bufferBeforeMinutes > bufferBeforeMinutes) {
+        bufferBeforeMinutes = memberSlot.bufferBeforeMinutes;
+      }
+      if (memberSlot.bufferAfterMinutes > bufferAfterMinutes) {
+        bufferAfterMinutes = memberSlot.bufferAfterMinutes;
+      }
+    }
+
+    return {
+      assignmentUserIds: orderedMemberIds,
+      bufferBeforeMinutes,
+      bufferAfterMinutes,
+      nextRoundRobinCursor: input.roundRobinCursor,
+      requestedEndsAtIso,
+    };
+  }
+
+  const selection = chooseRoundRobinAssignee({
+    orderedMemberIds,
+    availableMemberIds,
+    cursor: input.roundRobinCursor,
+  });
+  if (!selection) {
+    return null;
+  }
+
+  const selectedSlot = requestedSlot.byUserId.get(selection.assigneeUserId);
+  if (!selectedSlot) {
+    return null;
+  }
+
+  return {
+    assignmentUserIds: [selection.assigneeUserId],
+    bufferBeforeMinutes: selectedSlot.bufferBeforeMinutes,
+    bufferAfterMinutes: selectedSlot.bufferAfterMinutes,
+    nextRoundRobinCursor: selection.nextCursor,
+    requestedEndsAtIso,
   };
 };
 
@@ -1591,6 +1953,289 @@ app.patch('/v0/event-types/:id', async (context) => {
   });
 });
 
+app.post('/v0/teams', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const sanitizedBody =
+      body && typeof body === 'object'
+        ? {
+            ...body,
+            slug: typeof body.slug === 'string' ? body.slug.toLowerCase().trim() : body.slug,
+          }
+        : body;
+    const parsed = teamCreateSchema.safeParse(sanitizedBody);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    try {
+      const [team] = await db
+        .insert(teams)
+        .values({
+          ownerUserId: authedUser.id,
+          name: parsed.data.name,
+          slug: parsed.data.slug,
+        })
+        .returning({
+          id: teams.id,
+          ownerUserId: teams.ownerUserId,
+          name: teams.name,
+          slug: teams.slug,
+        });
+
+      if (!team) {
+        return jsonError(context, 500, 'Failed to create team.');
+      }
+
+      await db.insert(teamMembers).values({
+        teamId: team.id,
+        userId: authedUser.id,
+        role: 'owner',
+      });
+
+      return context.json({
+        ok: true,
+        team,
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'teams_slug_unique')) {
+        return jsonError(context, 409, 'A team with that slug already exists.');
+      }
+      if (isUniqueViolation(error, 'team_members_team_user_unique')) {
+        return jsonError(context, 409, 'User is already a team member.');
+      }
+      throw error;
+    }
+  });
+});
+
+app.post('/v0/teams/:teamId/members', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const teamId = context.req.param('teamId');
+    const body = await context.req.json().catch(() => null);
+    const parsed = teamAddMemberSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const [team] = await db
+      .select({
+        id: teams.id,
+        ownerUserId: teams.ownerUserId,
+      })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    if (!team) {
+      return jsonError(context, 404, 'Team not found.');
+    }
+    if (team.ownerUserId !== authedUser.id) {
+      return jsonError(context, 403, 'Only the team owner can add members.');
+    }
+
+    const [memberUser] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        username: users.username,
+        displayName: users.displayName,
+      })
+      .from(users)
+      .where(eq(users.id, parsed.data.userId))
+      .limit(1);
+
+    if (!memberUser) {
+      return jsonError(context, 404, 'User not found.');
+    }
+
+    try {
+      const [inserted] = await db
+        .insert(teamMembers)
+        .values({
+          teamId: team.id,
+          userId: parsed.data.userId,
+          role: parsed.data.role,
+        })
+        .returning({
+          teamId: teamMembers.teamId,
+          userId: teamMembers.userId,
+          role: teamMembers.role,
+        });
+
+      if (!inserted) {
+        return jsonError(context, 500, 'Failed to add team member.');
+      }
+
+      return context.json({
+        ok: true,
+        member: {
+          ...inserted,
+          user: memberUser,
+        },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'team_members_team_user_unique')) {
+        return jsonError(context, 409, 'User is already a team member.');
+      }
+      throw error;
+    }
+  });
+});
+
+app.post('/v0/team-event-types', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const sanitizedBody =
+      body && typeof body === 'object'
+        ? {
+            ...body,
+            slug: typeof body.slug === 'string' ? body.slug.toLowerCase().trim() : body.slug,
+          }
+        : body;
+    const parsed = teamEventTypeCreateSchema.safeParse(sanitizedBody);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const payload = parsed.data;
+    const [team] = await db
+      .select({
+        id: teams.id,
+        ownerUserId: teams.ownerUserId,
+      })
+      .from(teams)
+      .where(eq(teams.id, payload.teamId))
+      .limit(1);
+
+    if (!team) {
+      return jsonError(context, 404, 'Team not found.');
+    }
+    if (team.ownerUserId !== authedUser.id) {
+      return jsonError(context, 403, 'Only the team owner can create team event types.');
+    }
+
+    const teamMemberRows = await db
+      .select({
+        userId: teamMembers.userId,
+      })
+      .from(teamMembers)
+      .where(eq(teamMembers.teamId, team.id));
+
+    const teamMemberSet = new Set(teamMemberRows.map((member) => member.userId));
+    const requiredMemberUserIds = payload.requiredMemberUserIds
+      ? Array.from(new Set(payload.requiredMemberUserIds))
+      : Array.from(teamMemberSet);
+
+    if (requiredMemberUserIds.length === 0) {
+      return jsonError(context, 400, 'Team event type must include at least one required member.');
+    }
+
+    if (requiredMemberUserIds.some((memberId) => !teamMemberSet.has(memberId))) {
+      return jsonError(context, 400, 'All required members must belong to the team.');
+    }
+
+    try {
+      const result = await db.transaction(async (transaction) => {
+        const [eventType] = await transaction
+          .insert(eventTypes)
+          .values({
+            userId: authedUser.id,
+            name: payload.name,
+            slug: payload.slug,
+            durationMinutes: payload.durationMinutes,
+            locationType: payload.locationType,
+            locationValue: payload.locationValue ?? null,
+            questions: payload.questions,
+          })
+          .returning({
+            id: eventTypes.id,
+            userId: eventTypes.userId,
+            slug: eventTypes.slug,
+            name: eventTypes.name,
+            durationMinutes: eventTypes.durationMinutes,
+            locationType: eventTypes.locationType,
+            locationValue: eventTypes.locationValue,
+            questions: eventTypes.questions,
+            isActive: eventTypes.isActive,
+          });
+
+        if (!eventType) {
+          throw new Error('Failed to create base event type.');
+        }
+
+        const [teamEventType] = await transaction
+          .insert(teamEventTypes)
+          .values({
+            teamId: team.id,
+            eventTypeId: eventType.id,
+            mode: payload.mode,
+          })
+          .returning({
+            id: teamEventTypes.id,
+            mode: teamEventTypes.mode,
+            roundRobinCursor: teamEventTypes.roundRobinCursor,
+          });
+
+        if (!teamEventType) {
+          throw new Error('Failed to create team event type.');
+        }
+
+        await transaction.insert(teamEventTypeMembers).values(
+          requiredMemberUserIds.map((memberUserId) => ({
+            teamEventTypeId: teamEventType.id,
+            userId: memberUserId,
+            isRequired: true,
+          })),
+        );
+
+        return {
+          teamEventType,
+          eventType,
+        };
+      });
+
+      return context.json({
+        ok: true,
+        teamEventType: {
+          id: result.teamEventType.id,
+          teamId: team.id,
+          mode: result.teamEventType.mode,
+          roundRobinCursor: result.teamEventType.roundRobinCursor,
+          requiredMemberUserIds,
+          eventType: {
+            ...result.eventType,
+            questions: toEventQuestions(result.eventType.questions),
+          },
+        },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'event_types_user_slug_unique')) {
+        return jsonError(context, 409, 'An event type with that slug already exists.');
+      }
+      if (isUniqueViolation(error, 'team_event_type_members_event_type_user_unique')) {
+        return jsonError(context, 409, 'Duplicate team event member assignment.');
+      }
+      throw error;
+    }
+  });
+});
+
 app.put('/v0/me/availability/rules', async (context) => {
   return withDatabase(context, async (db) => {
     const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
@@ -1785,6 +2430,398 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
         endsAt: slot.endsAt,
       })),
     });
+  });
+});
+
+app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (context) => {
+  return withDatabase(context, async (db) => {
+    const teamSlug = context.req.param('teamSlug');
+    const eventSlug = context.req.param('eventSlug');
+    const teamEventContext = await findTeamEventTypeContext(db, teamSlug, eventSlug);
+
+    if (!teamEventContext) {
+      return jsonError(context, 404, 'Team event type not found.');
+    }
+
+    const query = availabilityQuerySchema.safeParse({
+      timezone: context.req.query('timezone') ?? undefined,
+      start: context.req.query('start') ?? undefined,
+      days: context.req.query('days') ?? undefined,
+    });
+    if (!query.success) {
+      return jsonError(context, 400, query.error.issues[0]?.message ?? 'Invalid query params.');
+    }
+
+    const startIso = query.data.start ?? DateTime.utc().toISO();
+    if (!startIso) {
+      return jsonError(context, 400, 'Invalid range start.');
+    }
+    const rangeStart = DateTime.fromISO(startIso, { zone: 'utc' });
+    if (!rangeStart.isValid) {
+      return jsonError(context, 400, 'Invalid range start.');
+    }
+
+    const days = query.data.days ?? 7;
+    const rangeEnd = rangeStart.plus({ days });
+    const memberSchedules = await listTeamMemberSchedules(
+      db,
+      teamEventContext.members.map((member) => member.userId),
+      rangeStart.toJSDate(),
+      rangeEnd.toJSDate(),
+    );
+
+    const availability = computeTeamAvailabilitySlots({
+      mode: teamEventContext.mode,
+      members: memberSchedules,
+      rangeStartIso: startIso,
+      days,
+      durationMinutes: teamEventContext.eventType.durationMinutes,
+      roundRobinCursor: teamEventContext.roundRobinCursor,
+    });
+
+    return context.json({
+      ok: true,
+      mode: teamEventContext.mode,
+      timezone: normalizeTimezone(query.data.timezone),
+      slots: availability.slots.map((slot) => ({
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        assignmentUserIds: slot.assignmentUserIds,
+      })),
+    });
+  });
+});
+
+app.post('/v0/team-bookings', async (context) => {
+  return withDatabase(context, async (db) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = teamBookingCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const payload = parsed.data;
+    const timezone = normalizeTimezone(payload.timezone);
+    const startsAt = DateTime.fromISO(payload.startsAt, { zone: 'utc' });
+    if (!startsAt.isValid) {
+      return jsonError(context, 400, 'Invalid startsAt value.');
+    }
+
+    const requestedStartsAtIso = startsAt.toUTC().toISO();
+    if (!requestedStartsAtIso) {
+      return jsonError(context, 400, 'Unable to normalize startsAt.');
+    }
+
+    try {
+      const result = await db.transaction(async (transaction) => {
+        const lockedTeamEventResult = await transaction.execute<{
+          teamEventTypeId: string;
+          teamId: string;
+          teamName: string;
+          mode: string;
+          roundRobinCursor: number;
+          eventTypeId: string;
+          eventTypeName: string;
+          durationMinutes: number;
+          locationType: string;
+          locationValue: string | null;
+          isActive: boolean;
+        }>(sql`
+          select
+            tet.id as "teamEventTypeId",
+            tet.team_id as "teamId",
+            t.name as "teamName",
+            tet.mode,
+            tet.round_robin_cursor as "roundRobinCursor",
+            et.id as "eventTypeId",
+            et.name as "eventTypeName",
+            et.duration_minutes as "durationMinutes",
+            et.location_type as "locationType",
+            et.location_value as "locationValue",
+            et.is_active as "isActive"
+          from team_event_types tet
+          inner join teams t on t.id = tet.team_id
+          inner join event_types et on et.id = tet.event_type_id
+          where t.slug = ${payload.teamSlug} and et.slug = ${payload.eventSlug}
+          for update
+        `);
+
+        const teamEventRow = lockedTeamEventResult.rows[0];
+        const mode = teamEventRow ? resolveTeamMode(teamEventRow.mode) : null;
+        if (!teamEventRow || !teamEventRow.isActive || !mode) {
+          throw new BookingNotFoundError('Team event type not found.');
+        }
+
+        const memberRows = await transaction
+          .select({
+            userId: teamEventTypeMembers.userId,
+          })
+          .from(teamEventTypeMembers)
+          .where(
+            and(
+              eq(teamEventTypeMembers.teamEventTypeId, teamEventRow.teamEventTypeId),
+              eq(teamEventTypeMembers.isRequired, true),
+            ),
+          )
+          .orderBy(asc(teamEventTypeMembers.userId));
+
+        const memberUserIds = memberRows.map((member) => member.userId);
+        if (memberUserIds.length === 0) {
+          throw new BookingValidationError('Team event has no required members.');
+        }
+
+        const rangeStart = startsAt.minus({ days: 1 });
+        const requestedEndsAt = startsAt.plus({ minutes: teamEventRow.durationMinutes });
+        const rangeEnd = requestedEndsAt.plus({ days: 1 });
+        const rangeStartIso = rangeStart.toUTC().toISO();
+        if (!rangeStartIso) {
+          throw new BookingValidationError('Unable to build slot validation range.');
+        }
+
+        const memberSchedules = await listTeamMemberSchedules(
+          transaction,
+          memberUserIds,
+          rangeStart.toJSDate(),
+          rangeEnd.toJSDate(),
+        );
+        if (memberSchedules.length !== memberUserIds.length) {
+          throw new BookingValidationError('Some required team members no longer exist.');
+        }
+
+        const slotResolution = resolveTeamRequestedSlot({
+          mode,
+          memberSchedules,
+          requestedStartsAtIso,
+          durationMinutes: teamEventRow.durationMinutes,
+          rangeStartIso,
+          days: 2,
+          roundRobinCursor: teamEventRow.roundRobinCursor,
+        });
+        if (!slotResolution) {
+          throw new BookingConflictError('Selected slot is no longer available.');
+        }
+
+        // Organizer for a team booking is deterministically the first assigned member.
+        const organizerId = slotResolution.assignmentUserIds[0];
+        if (!organizerId) {
+          throw new BookingValidationError('Unable to assign team booking.');
+        }
+
+        const metadata = JSON.stringify({
+          answers: payload.answers ?? {},
+          timezone,
+          bufferBeforeMinutes: slotResolution.bufferBeforeMinutes,
+          bufferAfterMinutes: slotResolution.bufferAfterMinutes,
+          team: {
+            teamId: teamEventRow.teamId,
+            teamSlug: payload.teamSlug,
+            teamEventTypeId: teamEventRow.teamEventTypeId,
+            mode,
+            assignmentUserIds: slotResolution.assignmentUserIds,
+          },
+        });
+
+        const tokenSet = createBookingActionTokenSet();
+
+        let insertedBooking: {
+          id: string;
+          eventTypeId: string;
+          organizerId: string;
+          inviteeName: string;
+          inviteeEmail: string;
+          startsAt: Date;
+          endsAt: Date;
+        } | null = null;
+        try {
+          const [bookingInsert] = await transaction
+            .insert(bookings)
+            .values({
+              eventTypeId: teamEventRow.eventTypeId,
+              organizerId,
+              inviteeName: payload.inviteeName,
+              inviteeEmail: payload.inviteeEmail,
+              startsAt: startsAt.toJSDate(),
+              endsAt: new Date(slotResolution.requestedEndsAtIso),
+              metadata,
+            })
+            .returning({
+              id: bookings.id,
+              eventTypeId: bookings.eventTypeId,
+              organizerId: bookings.organizerId,
+              inviteeName: bookings.inviteeName,
+              inviteeEmail: bookings.inviteeEmail,
+              startsAt: bookings.startsAt,
+              endsAt: bookings.endsAt,
+            });
+          insertedBooking = bookingInsert ?? null;
+        } catch (error) {
+          if (isUniqueViolation(error, 'bookings_unique_slot')) {
+            throw new BookingConflictError('Selected slot is no longer available.');
+          }
+          throw error;
+        }
+
+        if (!insertedBooking) {
+          throw new Error('Failed to create team booking.');
+        }
+
+        await transaction.insert(bookingActionTokens).values(
+          tokenSet.tokenWrites.map((tokenWrite) => ({
+            bookingId: insertedBooking.id,
+            actionType: tokenWrite.actionType,
+            tokenHash: tokenWrite.tokenHash,
+            expiresAt: tokenWrite.expiresAt,
+          })),
+        );
+
+        try {
+          await transaction.insert(teamBookingAssignments).values(
+            slotResolution.assignmentUserIds.map((memberUserId) => ({
+              bookingId: insertedBooking.id,
+              teamEventTypeId: teamEventRow.teamEventTypeId,
+              userId: memberUserId,
+              startsAt: insertedBooking.startsAt,
+              endsAt: insertedBooking.endsAt,
+            })),
+          );
+        } catch (error) {
+          if (isUniqueViolation(error, 'team_booking_assignments_user_slot_unique')) {
+            throw new BookingConflictError('Selected slot is no longer available.');
+          }
+          throw error;
+        }
+
+        if (mode === 'round_robin') {
+          await transaction
+            .update(teamEventTypes)
+            .set({
+              roundRobinCursor: slotResolution.nextRoundRobinCursor,
+            })
+            .where(eq(teamEventTypes.id, teamEventRow.teamEventTypeId));
+        }
+
+        const [organizer] = await transaction
+          .select({
+            id: users.id,
+            email: users.email,
+            displayName: users.displayName,
+          })
+          .from(users)
+          .where(eq(users.id, organizerId))
+          .limit(1);
+
+        if (!organizer) {
+          throw new Error('Assigned organizer not found.');
+        }
+
+        return {
+          booking: insertedBooking,
+          eventType: {
+            id: teamEventRow.eventTypeId,
+            name: teamEventRow.eventTypeName,
+            locationType: teamEventRow.locationType,
+            locationValue: teamEventRow.locationValue,
+          },
+          team: {
+            id: teamEventRow.teamId,
+            name: teamEventRow.teamName,
+            mode,
+            teamEventTypeId: teamEventRow.teamEventTypeId,
+          },
+          organizer,
+          actionTokens: tokenSet.publicTokens,
+          assignmentUserIds: slotResolution.assignmentUserIds,
+        };
+      });
+
+      const tokens = actionTokenMap(result.actionTokens);
+      const actionUrls = buildActionUrls(context.req.raw, {
+        cancelToken: tokens.cancelToken,
+        rescheduleToken: tokens.rescheduleToken,
+      });
+
+      const email = await sendBookingConfirmationEmail(context.env, {
+        inviteeEmail: payload.inviteeEmail,
+        inviteeName: payload.inviteeName,
+        organizerDisplayName:
+          result.team.mode === 'collective' ? `${result.team.name} Team` : result.organizer.displayName,
+        eventName: result.eventType.name,
+        startsAt: result.booking.startsAt.toISOString(),
+        timezone,
+        locationType: result.eventType.locationType,
+        locationValue: result.eventType.locationValue,
+        cancelLink: actionUrls.lookupCancelUrl,
+        rescheduleLink: actionUrls.lookupRescheduleUrl,
+        idempotencyKey: `booking-confirmation:${result.booking.id}`,
+      });
+
+      const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
+        organizerId: result.booking.organizerId,
+        type: 'booking.created',
+        booking: {
+          id: result.booking.id,
+          eventTypeId: result.booking.eventTypeId,
+          organizerId: result.booking.organizerId,
+          inviteeEmail: result.booking.inviteeEmail,
+          inviteeName: result.booking.inviteeName,
+          startsAtIso: result.booking.startsAt.toISOString(),
+          endsAtIso: result.booking.endsAt.toISOString(),
+        },
+        metadata: {
+          timezone,
+          teamId: result.team.id,
+          teamEventTypeId: result.team.teamEventTypeId,
+          teamMode: result.team.mode,
+          assignmentUserIds: result.assignmentUserIds,
+          actionLookupCancelUrl: actionUrls.lookupCancelUrl,
+          actionLookupRescheduleUrl: actionUrls.lookupRescheduleUrl,
+        },
+      });
+
+      return context.json({
+        ok: true,
+        booking: {
+          id: result.booking.id,
+          eventTypeId: result.booking.eventTypeId,
+          organizerId: result.booking.organizerId,
+          inviteeName: result.booking.inviteeName,
+          inviteeEmail: result.booking.inviteeEmail,
+          startsAt: result.booking.startsAt.toISOString(),
+          endsAt: result.booking.endsAt.toISOString(),
+          assignmentUserIds: result.assignmentUserIds,
+          teamMode: result.team.mode,
+        },
+        actions: {
+          cancel: {
+            token: tokens.cancelToken,
+            expiresAt: tokens.cancelExpiresAt,
+            lookupUrl: actionUrls.lookupCancelUrl,
+            url: actionUrls.cancelUrl,
+          },
+          reschedule: {
+            token: tokens.rescheduleToken,
+            expiresAt: tokens.rescheduleExpiresAt,
+            lookupUrl: actionUrls.lookupRescheduleUrl,
+            url: actionUrls.rescheduleUrl,
+          },
+        },
+        email,
+        webhooks: {
+          queued: queuedWebhookDeliveries,
+        },
+      });
+    } catch (error) {
+      if (error instanceof BookingNotFoundError) {
+        return jsonError(context, 404, 'Team event type not found.');
+      }
+      if (error instanceof BookingValidationError) {
+        return jsonError(context, 400, error.message);
+      }
+      if (error instanceof BookingConflictError) {
+        return jsonError(context, 409, error.message);
+      }
+      throw error;
+    }
   });
 });
 
@@ -2217,6 +3254,10 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
               ),
             );
 
+          await transaction
+            .delete(teamBookingAssignments)
+            .where(eq(teamBookingAssignments.bookingId, booking.id));
+
           return {
             booking,
             eventType,
@@ -2262,6 +3303,10 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
           .where(
             and(eq(bookingActionTokens.bookingId, booking.id), isNull(bookingActionTokens.consumedAt)),
           );
+
+        await transaction
+          .delete(teamBookingAssignments)
+          .where(eq(teamBookingAssignments.bookingId, booking.id));
 
         return {
           booking: canceledBooking,
@@ -2497,70 +3542,163 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           throw new BookingValidationError('Unable to build slot validation range.');
         }
 
-        const [rules, overrides, existingBookings] = await Promise.all([
-          transaction
-            .select({
-              dayOfWeek: availabilityRules.dayOfWeek,
-              startMinute: availabilityRules.startMinute,
-              endMinute: availabilityRules.endMinute,
-              bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
-              bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
-            })
-            .from(availabilityRules)
-            .where(eq(availabilityRules.userId, organizerRow.id)),
-          transaction
-            .select({
-              startAt: availabilityOverrides.startAt,
-              endAt: availabilityOverrides.endAt,
-              isAvailable: availabilityOverrides.isAvailable,
-            })
-            .from(availabilityOverrides)
-            .where(
-              and(
-                eq(availabilityOverrides.userId, organizerRow.id),
-                lt(availabilityOverrides.startAt, rangeEnd.toJSDate()),
-                gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
-              ),
-            ),
-          transaction
-            .select({
-              id: bookings.id,
-              startsAt: bookings.startsAt,
-              endsAt: bookings.endsAt,
-              status: bookings.status,
-              metadata: bookings.metadata,
-            })
-            .from(bookings)
-            .where(
-              and(
-                eq(bookings.organizerId, organizerRow.id),
-                eq(bookings.status, 'confirmed'),
-                lt(bookings.startsAt, rangeEnd.toJSDate()),
-                gt(bookings.endsAt, rangeStart.toJSDate()),
-              ),
-            ),
-        ]);
+        const existingMetadata = parseBookingMetadata(booking.metadata, normalizeTimezone);
+        const existingTeamAssignments = await transaction
+          .select({
+            teamEventTypeId: teamBookingAssignments.teamEventTypeId,
+            userId: teamBookingAssignments.userId,
+          })
+          .from(teamBookingAssignments)
+          .where(eq(teamBookingAssignments.bookingId, booking.id))
+          .orderBy(asc(teamBookingAssignments.userId));
 
-        const slotResolution = resolveRequestedRescheduleSlot({
-          requestedStartsAtIso,
-          durationMinutes: eventTypeRow.durationMinutes,
-          organizerTimezone: normalizeTimezone(organizerRow.timezone),
-          rules,
-          overrides,
-          bookings: existingBookings,
-          excludeBookingId: booking.id,
-        });
+        let bufferBeforeMinutes = 0;
+        let bufferAfterMinutes = 0;
+        let teamAssignmentWrite: { teamEventTypeId: string; userIds: string[]; mode: TeamSchedulingMode } | null =
+          null;
 
-        if (!slotResolution) {
-          throw new BookingConflictError('Selected slot is no longer available.');
+        if (existingTeamAssignments.length === 0) {
+          const [rules, overrides, existingBookings] = await Promise.all([
+            transaction
+              .select({
+                dayOfWeek: availabilityRules.dayOfWeek,
+                startMinute: availabilityRules.startMinute,
+                endMinute: availabilityRules.endMinute,
+                bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
+                bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
+              })
+              .from(availabilityRules)
+              .where(eq(availabilityRules.userId, organizerRow.id)),
+            transaction
+              .select({
+                startAt: availabilityOverrides.startAt,
+                endAt: availabilityOverrides.endAt,
+                isAvailable: availabilityOverrides.isAvailable,
+              })
+              .from(availabilityOverrides)
+              .where(
+                and(
+                  eq(availabilityOverrides.userId, organizerRow.id),
+                  lt(availabilityOverrides.startAt, rangeEnd.toJSDate()),
+                  gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
+                ),
+              ),
+            transaction
+              .select({
+                id: bookings.id,
+                startsAt: bookings.startsAt,
+                endsAt: bookings.endsAt,
+                status: bookings.status,
+                metadata: bookings.metadata,
+              })
+              .from(bookings)
+              .where(
+                and(
+                  eq(bookings.organizerId, organizerRow.id),
+                  eq(bookings.status, 'confirmed'),
+                  lt(bookings.startsAt, rangeEnd.toJSDate()),
+                  gt(bookings.endsAt, rangeStart.toJSDate()),
+                ),
+              ),
+          ]);
+
+          const slotResolution = resolveRequestedRescheduleSlot({
+            requestedStartsAtIso,
+            durationMinutes: eventTypeRow.durationMinutes,
+            organizerTimezone: normalizeTimezone(organizerRow.timezone),
+            rules,
+            overrides,
+            bookings: existingBookings,
+            excludeBookingId: booking.id,
+          });
+
+          if (!slotResolution) {
+            throw new BookingConflictError('Selected slot is no longer available.');
+          }
+
+          bufferBeforeMinutes = slotResolution.matchingSlot.bufferBeforeMinutes;
+          bufferAfterMinutes = slotResolution.matchingSlot.bufferAfterMinutes;
+        } else {
+          const teamEventTypeId = existingTeamAssignments[0]?.teamEventTypeId;
+          if (!teamEventTypeId) {
+            throw new BookingValidationError('Invalid team assignment state.');
+          }
+
+          const [teamEventRow] = await transaction
+            .select({
+              id: teamEventTypes.id,
+              mode: teamEventTypes.mode,
+            })
+            .from(teamEventTypes)
+            .where(eq(teamEventTypes.id, teamEventTypeId))
+            .limit(1);
+
+          const teamMode = teamEventRow ? resolveTeamMode(teamEventRow.mode) : null;
+          if (!teamEventRow || !teamMode) {
+            throw new BookingValidationError('Team scheduling mode is invalid.');
+          }
+
+          const assignmentUserIds = Array.from(
+            new Set(existingTeamAssignments.map((assignment) => assignment.userId)),
+          );
+          const memberSchedules = await listTeamMemberSchedules(
+            transaction,
+            assignmentUserIds,
+            rangeStart.toJSDate(),
+            rangeEnd.toJSDate(),
+          );
+
+          const filteredMemberSchedules = memberSchedules.map((schedule) => ({
+            ...schedule,
+            bookings: schedule.bookings.filter(
+              (existingBooking) =>
+                !(
+                  existingBooking.startsAt.getTime() === booking.startsAt.getTime() &&
+                  existingBooking.endsAt.getTime() === booking.endsAt.getTime()
+                ),
+            ),
+          }));
+
+          const teamSlotResolution = resolveTeamRequestedSlot({
+            mode: teamMode,
+            memberSchedules: filteredMemberSchedules,
+            requestedStartsAtIso,
+            durationMinutes: eventTypeRow.durationMinutes,
+            rangeStartIso,
+            days: 2,
+            roundRobinCursor: 0,
+          });
+          if (!teamSlotResolution) {
+            throw new BookingConflictError('Selected slot is no longer available.');
+          }
+
+          bufferBeforeMinutes = teamSlotResolution.bufferBeforeMinutes;
+          bufferAfterMinutes = teamSlotResolution.bufferAfterMinutes;
+          teamAssignmentWrite = {
+            teamEventTypeId,
+            userIds: teamSlotResolution.assignmentUserIds,
+            mode: teamMode,
+          };
         }
 
-        const existingMetadata = parseBookingMetadata(booking.metadata, normalizeTimezone);
         const metadata = JSON.stringify({
           answers: existingMetadata.answers,
           timezone,
-          bufferBeforeMinutes: slotResolution.matchingSlot.bufferBeforeMinutes,
-          bufferAfterMinutes: slotResolution.matchingSlot.bufferAfterMinutes,
+          bufferBeforeMinutes,
+          bufferAfterMinutes,
+          ...(existingMetadata.team
+            ? {
+                team: {
+                  ...existingMetadata.team,
+                  ...(teamAssignmentWrite
+                    ? {
+                        assignmentUserIds: teamAssignmentWrite.userIds,
+                        mode: teamAssignmentWrite.mode,
+                      }
+                    : {}),
+                },
+              }
+            : {}),
         });
 
         let insertedBooking: {
@@ -2581,8 +3719,8 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
               organizerId: booking.organizerId,
               inviteeName: booking.inviteeName,
               inviteeEmail: booking.inviteeEmail,
-              startsAt: slotResolution.requestedStartsAt,
-              endsAt: slotResolution.requestedEndsAt,
+              startsAt: startsAt.toJSDate(),
+              endsAt: requestedEndsAt.toJSDate(),
               status: 'confirmed',
               rescheduledFromBookingId: booking.id,
               metadata,
@@ -2635,6 +3773,29 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           .where(
             and(eq(bookingActionTokens.bookingId, booking.id), isNull(bookingActionTokens.consumedAt)),
           );
+
+        await transaction
+          .delete(teamBookingAssignments)
+          .where(eq(teamBookingAssignments.bookingId, booking.id));
+
+        if (teamAssignmentWrite) {
+          try {
+            await transaction.insert(teamBookingAssignments).values(
+              teamAssignmentWrite.userIds.map((memberUserId) => ({
+                bookingId: insertedBooking.id,
+                teamEventTypeId: teamAssignmentWrite.teamEventTypeId,
+                userId: memberUserId,
+                startsAt: insertedBooking.startsAt,
+                endsAt: insertedBooking.endsAt,
+              })),
+            );
+          } catch (error) {
+            if (isUniqueViolation(error, 'team_booking_assignments_user_slot_unique')) {
+              throw new BookingConflictError('Selected slot is no longer available.');
+            }
+            throw error;
+          }
+        }
 
         return {
           oldBooking: {

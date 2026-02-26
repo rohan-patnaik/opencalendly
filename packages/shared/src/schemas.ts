@@ -22,6 +22,8 @@ export const eventQuestionSchema = z.object({
 
 export const eventQuestionsSchema = z.array(eventQuestionSchema).max(20);
 export const locationTypeSchema = z.enum(['video', 'phone', 'in_person', 'custom']);
+export const teamMemberRoleSchema = z.enum(['owner', 'member']);
+export const teamSchedulingModeSchema = z.enum(['round_robin', 'collective']);
 
 export const magicLinkRequestSchema = z.object({
   email: emailSchema,
@@ -54,6 +56,28 @@ export const eventTypeUpdateSchema = eventTypeCreateSchema
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field is required.',
   });
+
+export const teamCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  slug: eventSlugSchema,
+});
+
+export const teamAddMemberSchema = z.object({
+  userId: z.string().uuid(),
+  role: teamMemberRoleSchema.default('member'),
+});
+
+export const teamEventTypeCreateSchema = z.object({
+  teamId: z.string().uuid(),
+  name: z.string().min(1).max(120),
+  slug: eventSlugSchema,
+  durationMinutes: z.number().int().min(5).max(240),
+  mode: teamSchedulingModeSchema,
+  locationType: locationTypeSchema.default('video'),
+  locationValue: z.string().max(500).nullish(),
+  questions: eventQuestionsSchema.default([]),
+  requiredMemberUserIds: z.array(z.string().uuid()).min(1).max(100).optional(),
+});
 
 export const availabilityRuleSchema = z
   .object({
@@ -94,6 +118,16 @@ export const availabilityQuerySchema = z.object({
 
 export const bookingCreateSchema = z.object({
   username: usernameSchema,
+  eventSlug: eventSlugSchema,
+  startsAt: z.string().datetime({ offset: true }),
+  timezone: timezoneSchema.optional(),
+  inviteeName: z.string().min(1).max(120),
+  inviteeEmail: emailSchema,
+  answers: z.record(z.string(), z.string()).optional(),
+});
+
+export const teamBookingCreateSchema = z.object({
+  teamSlug: eventSlugSchema,
   eventSlug: eventSlugSchema,
   startsAt: z.string().datetime({ offset: true }),
   timezone: timezoneSchema.optional(),
@@ -170,10 +204,16 @@ export type BookingActionType = z.infer<typeof bookingActionTypeSchema>;
 export type EventTypeCreateInput = z.infer<typeof eventTypeCreateSchema>;
 export type EventTypeUpdateInput = z.infer<typeof eventTypeUpdateSchema>;
 export type EventQuestion = z.infer<typeof eventQuestionSchema>;
+export type TeamMemberRole = z.infer<typeof teamMemberRoleSchema>;
+export type TeamSchedulingMode = z.infer<typeof teamSchedulingModeSchema>;
+export type TeamCreateInput = z.infer<typeof teamCreateSchema>;
+export type TeamAddMemberInput = z.infer<typeof teamAddMemberSchema>;
+export type TeamEventTypeCreateInput = z.infer<typeof teamEventTypeCreateSchema>;
 export type AvailabilityRuleInput = z.infer<typeof availabilityRuleSchema>;
 export type AvailabilityOverrideInput = z.infer<typeof availabilityOverrideSchema>;
 export type AvailabilityQueryInput = z.infer<typeof availabilityQuerySchema>;
 export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
+export type TeamBookingCreateInput = z.infer<typeof teamBookingCreateSchema>;
 export type BookingCancelInput = z.infer<typeof bookingCancelSchema>;
 export type BookingRescheduleInput = z.infer<typeof bookingRescheduleSchema>;
 export type DemoCreditsConsumeInput = z.infer<typeof demoCreditsConsumeSchema>;

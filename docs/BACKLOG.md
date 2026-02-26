@@ -67,3 +67,18 @@ Acceptance criteria:
 - Feature includes tests for event payload shape, signature generation, and retry scheduling logic.
 - `docs/API.md` includes webhook subscription and delivery contracts.
 - Embed documentation is added/updated in `README.md` (or dedicated docs page).
+
+## Feature 5 (PR#7): Team Scheduling Modes v1 (Round Robin + Collective)
+
+Acceptance criteria:
+
+- Authenticated organizers can create teams and add members.
+- Team event types can be configured with a scheduling mode: `round_robin` or `collective`.
+- Public availability endpoint supports team event types:
+  - `round_robin` returns slots from available assignees and rotates assignments fairly (distributes bookings evenly across available members over time).
+  - `collective` returns only slots where all required members are simultaneously available.
+- Booking commit for team event types stores assignment details and remains correctness-safe (transaction + unique slot constraint).
+- Reschedule/cancel flow remains compatible for team-assigned bookings.
+- Team mode logic is covered by tests for slot computation and booking assignment correctness.
+- `docs/API.md` includes team and team-event draft/final contracts.
+- `docs/ARCHITECTURE.md` is updated if data model/flow changes materially.

@@ -15,9 +15,14 @@ flowchart LR
 - `users`: account identity and timezone.
 - `sessions`: session tokens (DB-backed auth sessions).
 - `event_types`: host-defined booking templates.
+- `teams`: organizer-owned teams.
+- `team_members`: team membership + role.
+- `team_event_types`: links a base event type to a team scheduling mode (`round_robin`/`collective`).
+- `team_event_type_members`: required members for a team event type.
 - `availability_rules`: recurring weekly availability windows.
 - `availability_overrides`: date-specific changes.
 - `bookings`: confirmed/canceled/rescheduled booking records.
+- `team_booking_assignments`: per-member slot assignment rows for team bookings (enforces member-level uniqueness).
 - `webhook_subscriptions`: organizer-managed outbound webhook endpoints/secrets/event filters.
 - `webhook_deliveries`: queued delivery attempts with retry state and final status.
 
@@ -53,9 +58,20 @@ flowchart LR
 4. Non-2xx / transient failures reschedule with exponential backoff.
 5. Delivery marks `succeeded` or `failed` after bounded attempts.
 
+### Team booking (Feature 5)
+
+1. Public API resolves team event type (`team + mode + required members`).
+2. API computes member-level slot availability from each member's rules/overrides and confirmed bookings.
+3. `round_robin`: choose one assignee using persistent cursor rotation.
+4. `collective`: require slot intersection across all required members.
+5. Inside transaction, API writes booking + action tokens + team assignment rows.
+6. Unique constraints prevent double-booking races at member slot level.
+7. Cancel/reschedule keeps token flow unchanged and updates/deletes assignment rows accordingly.
+
 ## Correctness and idempotency notes
 
 - Booking writes must be transactional.
 - Slot uniqueness is enforced in DB (not only in app logic).
+- Team bookings additionally enforce per-member slot uniqueness through `team_booking_assignments`.
 - Email sends should be keyed by idempotency token to avoid duplicates on retries.
 - Webhooks use exponential backoff and dedupe by subscription + event id.

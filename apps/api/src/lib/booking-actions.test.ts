@@ -59,6 +59,26 @@ describe('booking action helpers', () => {
     expect(parsed.timezone).toBe('Asia/Kolkata');
   });
 
+  it('extracts team assignment metadata when present', () => {
+    const parsed = parseBookingMetadata(
+      JSON.stringify({
+        answers: { company: 'Acme' },
+        team: {
+          teamId: 'team-1',
+          teamSlug: 'customer-success',
+          teamEventTypeId: 'team-event-1',
+          mode: 'collective',
+          assignmentUserIds: ['user-1', 'user-2'],
+        },
+      }),
+      (timezone) => timezone ?? 'UTC',
+    );
+
+    expect(parsed.team?.teamId).toBe('team-1');
+    expect(parsed.team?.mode).toBe('collective');
+    expect(parsed.team?.assignmentUserIds).toEqual(['user-1', 'user-2']);
+  });
+
   it('finds requested reschedule slot when available', () => {
     const result = resolveRequestedRescheduleSlot({
       requestedStartsAtIso: '2026-03-02T09:00:00.000Z',
