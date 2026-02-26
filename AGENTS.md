@@ -31,14 +31,19 @@
 4) Reviews (mandatory order)
    - Codex self-review checklist
    - Open PR
-   - Greptile PR review must run
+   - Greptile PR review must run (auto-trigger expected)
+   - If Greptile status check does not appear within 5 minutes of PR update, trigger Greptile manually from dashboard and continue waiting for review
    - Resolve all Greptile review comments before merge
+   - Resolve all CodeRabbit review comments before merge when CodeRabbit posts review comments
+   - After each Greptile/CodeRabbit comment batch, provide a concise in-chat summary:
+     - what each reviewer asked to change
+     - what change will be made in response
 5) Merge
    - Merge PR only after Greptile review has run and comments are resolved
    - Do not delete the source feature branch after merge
    - Update docs/PRD.md and docs/ARCHITECTURE.md only if the feature changes plan/architecture
 6) Handoff
-   - After merge, produce NEXT_CHAT_PROMPT including:
+   - After merge, provide an in-chat handoff summary including:
      - what shipped
      - what’s next
      - commands/env vars
@@ -54,4 +59,4 @@
 - Tests added/updated
 - Docs updated
 - CI green
-- NEXT_CHAT_PROMPT generated after merge
+- In-chat handoff summary posted after merge
