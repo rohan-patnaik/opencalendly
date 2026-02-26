@@ -759,3 +759,61 @@ Delivery request headers:
 ## Webhook Event Schema (v0)
 
 Source of truth: `packages/shared/src/schemas.ts` (`webhookEventSchema`).
+
+## Feature 5 Draft Endpoints (Team Scheduling v1)
+
+### `POST /v0/teams`
+
+Auth required. Creates a team owned by the current organizer.
+
+Request:
+
+```json
+{
+  "name": "Customer Success Team",
+  "slug": "customer-success"
+}
+```
+
+### `POST /v0/teams/:teamId/members`
+
+Auth required. Adds a member user to a team.
+
+Request:
+
+```json
+{
+  "userId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+  "role": "member"
+}
+```
+
+### `POST /v0/team-event-types`
+
+Auth required. Creates a team event type with scheduling mode.
+
+Request:
+
+```json
+{
+  "teamId": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+  "name": "Team Intro",
+  "slug": "team-intro",
+  "durationMinutes": 30,
+  "mode": "round_robin"
+}
+```
+
+### `GET /v0/teams/:teamSlug/event-types/:eventSlug/availability`
+
+Public availability endpoint for team event types.
+
+Query params:
+
+- `timezone` (optional)
+- `start` (optional ISO datetime)
+- `days` (optional integer `1..30`)
+
+### `POST /v0/team-bookings`
+
+Public booking commit endpoint for team event types. Behavior and response contract will align with existing booking correctness guarantees while adding assignment metadata.
