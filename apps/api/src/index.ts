@@ -1447,6 +1447,7 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
             sendBookingCancellationEmail(context.env, {
               recipientEmail: result.booking.inviteeEmail,
               recipientName: result.booking.inviteeName,
+              recipientRole: 'invitee',
               organizerDisplayName: result.organizer.displayName,
               eventName: result.eventType.name,
               startsAt: result.booking.startsAt.toISOString(),
@@ -1457,6 +1458,7 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
             sendBookingCancellationEmail(context.env, {
               recipientEmail: result.organizer.email,
               recipientName: result.organizer.displayName,
+              recipientRole: 'organizer',
               organizerDisplayName: result.organizer.displayName,
               eventName: result.eventType.name,
               startsAt: result.booking.startsAt.toISOString(),
@@ -1797,6 +1799,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             sendBookingRescheduledEmail(context.env, {
               recipientEmail: result.newBooking.inviteeEmail,
               recipientName: result.newBooking.inviteeName,
+              recipientRole: 'invitee',
               organizerDisplayName: result.organizer.displayName,
               eventName: result.eventType.name,
               oldStartsAt: result.oldBooking.startsAt.toISOString(),
@@ -1807,6 +1810,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             sendBookingRescheduledEmail(context.env, {
               recipientEmail: result.organizer.email,
               recipientName: result.organizer.displayName,
+              recipientRole: 'organizer',
               organizerDisplayName: result.organizer.displayName,
               eventName: result.eventType.name,
               oldStartsAt: result.oldBooking.startsAt.toISOString(),

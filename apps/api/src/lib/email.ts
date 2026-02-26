@@ -22,6 +22,7 @@ export type BookingConfirmationEmailInput = {
 export type BookingCancellationEmailInput = {
   recipientEmail: string;
   recipientName: string;
+  recipientRole: 'invitee' | 'organizer';
   organizerDisplayName: string;
   eventName: string;
   startsAt: string;
@@ -33,6 +34,7 @@ export type BookingCancellationEmailInput = {
 export type BookingRescheduledEmailInput = {
   recipientEmail: string;
   recipientName: string;
+  recipientRole: 'invitee' | 'organizer';
   organizerDisplayName: string;
   eventName: string;
   oldStartsAt: string;
@@ -182,7 +184,9 @@ export const sendBookingCancellationEmail = async (
   const textLines = [
     `Hi ${input.recipientName},`,
     '',
-    `${input.organizerDisplayName} canceled this booking.`,
+    input.recipientRole === 'invitee'
+      ? 'You have canceled your booking.'
+      : 'Your invitee has canceled their booking.',
     `Event: ${input.eventName}`,
     `Original time: ${when} (${input.timezone})`,
   ];
@@ -209,7 +213,9 @@ export const sendBookingRescheduledEmail = async (
   const text = [
     `Hi ${input.recipientName},`,
     '',
-    `${input.organizerDisplayName} rescheduled this booking.`,
+    input.recipientRole === 'invitee'
+      ? 'You have rescheduled your booking.'
+      : 'Your invitee has rescheduled their booking.',
     `Event: ${input.eventName}`,
     `Previous time: ${oldWhen} (${input.timezone})`,
     `New time: ${newWhen} (${input.timezone})`,
