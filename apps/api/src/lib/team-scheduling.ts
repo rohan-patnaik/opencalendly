@@ -1,3 +1,5 @@
+import type { TeamSchedulingMode } from '@opencalendly/shared';
+
 import {
   computeAvailabilitySlots,
   type AvailabilityOverrideWindow,
@@ -5,8 +7,6 @@ import {
   type ExistingBooking,
   type WeeklyAvailabilityRule,
 } from './availability';
-
-export type TeamSchedulingMode = 'round_robin' | 'collective';
 
 export type TeamMemberSchedule = {
   userId: string;
@@ -173,10 +173,13 @@ export const computeTeamAvailabilitySlots = (input: {
 
     return {
       slots,
+      // Collective mode assigns every required member, so no cursor advancement is needed.
       nextRoundRobinCursor: normalizeCursor(input.roundRobinCursor ?? 0, orderedMembers.length),
     };
   }
 
+  // This cursor is for availability-time rotation preview only. Booking-time persistence is handled
+  // in commit logic (resolveTeamRequestedSlot + DB update), not by this pure computation helper.
   let cursor = normalizeCursor(input.roundRobinCursor ?? 0, orderedMembers.length);
   const slots: TeamSlot[] = [];
 

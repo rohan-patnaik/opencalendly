@@ -45,6 +45,7 @@ import {
   webhookSubscriptionUpdateSchema,
   verifyMagicLinkRequestSchema,
   type EventQuestion,
+  type TeamSchedulingMode,
   type WebhookEvent,
   type WebhookEventType,
 } from '@opencalendly/shared';
@@ -95,7 +96,6 @@ import {
   chooseRoundRobinAssignee,
   computeTeamAvailabilitySlots,
   computeTeamSlotMatrix,
-  type TeamSchedulingMode,
 } from './lib/team-scheduling';
 
 type HyperdriveBinding = {
@@ -117,6 +117,7 @@ type ContextLike = {
 };
 
 type Database = ReturnType<typeof createDb>['db'];
+type QueryableDb = Pick<Database, 'select'>;
 
 type AuthenticatedUser = {
   id: string;
@@ -823,7 +824,7 @@ const findTeamEventTypeContext = async (
 };
 
 const listTeamMemberSchedules = async (
-  db: Database,
+  db: QueryableDb,
   memberIds: string[],
   rangeStart: Date,
   rangeEnd: Date,
@@ -2002,7 +2003,7 @@ app.post('/v0/teams', async (context) => {
         team,
       });
     } catch (error) {
-      if (isUniqueViolation(error, 'teams_owner_slug_unique')) {
+      if (isUniqueViolation(error, 'teams_slug_unique')) {
         return jsonError(context, 409, 'A team with that slug already exists.');
       }
       if (isUniqueViolation(error, 'team_members_team_user_unique')) {
@@ -2578,7 +2579,7 @@ app.post('/v0/team-bookings', async (context) => {
         }
 
         const memberSchedules = await listTeamMemberSchedules(
-          transaction as unknown as Database,
+          transaction,
           memberUserIds,
           rangeStart.toJSDate(),
           rangeEnd.toJSDate(),
@@ -2600,6 +2601,7 @@ app.post('/v0/team-bookings', async (context) => {
           throw new BookingConflictError('Selected slot is no longer available.');
         }
 
+        // Organizer for a team booking is deterministically the first assigned member.
         const organizerId = slotResolution.assignmentUserIds[0];
         if (!organizerId) {
           throw new BookingValidationError('Unable to assign team booking.');
@@ -3640,7 +3642,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             new Set(existingTeamAssignments.map((assignment) => assignment.userId)),
           );
           const memberSchedules = await listTeamMemberSchedules(
-            transaction as unknown as Database,
+            transaction,
             assignmentUserIds,
             rangeStart.toJSDate(),
             rangeEnd.toJSDate(),

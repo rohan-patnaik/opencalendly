@@ -1,8 +1,11 @@
 import {
   boolean,
+  foreignKey,
+  index,
   integer,
   jsonb,
   type AnyPgColumn,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -18,9 +21,6 @@ type EventQuestionRecord = {
   required: boolean;
   placeholder?: string | undefined;
 };
-
-type TeamMemberRoleRecord = 'owner' | 'member';
-type TeamSchedulingModeRecord = 'round_robin' | 'collective';
 
 type WebhookEventTypeRecord = 'booking.created' | 'booking.canceled' | 'booking.rescheduled';
 type WebhookDeliveryStatusRecord = 'pending' | 'succeeded' | 'failed';
@@ -39,6 +39,9 @@ type WebhookEventPayloadRecord = {
     metadata?: Record<string, unknown> | undefined;
   };
 };
+
+export const teamMemberRoleEnum = pgEnum('team_member_role', ['owner', 'member']);
+export const teamSchedulingModeEnum = pgEnum('team_scheduling_mode', ['round_robin', 'collective']);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -84,21 +87,15 @@ export const eventTypes = pgTable(
   }),
 );
 
-export const teams = pgTable(
-  'teams',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerUserId: uuid('owner_user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    slug: varchar('slug', { length: 80 }).notNull(),
-    name: varchar('name', { length: 120 }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    uniqueSlugPerOwner: unique('teams_owner_slug_unique').on(table.ownerUserId, table.slug),
-  }),
-);
+export const teams = pgTable('teams', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerUserId: uuid('owner_user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  slug: varchar('slug', { length: 80 }).notNull().unique(),
+  name: varchar('name', { length: 120 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const teamMembers = pgTable(
   'team_members',
@@ -110,7 +107,7 @@ export const teamMembers = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    role: varchar('role', { length: 20 }).$type<TeamMemberRoleRecord>().notNull().default('member'),
+    role: teamMemberRoleEnum('role').notNull().default('member'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
@@ -128,7 +125,7 @@ export const teamEventTypes = pgTable(
     eventTypeId: uuid('event_type_id')
       .notNull()
       .references(() => eventTypes.id, { onDelete: 'cascade' }),
-    mode: varchar('mode', { length: 20 }).$type<TeamSchedulingModeRecord>().notNull(),
+    mode: teamSchedulingModeEnum('mode').notNull(),
     roundRobinCursor: integer('round_robin_cursor').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -267,6 +264,15 @@ export const teamBookingAssignments = pgTable(
       table.startsAt,
       table.endsAt,
     ),
+    bookingIdIndex: index('team_booking_assignments_booking_id_idx').on(table.bookingId),
+    teamEventTypeIdIndex: index('team_booking_assignments_team_event_type_id_idx').on(
+      table.teamEventTypeId,
+    ),
+    teamMembershipFk: foreignKey({
+      columns: [table.teamEventTypeId, table.userId],
+      foreignColumns: [teamEventTypeMembers.teamEventTypeId, teamEventTypeMembers.userId],
+      name: 'team_booking_assignments_member_fk',
+    }),
   }),
 );
 

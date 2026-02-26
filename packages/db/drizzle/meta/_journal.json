@@ -50,6 +50,13 @@
       "when": 1772104874222,
       "tag": "0006_wise_skrulls",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772106636566,
+      "tag": "0007_absurd_boomer",
+      "breakpoints": true
     }
   ]
 }

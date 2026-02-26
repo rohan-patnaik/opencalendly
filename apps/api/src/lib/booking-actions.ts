@@ -54,6 +54,21 @@ export const parseBookingMetadata = (
         ? normalizeTimezone(parsed.timezone)
         : undefined;
 
+    const rawAssignmentUserIds =
+      parsed.team &&
+      typeof parsed.team === 'object' &&
+      !Array.isArray(parsed.team) &&
+      Array.isArray((parsed.team as Record<string, unknown>).assignmentUserIds)
+        ? ((parsed.team as Record<string, unknown>).assignmentUserIds as unknown[])
+        : null;
+
+    const hasValidAssignmentUserIds =
+      rawAssignmentUserIds !== null &&
+      rawAssignmentUserIds.length > 0 &&
+      rawAssignmentUserIds.every(
+        (value) => typeof value === 'string' && value.trim().length > 0,
+      );
+
     const team =
       parsed.team &&
       typeof parsed.team === 'object' &&
@@ -62,14 +77,12 @@ export const parseBookingMetadata = (
       typeof (parsed.team as Record<string, unknown>).teamEventTypeId === 'string' &&
       ((parsed.team as Record<string, unknown>).mode === 'round_robin' ||
         (parsed.team as Record<string, unknown>).mode === 'collective') &&
-      Array.isArray((parsed.team as Record<string, unknown>).assignmentUserIds)
+      hasValidAssignmentUserIds
         ? {
             teamId: (parsed.team as Record<string, unknown>).teamId as string,
             teamEventTypeId: (parsed.team as Record<string, unknown>).teamEventTypeId as string,
             mode: (parsed.team as Record<string, unknown>).mode as 'round_robin' | 'collective',
-            assignmentUserIds: (
-              (parsed.team as Record<string, unknown>).assignmentUserIds as unknown[]
-            ).filter((value): value is string => typeof value === 'string'),
+            assignmentUserIds: rawAssignmentUserIds as string[],
             ...((parsed.team as Record<string, unknown>).teamSlug &&
             typeof (parsed.team as Record<string, unknown>).teamSlug === 'string'
               ? { teamSlug: (parsed.team as Record<string, unknown>).teamSlug as string }

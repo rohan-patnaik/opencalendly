@@ -112,7 +112,7 @@ const seed = async (): Promise<void> => {
         slug: 'demo-team',
         name: 'Demo Team',
       })
-      .onConflictDoNothing({ target: [teams.ownerUserId, teams.slug] });
+      .onConflictDoNothing({ target: [teams.slug] });
 
     const [demoTeam] = await db
       .select({ id: teams.id })
@@ -152,7 +152,12 @@ const seed = async (): Promise<void> => {
     const [teamEventType] = await db
       .select({ id: teamEventTypes.id })
       .from(teamEventTypes)
-      .where(eq(teamEventTypes.eventTypeId, teamEventTypeBase.id))
+      .where(
+        and(
+          eq(teamEventTypes.eventTypeId, teamEventTypeBase.id),
+          eq(teamEventTypes.teamId, demoTeam.id),
+        ),
+      )
       .limit(1);
 
     if (!teamEventType) {
