@@ -793,6 +793,11 @@ Success response:
 
 Auth required. Adds a member user to a team.
 
+Routing note:
+
+- Authenticated admin operations use `:teamId` (stable internal key).
+- Public booking endpoints use `:teamSlug` for shareable URLs.
+
 Request:
 
 ```json

@@ -75,7 +75,7 @@ Acceptance criteria:
 - Authenticated organizers can create teams and add members.
 - Team event types can be configured with a scheduling mode: `round_robin` or `collective`.
 - Public availability endpoint supports team event types:
-  - `round_robin` returns slots from available assignees and rotates assignments fairly.
+  - `round_robin` returns slots from available assignees and rotates assignments fairly (distributes bookings evenly across available members over time).
   - `collective` returns only slots where all required members are simultaneously available.
 - Booking commit for team event types stores assignment details and remains correctness-safe (transaction + unique slot constraint).
 - Reschedule/cancel flow remains compatible for team-assigned bookings.
