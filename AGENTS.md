@@ -23,6 +23,7 @@
 2) Implement
    - Keep changes minimal and scoped
    - Add/update tests
+   - After first push on the feature branch, open a Draft PR immediately to start CI and bot reviews early
 3) Auditor verification (mandatory)
    - Confirm every acceptance criterion is met
    - Confirm migrations are included (if schema changes)
@@ -30,7 +31,7 @@
    - Confirm docs updated
 4) Reviews (mandatory order)
    - Codex self-review checklist
-   - Open PR
+   - Mark Draft PR ready for review when acceptance criteria are implemented
    - Greptile PR review must run (auto-trigger expected)
    - If Greptile status check does not appear within 5 minutes of PR update, trigger Greptile manually from dashboard and continue waiting for review
    - Resolve all Greptile review comments before merge
