@@ -6,6 +6,7 @@ export type CalendarWritebackRecord = {
   attemptCount: number;
   maxAttempts: number;
   externalEventId: string | null;
+  idempotencyKey: string;
 };
 
 export type CalendarWritebackBookingContext = {
@@ -26,9 +27,14 @@ export type CalendarWritebackRescheduleTarget = {
 };
 
 export type CalendarWritebackProviderClient = {
-  createEvent(input: CalendarWritebackBookingContext): Promise<{ externalEventId: string }>;
+  createEvent(
+    input: CalendarWritebackBookingContext & { idempotencyKey: string },
+  ): Promise<{ externalEventId: string }>;
   cancelEvent(input: { externalEventId: string }): Promise<void>;
   updateEvent(input: { externalEventId: string; startsAtIso: string; endsAtIso: string }): Promise<void>;
+  findEventByIdempotencyKey?(
+    input: { idempotencyKey: string },
+  ): Promise<{ externalEventId: string } | null>;
 };
 
 export type CalendarWritebackResult = {
@@ -65,13 +71,44 @@ export const processCalendarWriteback = async (input: {
   const attemptCount = input.record.attemptCount + 1;
   const lastAttemptAt = input.now;
 
+  const findExistingEventId = async (idempotencyKey: string): Promise<string | null> => {
+    if (!input.providerClient.findEventByIdempotencyKey) {
+      return null;
+    }
+    const existing = await input.providerClient.findEventByIdempotencyKey({ idempotencyKey });
+    return existing?.externalEventId ?? null;
+  };
+
+  const createOrReuseEvent = async (
+    booking: CalendarWritebackBookingContext,
+    idempotencyKey: string,
+  ): Promise<string> => {
+    const existingBeforeCreate = await findExistingEventId(idempotencyKey);
+    if (existingBeforeCreate) {
+      return existingBeforeCreate;
+    }
+
+    try {
+      const created = await input.providerClient.createEvent({
+        ...booking,
+        idempotencyKey,
+      });
+      return created.externalEventId;
+    } catch (error) {
+      const existingAfterCreate = await findExistingEventId(idempotencyKey);
+      if (existingAfterCreate) {
+        return existingAfterCreate;
+      }
+      throw error;
+    }
+  };
+
   try {
     let externalEventId = input.record.externalEventId;
     let transferExternalEventToBookingId: string | null = null;
 
     if (input.record.operation === 'create') {
-      const created = await input.providerClient.createEvent(input.booking);
-      externalEventId = created.externalEventId;
+      externalEventId = await createOrReuseEvent(input.booking, input.record.idempotencyKey);
     } else if (input.record.operation === 'cancel') {
       if (externalEventId) {
         await input.providerClient.cancelEvent({ externalEventId });
@@ -88,12 +125,14 @@ export const processCalendarWriteback = async (input: {
           endsAtIso: input.rescheduleTarget.endsAtIso,
         });
       } else {
-        const created = await input.providerClient.createEvent({
-          ...input.booking,
-          startsAtIso: input.rescheduleTarget.startsAtIso,
-          endsAtIso: input.rescheduleTarget.endsAtIso,
-        });
-        externalEventId = created.externalEventId;
+        externalEventId = await createOrReuseEvent(
+          {
+            ...input.booking,
+            startsAtIso: input.rescheduleTarget.startsAtIso,
+            endsAtIso: input.rescheduleTarget.endsAtIso,
+          },
+          input.rescheduleTarget.bookingId,
+        );
       }
 
       transferExternalEventToBookingId = input.rescheduleTarget.bookingId;

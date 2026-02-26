@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
@@ -31,6 +33,11 @@ type GoogleBusyWindow = {
 
 type GoogleCalendarEventResponse = {
   id?: string;
+};
+
+const toGoogleCalendarEventId = (idempotencyKey: string): string => {
+  const hash = createHash('sha256').update(idempotencyKey).digest('hex');
+  return `oc${hash.slice(0, 30)}`;
 };
 
 const readErrorPayload = async (response: Response): Promise<string> => {
@@ -218,6 +225,7 @@ export const fetchGoogleBusyWindows = async (
 export const createGoogleCalendarEvent = async (
   input: {
     accessToken: string;
+    idempotencyKey: string;
     eventName: string;
     inviteeName: string;
     inviteeEmail: string;
@@ -229,6 +237,7 @@ export const createGoogleCalendarEvent = async (
   },
   fetchImpl: FetchLike = fetch,
 ): Promise<{ externalEventId: string }> => {
+  const externalEventId = toGoogleCalendarEventId(input.idempotencyKey);
   const response = await fetchImpl('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
     method: 'POST',
     headers: {
@@ -236,6 +245,7 @@ export const createGoogleCalendarEvent = async (
       'content-type': 'application/json',
     },
     body: JSON.stringify({
+      id: externalEventId,
       summary: input.eventName,
       description: `OpenCalendly booking with ${input.inviteeName} (${input.inviteeEmail})`,
       start: {
@@ -256,10 +266,15 @@ export const createGoogleCalendarEvent = async (
         private: {
           source: 'opencalendly',
           locationType: input.locationType,
+          idempotencyKey: input.idempotencyKey,
         },
       },
     }),
   });
+
+  if (response.status === 409) {
+    return { externalEventId };
+  }
 
   if (!response.ok) {
     throw new Error(`Google calendar event create failed: ${await readErrorPayload(response)}`);
@@ -271,6 +286,35 @@ export const createGoogleCalendarEvent = async (
   }
 
   return { externalEventId: parsed.id };
+};
+
+export const findGoogleCalendarEventByIdempotencyKey = async (
+  input: {
+    accessToken: string;
+    idempotencyKey: string;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<{ externalEventId: string } | null> => {
+  const externalEventId = toGoogleCalendarEventId(input.idempotencyKey);
+  const response = await fetchImpl(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(externalEventId)}`,
+    {
+      method: 'GET',
+      headers: {
+        authorization: `Bearer ${input.accessToken}`,
+      },
+    },
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Google calendar event lookup failed: ${await readErrorPayload(response)}`);
+  }
+
+  return { externalEventId };
 };
 
 export const cancelGoogleCalendarEvent = async (

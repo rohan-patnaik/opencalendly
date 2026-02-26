@@ -12,7 +12,7 @@ export type CalendarConnectionSecretState = {
   accessTokenExpiresAt: Date;
 };
 
-export type GoogleTokenResolution = {
+export type CalendarTokenResolution = {
   accessToken: string;
   refreshToken: string;
   accessTokenExpiresAt: Date;
@@ -66,7 +66,7 @@ export const resolveGoogleAccessToken = async (
     now: Date;
   },
   fetchImpl: FetchLike = fetch,
-): Promise<GoogleTokenResolution> => {
+): Promise<CalendarTokenResolution> => {
   return resolveProviderAccessToken(
     input,
     async (refreshToken) =>
@@ -90,7 +90,7 @@ export const resolveMicrosoftAccessToken = async (
     now: Date;
   },
   fetchImpl: FetchLike = fetch,
-): Promise<GoogleTokenResolution> => {
+): Promise<CalendarTokenResolution> => {
   return resolveProviderAccessToken(
     input,
     async (refreshToken) =>
@@ -120,7 +120,7 @@ const resolveProviderAccessToken = async (
     expires_in: number;
     refresh_token?: string;
   }>,
-): Promise<GoogleTokenResolution> => {
+): Promise<CalendarTokenResolution> => {
   const accessToken = decryptSecret(input.connection.accessTokenEncrypted, input.encryptionSecret);
   const refreshToken = decryptSecret(input.connection.refreshTokenEncrypted, input.encryptionSecret);
 

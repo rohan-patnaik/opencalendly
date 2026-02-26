@@ -257,6 +257,7 @@ export const fetchMicrosoftBusyWindows = async (
 export const createMicrosoftCalendarEvent = async (
   input: {
     accessToken: string;
+    idempotencyKey: string;
     eventName: string;
     inviteeName: string;
     inviteeEmail: string;
@@ -286,6 +287,7 @@ export const createMicrosoftCalendarEvent = async (
         dateTime: toGraphDateTime(input.endsAtIso),
         timeZone: 'UTC',
       },
+      transactionId: input.idempotencyKey,
       attendees: [
         {
           emailAddress: {
@@ -315,6 +317,41 @@ export const createMicrosoftCalendarEvent = async (
   }
 
   return { externalEventId: parsed.id };
+};
+
+export const findMicrosoftCalendarEventByIdempotencyKey = async (
+  input: {
+    accessToken: string;
+    idempotencyKey: string;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<{ externalEventId: string } | null> => {
+  const url = new URL(MICROSOFT_EVENTS_URL);
+  const escapedIdempotencyKey = input.idempotencyKey.replace(/'/g, "''");
+  url.searchParams.set('$filter', `transactionId eq '${escapedIdempotencyKey}'`);
+  url.searchParams.set('$select', 'id');
+  url.searchParams.set('$top', '1');
+
+  const response = await fetchImpl(url.toString(), {
+    method: 'GET',
+    headers: {
+      authorization: `Bearer ${input.accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Microsoft calendar event lookup failed: ${await readErrorPayload(response)}`);
+  }
+
+  const parsed = (await response.json()) as {
+    value?: Array<{ id?: string }>;
+  };
+  const externalEventId = parsed.value?.[0]?.id;
+  if (typeof externalEventId !== 'string' || externalEventId.length === 0) {
+    return null;
+  }
+
+  return { externalEventId };
 };
 
 export const cancelMicrosoftCalendarEvent = async (

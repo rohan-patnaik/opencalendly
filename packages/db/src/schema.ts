@@ -389,6 +389,7 @@ export const calendarConnections = pgTable(
       table.userId,
       table.provider,
     ),
+    uniqueIdProvider: unique('calendar_connections_id_provider_unique').on(table.id, table.provider),
     userProviderIndex: index('calendar_connections_user_provider_idx').on(table.userId, table.provider),
   }),
 );
@@ -439,9 +440,7 @@ export const bookingExternalEvents = pgTable(
     organizerId: uuid('organizer_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    connectionId: uuid('connection_id').references(() => calendarConnections.id, {
-      onDelete: 'set null',
-    }),
+    connectionId: uuid('connection_id'),
     provider: calendarProviderEnum('provider').$type<CalendarProviderRecord>().notNull(),
     operation: calendarWritebackOperationEnum('operation')
       .$type<CalendarWritebackOperationRecord>()
@@ -477,6 +476,11 @@ export const bookingExternalEvents = pgTable(
       table.nextAttemptAt,
     ),
     connectionIndex: index('booking_external_events_connection_idx').on(table.connectionId),
+    connectionProviderFk: foreignKey({
+      columns: [table.connectionId, table.provider],
+      foreignColumns: [calendarConnections.id, calendarConnections.provider],
+      name: 'booking_external_events_connection_provider_fk',
+    }).onDelete('set null'),
     attemptCountCheck: check('booking_external_events_attempt_count_check', sql`${table.attemptCount} >= 0`),
     maxAttemptsCheck: check('booking_external_events_max_attempts_check', sql`${table.maxAttempts} >= 1`),
   }),

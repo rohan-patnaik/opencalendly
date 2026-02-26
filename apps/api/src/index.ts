@@ -99,6 +99,7 @@ import {
   cancelGoogleCalendarEvent,
   createGoogleCalendarEvent,
   exchangeGoogleOAuthCode,
+  findGoogleCalendarEventByIdempotencyKey,
   fetchGoogleUserProfile,
   updateGoogleCalendarEvent,
 } from './lib/google-calendar';
@@ -107,6 +108,7 @@ import {
   cancelMicrosoftCalendarEvent,
   createMicrosoftCalendarEvent,
   exchangeMicrosoftOAuthCode,
+  findMicrosoftCalendarEventByIdempotencyKey,
   fetchMicrosoftUserProfile,
   updateMicrosoftCalendarEvent,
 } from './lib/microsoft-calendar';
@@ -307,7 +309,6 @@ type CalendarConnectionStatus = {
 };
 
 type CalendarWritebackOperation = 'create' | 'cancel' | 'reschedule';
-type CalendarWritebackStatus = 'pending' | 'succeeded' | 'failed';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -416,6 +417,7 @@ const MICROSOFT_CALENDAR_PROVIDER: CalendarProvider = 'microsoft';
 const CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS = 5;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT = 25;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_MAX = 100;
+const CALENDAR_WRITEBACK_LEASE_MINUTES = 3;
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -875,6 +877,49 @@ const enqueueCalendarWritebacksForBooking = async (
   };
 };
 
+const claimDueCalendarWritebackRowIds = async (
+  db: Database,
+  input: {
+    now: Date;
+    organizerId?: string;
+    rowIds?: string[];
+    limit: number;
+  },
+): Promise<string[]> => {
+  const leaseUntil = new Date(input.now.getTime() + CALENDAR_WRITEBACK_LEASE_MINUTES * 60_000);
+  return db.transaction(async (transaction) => {
+    const organizerFilter = input.organizerId
+      ? sql`and organizer_id = ${input.organizerId}`
+      : sql``;
+    const rowIdsFilter =
+      input.rowIds && input.rowIds.length > 0
+        ? sql`and id in (${sql.join(input.rowIds.map((id) => sql`${id}`), sql`, `)})`
+        : sql``;
+
+    const claimed = await transaction.execute<{ id: string }>(sql`
+      with due_rows as (
+        select id
+        from booking_external_events
+        where status = 'pending'
+          and next_attempt_at <= ${input.now}
+          ${organizerFilter}
+          ${rowIdsFilter}
+        order by next_attempt_at asc
+        limit ${input.limit}
+        for update skip locked
+      )
+      update booking_external_events as target
+      set next_attempt_at = ${leaseUntil},
+          updated_at = ${input.now}
+      from due_rows
+      where target.id = due_rows.id
+      returning target.id
+    `);
+
+    return claimed.rows.map((row) => row.id);
+  });
+};
+
 const runCalendarWritebackBatch = async (
   db: Database,
   env: Bindings,
@@ -885,16 +930,20 @@ const runCalendarWritebackBatch = async (
   },
 ): Promise<CalendarWritebackRunResult> => {
   const now = new Date();
-  const whereClauses = [
-    eq(bookingExternalEvents.status, 'pending' as CalendarWritebackStatus),
-    lte(bookingExternalEvents.nextAttemptAt, now),
-  ];
+  const claimedRowIds = await claimDueCalendarWritebackRowIds(db, {
+    now,
+    limit: input.limit,
+    ...(input.organizerId ? { organizerId: input.organizerId } : {}),
+    ...(input.rowIds && input.rowIds.length > 0 ? { rowIds: input.rowIds } : {}),
+  });
 
-  if (input.organizerId) {
-    whereClauses.push(eq(bookingExternalEvents.organizerId, input.organizerId));
-  }
-  if (input.rowIds && input.rowIds.length > 0) {
-    whereClauses.push(inArray(bookingExternalEvents.id, input.rowIds));
+  if (claimedRowIds.length === 0) {
+    return {
+      processed: 0,
+      succeeded: 0,
+      retried: 0,
+      failed: 0,
+    };
   }
 
   const rows = await db
@@ -928,9 +977,8 @@ const runCalendarWritebackBatch = async (
     .innerJoin(eventTypes, eq(eventTypes.id, bookings.eventTypeId))
     .innerJoin(users, eq(users.id, bookingExternalEvents.organizerId))
     .leftJoin(calendarConnections, eq(calendarConnections.id, bookingExternalEvents.connectionId))
-    .where(and(...whereClauses))
-    .orderBy(asc(bookingExternalEvents.nextAttemptAt))
-    .limit(input.limit);
+    .where(inArray(bookingExternalEvents.id, claimedRowIds))
+    .orderBy(asc(bookingExternalEvents.updatedAt));
 
   const encryptionSecret = resolveCalendarEncryptionSecret(env);
   const googleConfig = resolveGoogleOAuthConfig(env);
@@ -1050,6 +1098,7 @@ const runCalendarWritebackBatch = async (
           attemptCount: row.attemptCount,
           maxAttempts: row.maxAttempts > 0 ? row.maxAttempts : CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS,
           externalEventId: row.externalEventId,
+          idempotencyKey: `${row.provider}:${row.bookingId}`,
         },
         booking: {
           eventName: row.eventTypeName,
@@ -1137,6 +1186,7 @@ const runCalendarWritebackBatch = async (
 
     const providerClient = {
       createEvent: async (bookingContext: {
+        idempotencyKey: string;
         eventName: string;
         inviteeName: string;
         inviteeEmail: string;
@@ -1150,6 +1200,7 @@ const runCalendarWritebackBatch = async (
         if (provider === GOOGLE_CALENDAR_PROVIDER) {
           return createGoogleCalendarEvent({
             accessToken,
+            idempotencyKey: bookingContext.idempotencyKey,
             eventName: bookingContext.eventName,
             inviteeName: bookingContext.inviteeName,
             inviteeEmail: bookingContext.inviteeEmail,
@@ -1163,12 +1214,27 @@ const runCalendarWritebackBatch = async (
 
         return createMicrosoftCalendarEvent({
           accessToken,
+          idempotencyKey: bookingContext.idempotencyKey,
           eventName: bookingContext.eventName,
           inviteeName: bookingContext.inviteeName,
           inviteeEmail: bookingContext.inviteeEmail,
           startsAtIso: bookingContext.startsAtIso,
           endsAtIso: bookingContext.endsAtIso,
           locationValue: bookingContext.locationValue,
+        });
+      },
+      findEventByIdempotencyKey: async (lookupInput: { idempotencyKey: string }) => {
+        const accessToken = await getToken();
+        if (provider === GOOGLE_CALENDAR_PROVIDER) {
+          return findGoogleCalendarEventByIdempotencyKey({
+            accessToken,
+            idempotencyKey: lookupInput.idempotencyKey,
+          });
+        }
+
+        return findMicrosoftCalendarEventByIdempotencyKey({
+          accessToken,
+          idempotencyKey: lookupInput.idempotencyKey,
         });
       },
       cancelEvent: async (cancelInput: { externalEventId: string }) => {
@@ -1216,6 +1282,7 @@ const runCalendarWritebackBatch = async (
         attemptCount: row.attemptCount,
         maxAttempts: row.maxAttempts > 0 ? row.maxAttempts : CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS,
         externalEventId: row.externalEventId,
+        idempotencyKey: `${row.provider}:${row.bookingId}`,
       },
       booking: {
         eventName: row.eventTypeName,

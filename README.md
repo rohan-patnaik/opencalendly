@@ -68,6 +68,10 @@ Google OAuth setup note (for local dev):
 
 - In Google Cloud OAuth app, add your callback URL under Authorized redirect URIs (for example `http://localhost:3000/settings/calendar/google/callback`).
 
+Microsoft OAuth setup note (for local dev):
+
+- In Microsoft Entra App Registration, add a Web redirect URI for `http://localhost:3000/settings/calendar/microsoft/callback` and use that app's client ID/secret for `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET`.
+
 Then validate before doing feature work:
 
 ```bash

@@ -21,6 +21,7 @@ const createProviderClient = (): CalendarWritebackProviderClient => ({
   createEvent: vi.fn(async () => ({ externalEventId: 'provider-event-1' })),
   cancelEvent: vi.fn(async () => undefined),
   updateEvent: vi.fn(async () => undefined),
+  findEventByIdempotencyKey: vi.fn(async () => null),
 });
 
 describe('calendar-writeback', () => {
@@ -34,6 +35,7 @@ describe('calendar-writeback', () => {
         attemptCount: 0,
         maxAttempts: 5,
         externalEventId: null,
+        idempotencyKey: 'booking-1',
       },
       booking: baseBooking,
       providerClient,
@@ -43,6 +45,10 @@ describe('calendar-writeback', () => {
     expect(result.status).toBe('succeeded');
     expect(result.externalEventId).toBe('provider-event-1');
     expect(result.transferExternalEventToBookingId).toBeNull();
+    expect(providerClient.createEvent).toHaveBeenCalledWith({
+      ...baseBooking,
+      idempotencyKey: 'booking-1',
+    });
   });
 
   it('handles cancel success as no-op when external event id is missing', async () => {
@@ -55,6 +61,7 @@ describe('calendar-writeback', () => {
         attemptCount: 0,
         maxAttempts: 5,
         externalEventId: null,
+        idempotencyKey: 'booking-1',
       },
       booking: baseBooking,
       providerClient,
@@ -76,6 +83,7 @@ describe('calendar-writeback', () => {
         attemptCount: 0,
         maxAttempts: 5,
         externalEventId: 'provider-event-1',
+        idempotencyKey: 'booking-1',
       },
       booking: baseBooking,
       rescheduleTarget: {
@@ -105,6 +113,7 @@ describe('calendar-writeback', () => {
         attemptCount: 1,
         maxAttempts: 5,
         externalEventId: null,
+        idempotencyKey: 'booking-1',
       },
       booking: baseBooking,
       providerClient,
@@ -130,6 +139,7 @@ describe('calendar-writeback', () => {
         attemptCount: 2,
         maxAttempts: 3,
         externalEventId: 'provider-event-1',
+        idempotencyKey: 'booking-1',
       },
       booking: baseBooking,
       providerClient,
@@ -140,5 +150,30 @@ describe('calendar-writeback', () => {
     expect(result.attemptCount).toBe(3);
     expect(result.nextAttemptAt.toISOString()).toBe(now.toISOString());
     expect(result.lastError).toContain('Provider rejected request');
+  });
+
+  it('reuses an already existing event by idempotency key', async () => {
+    const now = new Date('2026-03-10T08:00:00.000Z');
+    const providerClient = createProviderClient();
+    providerClient.findEventByIdempotencyKey = vi.fn(async () => ({
+      externalEventId: 'provider-event-existing',
+    }));
+
+    const result = await processCalendarWriteback({
+      record: {
+        operation: 'create',
+        attemptCount: 0,
+        maxAttempts: 5,
+        externalEventId: null,
+        idempotencyKey: 'booking-1',
+      },
+      booking: baseBooking,
+      providerClient,
+      now,
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.externalEventId).toBe('provider-event-existing');
+    expect(providerClient.createEvent).not.toHaveBeenCalled();
   });
 });
