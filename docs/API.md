@@ -1130,3 +1130,29 @@ Error responses:
 - `404` Google calendar not connected.
 - `500` Google OAuth env config missing.
 - `502` provider sync failure (also records `lastError` + `nextSyncAt`).
+
+## Feature 7 Draft Endpoints (Outlook + Writeback v1)
+
+Draft-first contract for PR#11. Final response shapes may be refined during implementation.
+
+### Microsoft calendar connection/sync
+
+- `POST /v0/calendar/microsoft/connect/start`
+- `POST /v0/calendar/microsoft/connect/complete`
+- `POST /v0/calendar/microsoft/disconnect`
+- `POST /v0/calendar/microsoft/sync`
+
+Behavior target:
+
+- Same auth model and encrypted credential handling as Google endpoints.
+- Same sync status representation under `GET /v0/calendar/sync/status`.
+
+### External writeback runner/status (draft)
+
+- `POST /v0/calendar/writeback/run` (auth required)
+- `GET /v0/calendar/writeback/status` (auth required)
+
+Behavior target:
+
+- Process due external event writebacks (create/cancel/reschedule) with bounded retries.
+- Persist last error + next retry timestamp for operator visibility.
