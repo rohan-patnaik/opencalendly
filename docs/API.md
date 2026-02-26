@@ -724,7 +724,7 @@ Success response shape matches `POST /v0/webhooks`.
 
 ### `POST /v0/webhooks/deliveries/run`
 
-Protected dev/admin endpoint to process pending deliveries and retries.
+Auth required. Processes pending deliveries and retries for the authenticated organizer's webhook subscriptions.
 
 Query params:
 

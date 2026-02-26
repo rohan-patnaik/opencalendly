@@ -260,13 +260,26 @@ const clampWebhookDeliveryBatchLimit = (rawLimit: string | undefined): number =>
   return Math.max(1, Math.min(WEBHOOK_DELIVERY_BATCH_LIMIT_MAX, parsed));
 };
 
-const resolveAppBaseUrl = (env: Bindings): string => {
+const stripTrailingSlash = (value: string): string => {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+};
+
+const resolveAppBaseUrl = (env: Bindings, request: Request): string => {
   const configured = env.APP_BASE_URL?.trim();
   if (configured) {
-    return configured;
+    try {
+      return stripTrailingSlash(new URL(configured).toString());
+    } catch {
+      // Fall back to request-derived URL if APP_BASE_URL is malformed.
+    }
   }
 
-  return 'http://localhost:3000';
+  const requestUrl = new URL(request.url);
+  if (requestUrl.hostname === 'localhost' || requestUrl.hostname === '127.0.0.1') {
+    return 'http://localhost:3000';
+  }
+
+  return requestUrl.origin;
 };
 
 const resolveEmbedTheme = (rawTheme: string | undefined): 'light' | 'dark' => {
@@ -967,7 +980,7 @@ app.get('/v0/embed/widget.js', async (context) => {
 
     const timezone = context.req.query('timezone')?.trim();
     const theme = resolveEmbedTheme(context.req.query('theme'));
-    const appBaseUrl = resolveAppBaseUrl(context.env);
+    const appBaseUrl = resolveAppBaseUrl(context.env, context.req.raw);
     const iframeUrl = new URL(
       `/${encodeURIComponent(username)}/${encodeURIComponent(eventSlug)}`,
       appBaseUrl,
