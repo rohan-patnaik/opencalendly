@@ -71,13 +71,32 @@ const createMetricBucket = (): MetricBucket => ({
 type FunnelRow = {
   stage: AnalyticsFunnelStage;
   eventTypeId: string;
-  occurredAt: Date;
+  occurredAt?: Date;
+  date?: string;
+  count?: number;
 };
 
 type BookingRow = {
   eventTypeId: string;
   status: string;
-  createdAt: Date;
+  createdAt?: Date;
+  date?: string;
+  count?: number;
+};
+
+const resolveBucketDate = (input: {
+  date: string | undefined;
+  occurredAt: Date | undefined;
+  createdAt: Date | undefined;
+}): string => {
+  if (input.date) {
+    return input.date;
+  }
+  const referenceDate = input.occurredAt ?? input.createdAt;
+  if (!referenceDate) {
+    throw new Error('Analytics row missing date bucket.');
+  }
+  return DateTime.fromJSDate(referenceDate, { zone: 'utc' }).toFormat('yyyy-MM-dd');
 };
 
 export const summarizeFunnelAnalytics = (input: {
@@ -139,42 +158,52 @@ export const summarizeFunnelAnalytics = (input: {
   };
 
   for (const row of input.funnelRows) {
-    const date = DateTime.fromJSDate(row.occurredAt, { zone: 'utc' }).toFormat('yyyy-MM-dd');
+    const date = resolveBucketDate({
+      date: row.date,
+      occurredAt: row.occurredAt,
+      createdAt: undefined,
+    });
+    const count = row.count ?? 1;
     const eventBucket = getEventBucket(row.eventTypeId);
     const dayBucket = getDayBucket(row.eventTypeId, date);
 
     if (row.stage === 'page_view') {
-      summary.pageViews += 1;
-      eventBucket.pageViews += 1;
-      dayBucket.pageViews += 1;
+      summary.pageViews += count;
+      eventBucket.pageViews += count;
+      dayBucket.pageViews += count;
     } else if (row.stage === 'slot_selection') {
-      summary.slotSelections += 1;
-      eventBucket.slotSelections += 1;
-      dayBucket.slotSelections += 1;
+      summary.slotSelections += count;
+      eventBucket.slotSelections += count;
+      dayBucket.slotSelections += count;
     } else {
-      summary.bookingConfirmations += 1;
-      eventBucket.bookingConfirmations += 1;
-      dayBucket.bookingConfirmations += 1;
+      summary.bookingConfirmations += count;
+      eventBucket.bookingConfirmations += count;
+      dayBucket.bookingConfirmations += count;
     }
   }
 
   for (const row of input.bookingRows) {
-    const date = DateTime.fromJSDate(row.createdAt, { zone: 'utc' }).toFormat('yyyy-MM-dd');
+    const date = resolveBucketDate({
+      date: row.date,
+      occurredAt: undefined,
+      createdAt: row.createdAt,
+    });
+    const count = row.count ?? 1;
     const eventBucket = getEventBucket(row.eventTypeId);
     const dayBucket = getDayBucket(row.eventTypeId, date);
 
     if (row.status === 'confirmed') {
-      summary.confirmed += 1;
-      eventBucket.confirmed += 1;
-      dayBucket.confirmed += 1;
+      summary.confirmed += count;
+      eventBucket.confirmed += count;
+      dayBucket.confirmed += count;
     } else if (row.status === 'canceled') {
-      summary.canceled += 1;
-      eventBucket.canceled += 1;
-      dayBucket.canceled += 1;
+      summary.canceled += count;
+      eventBucket.canceled += count;
+      dayBucket.canceled += count;
     } else if (row.status === 'rescheduled') {
-      summary.rescheduled += 1;
-      eventBucket.rescheduled += 1;
-      dayBucket.rescheduled += 1;
+      summary.rescheduled += count;
+      eventBucket.rescheduled += count;
+      dayBucket.rescheduled += count;
     }
   }
 
@@ -343,8 +372,8 @@ export const summarizeTeamAnalytics = (input: {
 };
 
 export const summarizeOperatorHealth = (input: {
-  webhookRows: Array<{ status: string }>;
-  emailRows: Array<{ status: string; emailType: string }>;
+  webhookRows: Array<{ status: string; count?: number }>;
+  emailRows: Array<{ status: string; emailType: string; count?: number }>;
 }): {
   webhookDeliveries: {
     total: number;
@@ -360,50 +389,54 @@ export const summarizeOperatorHealth = (input: {
   };
 } => {
   const webhookSummary = {
-    total: input.webhookRows.length,
+    total: 0,
     pending: 0,
     succeeded: 0,
     failed: 0,
   };
   for (const row of input.webhookRows) {
+    const count = row.count ?? 1;
+    webhookSummary.total += count;
     if (row.status === 'pending') {
-      webhookSummary.pending += 1;
+      webhookSummary.pending += count;
     } else if (row.status === 'succeeded') {
-      webhookSummary.succeeded += 1;
-    } else if (row.status === 'failed') {
-      webhookSummary.failed += 1;
+      webhookSummary.succeeded += count;
+    } else {
+      webhookSummary.failed += count;
     }
   }
 
   const emailSummary = {
-    total: input.emailRows.length,
+    total: 0,
     succeeded: 0,
     failed: 0,
   };
   const byEmailType = new Map<string, { emailType: string; total: number; succeeded: number; failed: number }>();
   for (const row of input.emailRows) {
+    const count = row.count ?? 1;
+    emailSummary.total += count;
     if (row.status === 'succeeded') {
-      emailSummary.succeeded += 1;
-    } else if (row.status === 'failed') {
-      emailSummary.failed += 1;
+      emailSummary.succeeded += count;
+    } else {
+      emailSummary.failed += count;
     }
 
     const existing = byEmailType.get(row.emailType);
     if (existing) {
-      existing.total += 1;
+      existing.total += count;
       if (row.status === 'succeeded') {
-        existing.succeeded += 1;
-      } else if (row.status === 'failed') {
-        existing.failed += 1;
+        existing.succeeded += count;
+      } else {
+        existing.failed += count;
       }
       continue;
     }
 
     byEmailType.set(row.emailType, {
       emailType: row.emailType,
-      total: 1,
-      succeeded: row.status === 'succeeded' ? 1 : 0,
-      failed: row.status === 'failed' ? 1 : 0,
+      total: count,
+      succeeded: row.status === 'succeeded' ? count : 0,
+      failed: row.status === 'succeeded' ? 0 : count,
     });
   }
 

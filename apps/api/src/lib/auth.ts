@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 
 export const MAGIC_LINK_TTL_MINUTES = 15;
 export const SESSION_TTL_DAYS = 30;
@@ -9,6 +9,10 @@ export const createRawToken = (): string => {
 
 export const hashToken = (token: string): string => {
   return createHash('sha256').update(token).digest('hex');
+};
+
+export const hmacToken = (token: string, secret: string): string => {
+  return createHmac('sha256', secret).update(token).digest('hex');
 };
 
 export const getBearerToken = (request: Request): string | null => {

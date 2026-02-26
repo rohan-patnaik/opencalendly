@@ -1322,6 +1322,10 @@ Success response:
 }
 ```
 
+Notes:
+
+- `daily[].date` is grouped in UTC (`YYYY-MM-DD`).
+
 ### `GET /v0/analytics/team`
 
 Auth required.
@@ -1418,4 +1422,3 @@ Success response:
   }
 }
 ```
-

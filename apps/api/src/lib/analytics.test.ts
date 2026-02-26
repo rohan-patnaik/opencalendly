@@ -180,4 +180,43 @@ describe('summarizeOperatorHealth', () => {
     expect(result.emailDeliveries.failed).toBe(1);
     expect(result.emailDeliveries.byType).toHaveLength(2);
   });
+
+  it('counts unknown statuses as failed and supports aggregated row counts', () => {
+    const result = summarizeOperatorHealth({
+      webhookRows: [
+        { status: 'pending', count: 2 },
+        { status: 'succeeded', count: 1 },
+        { status: 'timed_out', count: 3 },
+      ],
+      emailRows: [
+        { status: 'succeeded', emailType: 'booking_confirmation', count: 2 },
+        { status: 'bounced', emailType: 'booking_confirmation', count: 1 },
+        { status: 'failed', emailType: 'booking_rescheduled', count: 4 },
+      ],
+    });
+
+    expect(result.webhookDeliveries).toEqual({
+      total: 6,
+      pending: 2,
+      succeeded: 1,
+      failed: 3,
+    });
+    expect(result.emailDeliveries.total).toBe(7);
+    expect(result.emailDeliveries.succeeded).toBe(2);
+    expect(result.emailDeliveries.failed).toBe(5);
+    expect(result.emailDeliveries.byType).toEqual([
+      {
+        emailType: 'booking_confirmation',
+        total: 3,
+        succeeded: 2,
+        failed: 1,
+      },
+      {
+        emailType: 'booking_rescheduled',
+        total: 4,
+        succeeded: 0,
+        failed: 4,
+      },
+    ]);
+  });
 });

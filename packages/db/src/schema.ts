@@ -290,7 +290,7 @@ export const emailDeliveries = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     bookingId: uuid('booking_id').references(() => bookings.id, { onDelete: 'set null' }),
     eventTypeId: uuid('event_type_id').references(() => eventTypes.id, { onDelete: 'set null' }),
-    recipientEmail: varchar('recipient_email', { length: 320 }).notNull(),
+    recipientEmailHash: varchar('recipient_email_hash', { length: 64 }).notNull(),
     emailType: emailDeliveryTypeEnum('email_type').$type<EmailDeliveryTypeRecord>().notNull(),
     status: emailDeliveryStatusEnum('status').$type<EmailDeliveryStatusRecord>().notNull(),
     provider: varchar('provider', { length: 32 }).notNull().default('none'),

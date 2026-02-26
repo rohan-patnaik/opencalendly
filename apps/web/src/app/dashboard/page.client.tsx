@@ -149,6 +149,14 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
       return;
     }
 
+    if (startDate && endDate && startDate > endDate) {
+      setFunnel(null);
+      setTeam(null);
+      setOperatorHealth(null);
+      setError('Start date must be on or before end date.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -220,6 +228,10 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
               value={sessionToken}
               onChange={(event) => setSessionToken(event.target.value)}
               placeholder="Paste bearer session token"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
             />
           </label>
           <label className={styles.label}>
