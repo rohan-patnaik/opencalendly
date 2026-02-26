@@ -121,18 +121,45 @@ export const waitlistJoinSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+export const webhookEventTypeSchema = z.enum([
+  'booking.created',
+  'booking.canceled',
+  'booking.rescheduled',
+]);
+
+export const webhookSubscriptionCreateSchema = z.object({
+  url: z.string().url().max(2000),
+  events: z.array(webhookEventTypeSchema).min(1).max(3),
+  secret: z.string().min(8).max(200),
+});
+
+export const webhookSubscriptionUpdateSchema = z
+  .object({
+    url: z.string().url().max(2000).optional(),
+    events: z.array(webhookEventTypeSchema).min(1).max(3).optional(),
+    secret: z.string().min(8).max(200).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field is required.',
+  });
+
+export const webhookEventPayloadSchema = z.object({
+  bookingId: z.string().uuid(),
+  eventTypeId: z.string().uuid(),
+  organizerId: z.string().uuid(),
+  inviteeEmail: z.string().email(),
+  inviteeName: z.string().min(1).max(120),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const webhookEventSchema = z.object({
   id: z.string().uuid(),
-  type: z.enum(['booking.created', 'booking.canceled', 'booking.rescheduled']),
+  type: webhookEventTypeSchema,
   createdAt: z.string().datetime(),
-  payload: z.object({
-    bookingId: z.string().uuid(),
-    eventTypeId: z.string().uuid(),
-    organizerId: z.string().uuid(),
-    inviteeEmail: z.string().email(),
-    startsAt: z.string().datetime(),
-    endsAt: z.string().datetime(),
-  }),
+  payload: webhookEventPayloadSchema,
 });
 
 export type HealthCheck = z.infer<typeof healthCheckSchema>;
@@ -151,4 +178,8 @@ export type BookingCancelInput = z.infer<typeof bookingCancelSchema>;
 export type BookingRescheduleInput = z.infer<typeof bookingRescheduleSchema>;
 export type DemoCreditsConsumeInput = z.infer<typeof demoCreditsConsumeSchema>;
 export type WaitlistJoinInput = z.infer<typeof waitlistJoinSchema>;
+export type WebhookEventType = z.infer<typeof webhookEventTypeSchema>;
+export type WebhookSubscriptionCreateInput = z.infer<typeof webhookSubscriptionCreateSchema>;
+export type WebhookSubscriptionUpdateInput = z.infer<typeof webhookSubscriptionUpdateSchema>;
+export type WebhookEventPayload = z.infer<typeof webhookEventPayloadSchema>;
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;

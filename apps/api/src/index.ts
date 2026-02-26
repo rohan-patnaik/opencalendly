@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { Hono } from 'hono';
 
@@ -13,6 +13,8 @@ import {
   sessions,
   users,
   waitlistEntries,
+  webhookDeliveries,
+  webhookSubscriptions,
 } from '@opencalendly/db';
 import {
   availabilityQuerySchema,
@@ -29,8 +31,13 @@ import {
   setAvailabilityOverridesSchema,
   setAvailabilityRulesSchema,
   waitlistJoinSchema,
+  webhookEventSchema,
+  webhookSubscriptionCreateSchema,
+  webhookSubscriptionUpdateSchema,
   verifyMagicLinkRequestSchema,
   type EventQuestion,
+  type WebhookEvent,
+  type WebhookEventType,
 } from '@opencalendly/shared';
 
 import {
@@ -66,6 +73,15 @@ import {
   parseDemoDailyPassLimit,
   toUtcDateKey,
 } from './lib/demo-credits';
+import {
+  WEBHOOK_DEFAULT_MAX_ATTEMPTS,
+  buildWebhookEvent,
+  buildWebhookSignatureHeader,
+  computeNextWebhookAttemptAt,
+  isWebhookDeliveryExhausted,
+  normalizeWebhookEvents,
+  parseWebhookEventTypes,
+} from './lib/webhooks';
 
 type HyperdriveBinding = {
   connectionString: string;
@@ -74,6 +90,7 @@ type HyperdriveBinding = {
 type Bindings = {
   HYPERDRIVE?: HyperdriveBinding;
   DATABASE_URL?: string;
+  APP_BASE_URL?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   DEMO_DAILY_PASS_LIMIT?: string;
@@ -140,6 +157,27 @@ type DemoCreditsDailyRow = {
   dateKey: string;
   used: number;
   dailyLimit: number;
+};
+
+type WebhookSubscriptionRecord = {
+  id: string;
+  userId: string;
+  url: string;
+  secret: string;
+  events: WebhookEventType[];
+  isActive: boolean;
+};
+
+type PendingWebhookDelivery = {
+  id: string;
+  subscriptionId: string;
+  url: string;
+  secret: string;
+  eventId: string;
+  eventType: WebhookEventType;
+  payload: WebhookEvent;
+  attemptCount: number;
+  maxAttempts: number;
 };
 
 type PublicEventView = {
@@ -210,9 +248,274 @@ const normalizeTimezone = (timezone: string | undefined): string => {
   return parsed.isValid ? timezone : 'UTC';
 };
 
+const WEBHOOK_DELIVERY_BATCH_LIMIT_DEFAULT = 25;
+const WEBHOOK_DELIVERY_BATCH_LIMIT_MAX = 100;
+
+const clampWebhookDeliveryBatchLimit = (rawLimit: string | undefined): number => {
+  const parsed = rawLimit ? Number.parseInt(rawLimit, 10) : Number.NaN;
+  if (!Number.isFinite(parsed)) {
+    return WEBHOOK_DELIVERY_BATCH_LIMIT_DEFAULT;
+  }
+
+  return Math.max(1, Math.min(WEBHOOK_DELIVERY_BATCH_LIMIT_MAX, parsed));
+};
+
+const resolveAppBaseUrl = (env: Bindings): string => {
+  const configured = env.APP_BASE_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  return 'http://localhost:3000';
+};
+
+const resolveEmbedTheme = (rawTheme: string | undefined): 'light' | 'dark' => {
+  return rawTheme?.trim().toLowerCase() === 'dark' ? 'dark' : 'light';
+};
+
+const buildEmbedWidgetScript = (input: {
+  iframeSrc: string;
+  theme: 'light' | 'dark';
+  timezone?: string;
+}): string => {
+  return `
+(() => {
+  const script = document.currentScript;
+  if (!script) return;
+
+  const timezone = ${JSON.stringify(input.timezone ?? '')};
+  const theme = ${JSON.stringify(input.theme)};
+  const frameSrc = ${JSON.stringify(input.iframeSrc)};
+
+  const targetSelector = script.dataset.target || '';
+  const mountPoint = targetSelector ? document.querySelector(targetSelector) : null;
+  const container = mountPoint || document.createElement('div');
+
+  if (!mountPoint) {
+    script.parentNode?.insertBefore(container, script.nextSibling);
+  }
+
+  const radius = script.dataset.radius || (theme === 'dark' ? '14px' : '12px');
+  const borderColor = theme === 'dark' ? '#1f2937' : '#d1d5db';
+  const background = theme === 'dark' ? '#020617' : '#ffffff';
+  const shadow = script.dataset.shadow || (theme === 'dark'
+    ? '0 10px 24px rgba(15, 23, 42, 0.45)'
+    : '0 10px 24px rgba(15, 23, 42, 0.10)');
+
+  container.style.width = script.dataset.width || '100%';
+  container.style.minHeight = script.dataset.height || '760px';
+  container.style.border = \`1px solid \${borderColor}\`;
+  container.style.borderRadius = radius;
+  container.style.overflow = 'hidden';
+  container.style.background = background;
+  container.style.boxShadow = shadow;
+
+  const iframe = document.createElement('iframe');
+  iframe.src = frameSrc;
+  iframe.style.width = '100%';
+  iframe.style.height = script.dataset.height || '760px';
+  iframe.style.border = '0';
+  iframe.style.display = 'block';
+  iframe.loading = 'lazy';
+  iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+  iframe.title = script.dataset.title || 'OpenCalendly booking widget';
+
+  if (timezone) {
+    iframe.dataset.timezone = timezone;
+  }
+  iframe.dataset.theme = theme;
+
+  container.innerHTML = '';
+  container.appendChild(iframe);
+})();
+`;
+};
+
 const toEventQuestions = (value: unknown): EventQuestion[] => {
   const parsed = eventQuestionsSchema.safeParse(value ?? []);
   return parsed.success ? parsed.data : [];
+};
+
+const toWebhookSubscriptionRecord = (value: {
+  id: string;
+  userId: string;
+  url: string;
+  secret: string;
+  events: unknown;
+  isActive: boolean;
+}): WebhookSubscriptionRecord => {
+  return {
+    id: value.id,
+    userId: value.userId,
+    url: value.url,
+    secret: value.secret,
+    events: parseWebhookEventTypes(value.events),
+    isActive: value.isActive,
+  };
+};
+
+const enqueueWebhookDeliveries = async (
+  db: Database,
+  input: {
+    organizerId: string;
+    type: WebhookEventType;
+    booking: {
+      id: string;
+      eventTypeId: string;
+      organizerId: string;
+      inviteeEmail: string;
+      inviteeName: string;
+      startsAtIso: string;
+      endsAtIso: string;
+    };
+    metadata?: Record<string, unknown>;
+  },
+): Promise<number> => {
+  const subscriptions = await db
+    .select({
+      id: webhookSubscriptions.id,
+      userId: webhookSubscriptions.userId,
+      url: webhookSubscriptions.url,
+      secret: webhookSubscriptions.secret,
+      events: webhookSubscriptions.events,
+      isActive: webhookSubscriptions.isActive,
+    })
+    .from(webhookSubscriptions)
+    .where(
+      and(eq(webhookSubscriptions.userId, input.organizerId), eq(webhookSubscriptions.isActive, true)),
+    );
+
+  const matchingSubscriptions = subscriptions
+    .map((subscription) => toWebhookSubscriptionRecord(subscription))
+    .filter((subscription) => subscription.events.includes(input.type));
+
+  if (matchingSubscriptions.length === 0) {
+    return 0;
+  }
+
+  const event = buildWebhookEvent({
+    type: input.type,
+    payload: {
+      bookingId: input.booking.id,
+      eventTypeId: input.booking.eventTypeId,
+      organizerId: input.booking.organizerId,
+      inviteeEmail: input.booking.inviteeEmail,
+      inviteeName: input.booking.inviteeName,
+      startsAt: input.booking.startsAtIso,
+      endsAt: input.booking.endsAtIso,
+      ...(input.metadata ? { metadata: input.metadata } : {}),
+    },
+  });
+
+  const deliveryWrites: Array<typeof webhookDeliveries.$inferInsert> = matchingSubscriptions.map(
+    (subscription) => ({
+      subscriptionId: subscription.id,
+      eventId: event.id,
+      eventType: event.type,
+      payload: event,
+      status: 'pending',
+      attemptCount: 0,
+      maxAttempts: WEBHOOK_DEFAULT_MAX_ATTEMPTS,
+      nextAttemptAt: new Date(event.createdAt),
+    }),
+  );
+
+  await db
+    .insert(webhookDeliveries)
+    .values(deliveryWrites)
+    .onConflictDoNothing({
+      target: [webhookDeliveries.subscriptionId, webhookDeliveries.eventId],
+    });
+
+  return matchingSubscriptions.length;
+};
+
+const executeWebhookDelivery = async (
+  db: Database,
+  delivery: PendingWebhookDelivery,
+): Promise<'succeeded' | 'retried' | 'failed'> => {
+  const now = new Date();
+  const serializedPayload = JSON.stringify(delivery.payload);
+  const timestampSeconds = Math.floor(now.getTime() / 1000);
+  const signature = buildWebhookSignatureHeader(delivery.secret, serializedPayload, timestampSeconds);
+
+  let responseStatus: number | null = null;
+  let errorMessage: string | null = null;
+
+  try {
+    const response = await fetch(delivery.url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-OpenCalendly-Signature': signature,
+        'X-OpenCalendly-Signature-Timestamp': String(timestampSeconds),
+        'X-OpenCalendly-Delivery-Id': delivery.id,
+        'X-OpenCalendly-Event': delivery.eventType,
+        'X-OpenCalendly-Event-Id': delivery.eventId,
+      },
+      body: serializedPayload,
+    });
+
+    responseStatus = response.status;
+
+    if (response.ok) {
+      await db
+        .update(webhookDeliveries)
+        .set({
+          status: 'succeeded',
+          attemptCount: delivery.attemptCount + 1,
+          lastAttemptAt: now,
+          lastResponseStatus: response.status,
+          lastError: null,
+          nextAttemptAt: now,
+          updatedAt: now,
+        })
+        .where(eq(webhookDeliveries.id, delivery.id));
+
+      return 'succeeded';
+    }
+
+    const responseBody = await response.text();
+    errorMessage = responseBody.slice(0, 2000) || `HTTP ${response.status}`;
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : 'Webhook delivery failed.';
+  }
+
+  const attemptedCount = delivery.attemptCount + 1;
+  const exhausted = isWebhookDeliveryExhausted(attemptedCount, delivery.maxAttempts);
+
+  if (exhausted) {
+    await db
+      .update(webhookDeliveries)
+      .set({
+        status: 'failed',
+        attemptCount: attemptedCount,
+        lastAttemptAt: now,
+        ...(responseStatus !== null ? { lastResponseStatus: responseStatus } : {}),
+        lastError: errorMessage,
+        nextAttemptAt: now,
+        updatedAt: now,
+      })
+      .where(eq(webhookDeliveries.id, delivery.id));
+
+    return 'failed';
+  }
+
+  const nextAttemptAt = computeNextWebhookAttemptAt(attemptedCount, now);
+  await db
+    .update(webhookDeliveries)
+    .set({
+      status: 'pending',
+      attemptCount: attemptedCount,
+      lastAttemptAt: now,
+      ...(responseStatus !== null ? { lastResponseStatus: responseStatus } : {}),
+      lastError: errorMessage,
+      nextAttemptAt,
+      updatedAt: now,
+    })
+    .where(eq(webhookDeliveries.id, delivery.id));
+
+  return 'retried';
 };
 
 const isUniqueViolation = (error: unknown, constraint?: string): boolean => {
@@ -645,6 +948,301 @@ app.get('/v0/auth/me', async (context) => {
     }
 
     return context.json({ ok: true, user: authedUser });
+  });
+});
+
+app.get('/v0/embed/widget.js', async (context) => {
+  return withDatabase(context, async (db) => {
+    const username = context.req.query('username')?.trim().toLowerCase();
+    const eventSlug = context.req.query('eventSlug')?.trim().toLowerCase();
+
+    if (!username || !eventSlug) {
+      return jsonError(context, 400, 'username and eventSlug query params are required.');
+    }
+
+    const eventView = await findPublicEventView(db, username, eventSlug);
+    if (!eventView) {
+      return jsonError(context, 404, 'Event type not found.');
+    }
+
+    const timezone = context.req.query('timezone')?.trim();
+    const theme = resolveEmbedTheme(context.req.query('theme'));
+    const appBaseUrl = resolveAppBaseUrl(context.env);
+    const iframeUrl = new URL(
+      `/${encodeURIComponent(username)}/${encodeURIComponent(eventSlug)}`,
+      appBaseUrl,
+    );
+
+    iframeUrl.searchParams.set('embed', '1');
+    iframeUrl.searchParams.set('theme', theme);
+    if (timezone) {
+      iframeUrl.searchParams.set('timezone', timezone);
+    }
+
+    const script = buildEmbedWidgetScript({
+      iframeSrc: iframeUrl.toString(),
+      theme,
+      ...(timezone ? { timezone } : {}),
+    });
+
+    return new Response(script, {
+      status: 200,
+      headers: {
+        'content-type': 'application/javascript; charset=utf-8',
+        'cache-control': 'public, max-age=60',
+      },
+    });
+  });
+});
+
+app.get('/v0/webhooks', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const rows = await db
+      .select({
+        id: webhookSubscriptions.id,
+        url: webhookSubscriptions.url,
+        events: webhookSubscriptions.events,
+        isActive: webhookSubscriptions.isActive,
+        createdAt: webhookSubscriptions.createdAt,
+        updatedAt: webhookSubscriptions.updatedAt,
+      })
+      .from(webhookSubscriptions)
+      .where(eq(webhookSubscriptions.userId, authedUser.id))
+      .orderBy(desc(webhookSubscriptions.createdAt));
+
+    return context.json({
+      ok: true,
+      webhooks: rows.map((row) => ({
+        id: row.id,
+        url: row.url,
+        events: parseWebhookEventTypes(row.events),
+        isActive: row.isActive,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      })),
+    });
+  });
+});
+
+app.post('/v0/webhooks', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = webhookSubscriptionCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    try {
+      const [inserted] = await db
+        .insert(webhookSubscriptions)
+        .values({
+          userId: authedUser.id,
+          url: parsed.data.url,
+          secret: parsed.data.secret,
+          events: normalizeWebhookEvents(parsed.data.events),
+          isActive: true,
+        })
+        .returning({
+          id: webhookSubscriptions.id,
+          url: webhookSubscriptions.url,
+          events: webhookSubscriptions.events,
+          isActive: webhookSubscriptions.isActive,
+          createdAt: webhookSubscriptions.createdAt,
+          updatedAt: webhookSubscriptions.updatedAt,
+        });
+
+      if (!inserted) {
+        return jsonError(context, 500, 'Failed to create webhook subscription.');
+      }
+
+      return context.json({
+        ok: true,
+        webhook: {
+          id: inserted.id,
+          url: inserted.url,
+          events: parseWebhookEventTypes(inserted.events),
+          isActive: inserted.isActive,
+          createdAt: inserted.createdAt.toISOString(),
+          updatedAt: inserted.updatedAt.toISOString(),
+        },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'webhook_subscriptions_user_url_unique')) {
+        return jsonError(context, 409, 'A webhook subscription with that URL already exists.');
+      }
+      throw error;
+    }
+  });
+});
+
+app.patch('/v0/webhooks/:id', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = webhookSubscriptionUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const updateValues: Partial<typeof webhookSubscriptions.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (parsed.data.url !== undefined) {
+      updateValues.url = parsed.data.url;
+    }
+    if (parsed.data.secret !== undefined) {
+      updateValues.secret = parsed.data.secret;
+    }
+    if (parsed.data.events !== undefined) {
+      updateValues.events = normalizeWebhookEvents(parsed.data.events);
+    }
+    if (parsed.data.isActive !== undefined) {
+      updateValues.isActive = parsed.data.isActive;
+    }
+
+    try {
+      const [updated] = await db
+        .update(webhookSubscriptions)
+        .set(updateValues)
+        .where(
+          and(eq(webhookSubscriptions.id, context.req.param('id')), eq(webhookSubscriptions.userId, authedUser.id)),
+        )
+        .returning({
+          id: webhookSubscriptions.id,
+          url: webhookSubscriptions.url,
+          events: webhookSubscriptions.events,
+          isActive: webhookSubscriptions.isActive,
+          createdAt: webhookSubscriptions.createdAt,
+          updatedAt: webhookSubscriptions.updatedAt,
+        });
+
+      if (!updated) {
+        return jsonError(context, 404, 'Webhook subscription not found.');
+      }
+
+      return context.json({
+        ok: true,
+        webhook: {
+          id: updated.id,
+          url: updated.url,
+          events: parseWebhookEventTypes(updated.events),
+          isActive: updated.isActive,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        },
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'webhook_subscriptions_user_url_unique')) {
+        return jsonError(context, 409, 'A webhook subscription with that URL already exists.');
+      }
+      throw error;
+    }
+  });
+});
+
+app.post('/v0/webhooks/deliveries/run', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const limit = clampWebhookDeliveryBatchLimit(context.req.query('limit'));
+
+    const dueRows = await db
+      .select({
+        id: webhookDeliveries.id,
+        subscriptionId: webhookDeliveries.subscriptionId,
+        eventId: webhookDeliveries.eventId,
+        eventType: webhookDeliveries.eventType,
+        payload: webhookDeliveries.payload,
+        attemptCount: webhookDeliveries.attemptCount,
+        maxAttempts: webhookDeliveries.maxAttempts,
+        url: webhookSubscriptions.url,
+        secret: webhookSubscriptions.secret,
+      })
+      .from(webhookDeliveries)
+      .innerJoin(webhookSubscriptions, eq(webhookSubscriptions.id, webhookDeliveries.subscriptionId))
+      .where(
+        and(
+          eq(webhookSubscriptions.userId, authedUser.id),
+          eq(webhookDeliveries.status, 'pending'),
+          lte(webhookDeliveries.nextAttemptAt, new Date()),
+        ),
+      )
+      .orderBy(webhookDeliveries.nextAttemptAt)
+      .limit(limit);
+
+    const deliveries: PendingWebhookDelivery[] = [];
+    let failed = 0;
+    for (const row of dueRows) {
+      const eventType = parseWebhookEventTypes([row.eventType])[0];
+      const payload = webhookEventSchema.safeParse(row.payload);
+      if (!eventType || !payload.success) {
+        const now = new Date();
+        await db
+          .update(webhookDeliveries)
+          .set({
+            status: 'failed',
+            attemptCount: row.maxAttempts,
+            lastAttemptAt: now,
+            lastError: 'Delivery payload failed validation.',
+            nextAttemptAt: now,
+            updatedAt: now,
+          })
+          .where(eq(webhookDeliveries.id, row.id));
+        failed += 1;
+        continue;
+      }
+
+      deliveries.push({
+        id: row.id,
+        subscriptionId: row.subscriptionId,
+        url: row.url,
+        secret: row.secret,
+        eventId: row.eventId,
+        eventType,
+        payload: payload.data,
+        attemptCount: row.attemptCount,
+        maxAttempts: row.maxAttempts,
+      });
+    }
+
+    let succeeded = 0;
+    let retried = 0;
+
+    for (const delivery of deliveries) {
+      const outcome = await executeWebhookDelivery(db, delivery);
+      if (outcome === 'succeeded') {
+        succeeded += 1;
+      } else if (outcome === 'retried') {
+        retried += 1;
+      } else {
+        failed += 1;
+      }
+    }
+
+    return context.json({
+      ok: true,
+      processed: dueRows.length,
+      succeeded,
+      retried,
+      failed,
+    });
   });
 });
 
@@ -1342,6 +1940,25 @@ app.post('/v0/bookings', async (context) => {
         idempotencyKey: `booking-confirmation:${result.booking.id}`,
       });
 
+      const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
+        organizerId: result.booking.organizerId,
+        type: 'booking.created',
+        booking: {
+          id: result.booking.id,
+          eventTypeId: result.booking.eventTypeId,
+          organizerId: result.booking.organizerId,
+          inviteeEmail: result.booking.inviteeEmail,
+          inviteeName: result.booking.inviteeName,
+          startsAtIso: result.booking.startsAt.toISOString(),
+          endsAtIso: result.booking.endsAt.toISOString(),
+        },
+        metadata: {
+          timezone,
+          actionLookupCancelUrl: actionUrls.lookupCancelUrl,
+          actionLookupRescheduleUrl: actionUrls.lookupRescheduleUrl,
+        },
+      });
+
       return context.json({
         ok: true,
         booking: {
@@ -1368,6 +1985,9 @@ app.post('/v0/bookings', async (context) => {
           },
         },
         email,
+        webhooks: {
+          queued: queuedWebhookDeliveries,
+        },
       });
     } catch (error) {
       if (error instanceof BookingNotFoundError) {
@@ -1673,6 +2293,25 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
             }),
           ]);
 
+      const queuedWebhookDeliveries = result.alreadyProcessed
+        ? 0
+        : await enqueueWebhookDeliveries(db, {
+            organizerId: result.booking.organizerId,
+            type: 'booking.canceled',
+            booking: {
+              id: result.booking.id,
+              eventTypeId: result.booking.eventTypeId,
+              organizerId: result.booking.organizerId,
+              inviteeEmail: result.booking.inviteeEmail,
+              inviteeName: result.booking.inviteeName,
+              startsAtIso: result.booking.startsAt.toISOString(),
+              endsAtIso: result.booking.endsAt.toISOString(),
+            },
+            metadata: {
+              cancellationReason: parsed.data.reason ?? null,
+            },
+          });
+
       return context.json({
         ok: true,
         booking: {
@@ -1680,6 +2319,9 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
           status: result.booking.status,
         },
         email,
+        webhooks: {
+          queued: queuedWebhookDeliveries,
+        },
       });
     } catch (error) {
       if (error instanceof BookingActionNotFoundError) {
@@ -2025,6 +2667,27 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             }),
           ]);
 
+      const queuedWebhookDeliveries = result.alreadyProcessed
+        ? 0
+        : await enqueueWebhookDeliveries(db, {
+            organizerId: result.newBooking.organizerId,
+            type: 'booking.rescheduled',
+            booking: {
+              id: result.newBooking.id,
+              eventTypeId: result.newBooking.eventTypeId,
+              organizerId: result.newBooking.organizerId,
+              inviteeEmail: result.newBooking.inviteeEmail,
+              inviteeName: result.newBooking.inviteeName,
+              startsAtIso: result.newBooking.startsAt.toISOString(),
+              endsAtIso: result.newBooking.endsAt.toISOString(),
+            },
+            metadata: {
+              rescheduledFromBookingId: result.oldBooking.id,
+              previousStartsAt: result.oldBooking.startsAt.toISOString(),
+              previousEndsAt: result.oldBooking.endsAt.toISOString(),
+            },
+          });
+
       const actions = result.actionTokens
         ? (() => {
             const tokens = actionTokenMap(result.actionTokens);
@@ -2065,6 +2728,9 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         },
         actions,
         email,
+        webhooks: {
+          queued: queuedWebhookDeliveries,
+        },
       });
     } catch (error) {
       if (error instanceof BookingActionNotFoundError) {

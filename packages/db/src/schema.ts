@@ -19,6 +19,24 @@ type EventQuestionRecord = {
   placeholder?: string | undefined;
 };
 
+type WebhookEventTypeRecord = 'booking.created' | 'booking.canceled' | 'booking.rescheduled';
+type WebhookDeliveryStatusRecord = 'pending' | 'succeeded' | 'failed';
+type WebhookEventPayloadRecord = {
+  id: string;
+  type: WebhookEventTypeRecord;
+  createdAt: string;
+  payload: {
+    bookingId: string;
+    eventTypeId: string;
+    organizerId: string;
+    inviteeEmail: string;
+    inviteeName: string;
+    startsAt: string;
+    endsAt: string;
+    metadata?: Record<string, unknown> | undefined;
+  };
+};
+
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 320 }).notNull().unique(),
@@ -164,5 +182,55 @@ export const waitlistEntries = pgTable(
   },
   (table) => ({
     uniqueDailyEmail: unique('waitlist_entries_daily_email_unique').on(table.dateKey, table.email),
+  }),
+);
+
+export const webhookSubscriptions = pgTable(
+  'webhook_subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    url: varchar('url', { length: 2000 }).notNull(),
+    secret: text('secret').notNull(),
+    events: jsonb('events').$type<WebhookEventTypeRecord[]>().notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueUserUrl: unique('webhook_subscriptions_user_url_unique').on(table.userId, table.url),
+  }),
+);
+
+export const webhookDeliveries = pgTable(
+  'webhook_deliveries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    subscriptionId: uuid('subscription_id')
+      .notNull()
+      .references(() => webhookSubscriptions.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    eventType: varchar('event_type', { length: 40 }).notNull(),
+    payload: jsonb('payload').$type<WebhookEventPayloadRecord>().notNull(),
+    status: varchar('status', { length: 20 })
+      .$type<WebhookDeliveryStatusRecord>()
+      .notNull()
+      .default('pending'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    maxAttempts: integer('max_attempts').notNull().default(6),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastResponseStatus: integer('last_response_status'),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueSubscriptionEvent: unique('webhook_deliveries_subscription_event_unique').on(
+      table.subscriptionId,
+      table.eventId,
+    ),
   }),
 );

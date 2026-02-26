@@ -11,6 +11,8 @@ import {
   healthCheckSchema,
   magicLinkRequestSchema,
   waitlistJoinSchema,
+  webhookSubscriptionCreateSchema,
+  webhookSubscriptionUpdateSchema,
   webhookEventSchema,
 } from './schemas';
 
@@ -21,6 +23,21 @@ describe('shared schemas', () => {
 
   it('rejects invalid webhook events', () => {
     const result = webhookEventSchema.safeParse({ type: 'invalid' });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts webhook subscription create payloads', () => {
+    const payload = webhookSubscriptionCreateSchema.parse({
+      url: 'https://example.com/webhooks/opencalendly',
+      events: ['booking.created', 'booking.canceled'],
+      secret: 'whsec_super_secret',
+    });
+
+    expect(payload.events).toHaveLength(2);
+  });
+
+  it('rejects empty webhook subscription update payloads', () => {
+    const result = webhookSubscriptionUpdateSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 
