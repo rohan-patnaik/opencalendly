@@ -39,7 +39,7 @@ Success response:
 
 Notes:
 
-- Email delivery telemetry stores HMAC hashes (not raw emails). Set `TELEMETRY_HMAC_KEY` to a stable secret to preserve continuity across `SESSION_SECRET` rotations.
+- Email delivery telemetry stores HMAC hashes (not raw emails) and requires `TELEMETRY_HMAC_KEY` (minimum 32 chars). If unset, email delivery telemetry writes are skipped.
 
 ### `POST /v0/auth/magic-link`
 

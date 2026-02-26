@@ -19,7 +19,7 @@ const REQUIRED = {
 const OPTIONAL = {
   DEMO_DAILY_PASS_LIMIT: 'Optional integer daily pass limit (Feature 3).',
   TELEMETRY_HMAC_KEY:
-    'Recommended dedicated secret for telemetry HMAC; fallback uses SESSION_SECRET if unset.',
+    'Recommended dedicated secret for telemetry HMAC. If unset, email delivery telemetry writes are skipped.',
   MICROSOFT_CLIENT_ID: 'Microsoft Entra -> App registrations -> client ID (Feature 7).',
   MICROSOFT_CLIENT_SECRET: 'Microsoft Entra -> App registrations -> client secret (Feature 7).',
   GITHUB_CLIENT_ID: 'GitHub Developer Settings -> OAuth Apps.',

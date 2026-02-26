@@ -385,10 +385,10 @@ const resolveCalendarEncryptionSecret = (env: Bindings): string | null => {
 
 const resolveTelemetryHmacKey = (env: Bindings): string | null => {
   const telemetryHmacKey = env.TELEMETRY_HMAC_KEY?.trim();
-  if (telemetryHmacKey && telemetryHmacKey.length >= MIN_CALENDAR_SECRET_LENGTH) {
-    return telemetryHmacKey;
+  if (!telemetryHmacKey || telemetryHmacKey.length < MIN_CALENDAR_SECRET_LENGTH) {
+    return null;
   }
-  return resolveCalendarEncryptionSecret(env);
+  return telemetryHmacKey;
 };
 
 const resolveGoogleOAuthConfig = (
@@ -581,12 +581,12 @@ const recordAnalyticsFunnelEvent = async (
   });
 };
 
-const tryRecordAnalyticsFunnelEvent = (
+const tryRecordAnalyticsFunnelEvent = async (
   db: Database,
   input: Parameters<typeof recordAnalyticsFunnelEvent>[1],
-): void => {
-  void recordAnalyticsFunnelEvent(db, input).catch((error) => {
-    // Analytics writes are best-effort and must not block booking flows.
+): Promise<void> => {
+  await recordAnalyticsFunnelEvent(db, input).catch((error) => {
+    // Analytics writes are best-effort and must not fail booking flows.
     console.warn('analytics_funnel_event_write_failed', {
       eventTypeId: input.eventTypeId,
       stage: input.stage,
@@ -627,11 +627,11 @@ const recordEmailDelivery = async (
   });
 };
 
-const tryRecordEmailDelivery = (
+const tryRecordEmailDelivery = async (
   env: Bindings,
   db: Database,
   input: Parameters<typeof recordEmailDelivery>[2],
-): void => {
+): Promise<void> => {
   const telemetryHmacKey = resolveTelemetryHmacKey(env);
   if (!telemetryHmacKey) {
     console.warn('email_delivery_write_failed', {
@@ -643,7 +643,7 @@ const tryRecordEmailDelivery = (
     return;
   }
 
-  void recordEmailDelivery(db, telemetryHmacKey, input).catch((error) => {
+  await recordEmailDelivery(db, telemetryHmacKey, input).catch((error) => {
     // Delivery telemetry is best-effort and should not fail request paths.
     console.warn('email_delivery_write_failed', {
       bookingId: input.bookingId,
@@ -4999,7 +4999,7 @@ app.post('/v0/team-bookings', async (context) => {
         rescheduleToken: tokens.rescheduleToken,
       });
 
-      tryRecordAnalyticsFunnelEvent(db, {
+      await tryRecordAnalyticsFunnelEvent(db, {
         organizerId: result.booking.organizerId,
         eventTypeId: result.booking.eventTypeId,
         teamEventTypeId: result.team.teamEventTypeId,
@@ -5022,7 +5022,7 @@ app.post('/v0/team-bookings', async (context) => {
         idempotencyKey: `booking-confirmation:${result.booking.id}`,
       });
 
-      tryRecordEmailDelivery(context.env, db, {
+      await tryRecordEmailDelivery(context.env, db, {
         organizerId: result.booking.organizerId,
         bookingId: result.booking.id,
         eventTypeId: result.booking.eventTypeId,
@@ -5281,7 +5281,7 @@ app.post('/v0/bookings', async (context) => {
         rescheduleToken: tokens.rescheduleToken,
       });
 
-      tryRecordAnalyticsFunnelEvent(db, {
+      await tryRecordAnalyticsFunnelEvent(db, {
         organizerId: result.booking.organizerId,
         eventTypeId: result.booking.eventTypeId,
         stage: 'booking_confirmed',
@@ -5302,7 +5302,7 @@ app.post('/v0/bookings', async (context) => {
         idempotencyKey: `booking-confirmation:${result.booking.id}`,
       });
 
-      tryRecordEmailDelivery(context.env, db, {
+      await tryRecordEmailDelivery(context.env, db, {
         organizerId: result.booking.organizerId,
         bookingId: result.booking.id,
         eventTypeId: result.booking.eventTypeId,
@@ -5701,7 +5701,7 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
       if (!result.alreadyProcessed && Array.isArray(email)) {
         const [inviteeEmailResult, organizerEmailResult] = email;
         if (inviteeEmailResult) {
-          tryRecordEmailDelivery(context.env, db, {
+          await tryRecordEmailDelivery(context.env, db, {
             organizerId: result.booking.organizerId,
             bookingId: result.booking.id,
             eventTypeId: result.booking.eventTypeId,
@@ -5716,7 +5716,7 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
           });
         }
         if (organizerEmailResult) {
-          tryRecordEmailDelivery(context.env, db, {
+          await tryRecordEmailDelivery(context.env, db, {
             organizerId: result.booking.organizerId,
             bookingId: result.booking.id,
             eventTypeId: result.booking.eventTypeId,
@@ -6263,7 +6263,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
       if (!result.alreadyProcessed && Array.isArray(email)) {
         const [inviteeEmailResult, organizerEmailResult] = email;
         if (inviteeEmailResult) {
-          tryRecordEmailDelivery(context.env, db, {
+          await tryRecordEmailDelivery(context.env, db, {
             organizerId: result.newBooking.organizerId,
             bookingId: result.newBooking.id,
             eventTypeId: result.newBooking.eventTypeId,
@@ -6278,7 +6278,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           });
         }
         if (organizerEmailResult) {
-          tryRecordEmailDelivery(context.env, db, {
+          await tryRecordEmailDelivery(context.env, db, {
             organizerId: result.newBooking.organizerId,
             bookingId: result.newBooking.id,
             eventTypeId: result.newBooking.eventTypeId,
