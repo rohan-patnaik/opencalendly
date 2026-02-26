@@ -22,6 +22,13 @@
       "when": 1772061532351,
       "tag": "0002_brown_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772080888678,
+      "tag": "0003_spicy_bedlam",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   availabilityRuleSchema,
+  bookingActionTokenSchema,
+  bookingCancelSchema,
   bookingCreateSchema,
+  bookingRescheduleSchema,
   eventTypeCreateSchema,
   healthCheckSchema,
   magicLinkRequestSchema,
@@ -61,6 +64,28 @@ describe('shared schemas', () => {
     });
 
     expect(payload.answers?.company).toBe('Acme');
+  });
+
+  it('accepts booking action token payloads', () => {
+    const token = 'a'.repeat(64);
+    expect(bookingActionTokenSchema.parse(token)).toBe(token);
+  });
+
+  it('accepts booking cancellation payloads', () => {
+    const payload = bookingCancelSchema.parse({
+      reason: 'Need to move this by a day.',
+    });
+
+    expect(payload.reason).toContain('move');
+  });
+
+  it('accepts booking reschedule payloads', () => {
+    const payload = bookingRescheduleSchema.parse({
+      startsAt: '2026-03-02T16:00:00.000Z',
+      timezone: 'Asia/Kolkata',
+    });
+
+    expect(payload.timezone).toBe('Asia/Kolkata');
   });
 
   it('rejects malformed auth payload', () => {

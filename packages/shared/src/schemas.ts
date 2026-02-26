@@ -34,6 +34,9 @@ export const verifyMagicLinkRequestSchema = z.object({
   token: z.string().min(32).max(256),
 });
 
+export const bookingActionTokenSchema = z.string().min(32).max(256);
+export const bookingActionTypeSchema = z.enum(['cancel', 'reschedule']);
+
 export const eventTypeCreateSchema = z.object({
   name: z.string().min(1).max(120),
   slug: eventSlugSchema,
@@ -99,6 +102,15 @@ export const bookingCreateSchema = z.object({
   answers: z.record(z.string(), z.string()).optional(),
 });
 
+export const bookingCancelSchema = z.object({
+  reason: z.string().min(1).max(500).nullish(),
+});
+
+export const bookingRescheduleSchema = z.object({
+  startsAt: z.string().datetime({ offset: true }),
+  timezone: timezoneSchema.optional(),
+});
+
 export const webhookEventSchema = z.object({
   id: z.string().uuid(),
   type: z.enum(['booking.created', 'booking.canceled', 'booking.rescheduled']),
@@ -116,6 +128,8 @@ export const webhookEventSchema = z.object({
 export type HealthCheck = z.infer<typeof healthCheckSchema>;
 export type MagicLinkRequest = z.infer<typeof magicLinkRequestSchema>;
 export type VerifyMagicLinkRequest = z.infer<typeof verifyMagicLinkRequestSchema>;
+export type BookingActionToken = z.infer<typeof bookingActionTokenSchema>;
+export type BookingActionType = z.infer<typeof bookingActionTypeSchema>;
 export type EventTypeCreateInput = z.infer<typeof eventTypeCreateSchema>;
 export type EventTypeUpdateInput = z.infer<typeof eventTypeUpdateSchema>;
 export type EventQuestion = z.infer<typeof eventQuestionSchema>;
@@ -123,4 +137,6 @@ export type AvailabilityRuleInput = z.infer<typeof availabilityRuleSchema>;
 export type AvailabilityOverrideInput = z.infer<typeof availabilityOverrideSchema>;
 export type AvailabilityQueryInput = z.infer<typeof availabilityQuerySchema>;
 export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
+export type BookingCancelInput = z.infer<typeof bookingCancelSchema>;
+export type BookingRescheduleInput = z.infer<typeof bookingRescheduleSchema>;
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;

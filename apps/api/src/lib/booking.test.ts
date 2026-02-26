@@ -39,6 +39,7 @@ const buildDataAccess = (options?: {
   eventType?: PublicEventType | null;
 }) => {
   let insertCount = 0;
+  let actionTokenInsertCount = 0;
   let transactionCount = 0;
 
   const dataAccess: BookingDataAccess = {
@@ -66,6 +67,9 @@ const buildDataAccess = (options?: {
             endsAt: new Date('2026-03-02T09:30:00.000Z'),
           };
         },
+        insertActionTokens: async (_bookingId, tokens) => {
+          actionTokenInsertCount += tokens.length;
+        },
       });
     },
   };
@@ -73,6 +77,7 @@ const buildDataAccess = (options?: {
   return {
     dataAccess,
     getInsertCount: () => insertCount,
+    getActionTokenInsertCount: () => actionTokenInsertCount,
     getTransactionCount: () => transactionCount,
   };
 };
@@ -91,8 +96,10 @@ describe('commitBooking', () => {
     });
 
     expect(result.booking.id).toBe('booking-1');
+    expect(result.actionTokens).toHaveLength(2);
     expect(harness.getTransactionCount()).toBe(1);
     expect(harness.getInsertCount()).toBe(1);
+    expect(harness.getActionTokenInsertCount()).toBe(2);
   });
 
   it('rejects booking if the requested slot is unavailable at commit time', async () => {

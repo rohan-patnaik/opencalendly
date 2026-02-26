@@ -281,7 +281,44 @@ Behavior:
 
 - Re-validates slot availability inside a DB transaction.
 - Uses DB unique slot constraint to avoid duplicate commits.
+- Creates secure cancel/reschedule action tokens (stored hashed server-side).
 - Sends booking confirmation email after successful write.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "booking": {
+    "id": "ff7e6f67-9d26-4ed6-9db5-f6f9fe00dc2e",
+    "eventTypeId": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+    "organizerId": "d8bdbf6d-aed7-4c84-a67f-a2c54f7c4f4a",
+    "inviteeName": "Pat Lee",
+    "inviteeEmail": "pat@example.com",
+    "startsAt": "2026-03-04T17:00:00.000Z",
+    "endsAt": "2026-03-04T17:30:00.000Z"
+  },
+  "actions": {
+    "cancel": {
+      "token": "raw-cancel-token",
+      "expiresAt": "2026-04-05T17:00:00.000Z",
+      "lookupUrl": "http://localhost:8787/v0/bookings/actions/raw-cancel-token",
+      "url": "http://localhost:8787/v0/bookings/actions/raw-cancel-token/cancel"
+    },
+    "reschedule": {
+      "token": "raw-reschedule-token",
+      "expiresAt": "2026-04-05T17:00:00.000Z",
+      "lookupUrl": "http://localhost:8787/v0/bookings/actions/raw-reschedule-token",
+      "url": "http://localhost:8787/v0/bookings/actions/raw-reschedule-token/reschedule"
+    }
+  },
+  "email": {
+    "sent": true,
+    "provider": "resend",
+    "messageId": "re_123"
+  }
+}
+```
 
 Conflict response (`409`):
 
@@ -291,6 +328,172 @@ Conflict response (`409`):
   "error": "Selected slot is no longer available."
 }
 ```
+
+## Feature 2 Endpoints (Reschedule/Cancel)
+
+### `GET /v0/bookings/actions/:token`
+
+Public endpoint used by cancel/reschedule action pages to resolve a token into booking context.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "actionType": "cancel",
+  "booking": {
+    "id": "ff7e6f67-9d26-4ed6-9db5-f6f9fe00dc2e",
+    "status": "confirmed",
+    "startsAt": "2026-03-04T17:00:00.000Z",
+    "endsAt": "2026-03-04T17:30:00.000Z",
+    "timezone": "America/Los_Angeles",
+    "inviteeName": "Pat Lee",
+    "inviteeEmail": "pat@example.com",
+    "rescheduledTo": null
+  },
+  "eventType": {
+    "slug": "intro-call",
+    "name": "Intro Call",
+    "durationMinutes": 30
+  },
+  "organizer": {
+    "username": "demo",
+    "displayName": "Demo Organizer",
+    "timezone": "America/New_York"
+  },
+  "actions": {
+    "canCancel": true,
+    "canReschedule": false
+  }
+}
+```
+
+Invalid/expired/consumed token response (`404` or `410`):
+
+```json
+{
+  "ok": false,
+  "error": "Action link is invalid or expired."
+}
+```
+
+### `POST /v0/bookings/actions/:token/cancel`
+
+Public endpoint to cancel a booking via tokenized action link.
+
+Request:
+
+```json
+{
+  "reason": "Need to move this out by a week."
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "booking": {
+    "id": "ff7e6f67-9d26-4ed6-9db5-f6f9fe00dc2e",
+    "status": "canceled"
+  },
+  "email": [
+    {
+      "sent": true,
+      "provider": "resend"
+    },
+    {
+      "sent": true,
+      "provider": "resend"
+    }
+  ]
+}
+```
+
+Idempotent replay response:
+
+```json
+{
+  "ok": true,
+  "booking": {
+    "id": "ff7e6f67-9d26-4ed6-9db5-f6f9fe00dc2e",
+    "status": "canceled"
+  }
+}
+```
+
+Behavior:
+
+- Idempotent if the same cancel token is submitted repeatedly.
+- Emits cancellation email notifications to invitee and organizer.
+
+### `POST /v0/bookings/actions/:token/reschedule`
+
+Public endpoint to reschedule a booking via tokenized action link.
+
+Request:
+
+```json
+{
+  "startsAt": "2026-03-05T18:00:00.000Z",
+  "timezone": "America/Los_Angeles"
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "oldBooking": {
+    "id": "ff7e6f67-9d26-4ed6-9db5-f6f9fe00dc2e",
+    "status": "rescheduled"
+  },
+  "newBooking": {
+    "id": "b6b70a0a-5358-4767-b68d-31d6408e7d1e",
+    "status": "confirmed",
+    "rescheduledFromBookingId": "ff7e6f67-9d26-4ed6-9db5-f6f9fe00dc2e",
+    "startsAt": "2026-03-05T18:00:00.000Z",
+    "endsAt": "2026-03-05T18:30:00.000Z"
+  },
+  "actions": {
+    "cancel": {
+      "token": "raw-cancel-token",
+      "expiresAt": "2026-04-05T18:00:00.000Z"
+    },
+    "reschedule": {
+      "token": "raw-reschedule-token",
+      "expiresAt": "2026-04-05T18:00:00.000Z"
+    }
+  },
+  "email": [
+    {
+      "sent": true,
+      "provider": "resend"
+    },
+    {
+      "sent": true,
+      "provider": "resend"
+    }
+  ]
+}
+```
+
+Conflict response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "Selected slot is no longer available."
+}
+```
+
+Behavior:
+
+- Transaction-safe organizer-level conflict checks are required before confirming the new slot.
+- Reschedule sends notification emails to invitee + organizer.
+- Repeated submissions of the same token are idempotent.
 
 ## Webhook event schema (v0)
 

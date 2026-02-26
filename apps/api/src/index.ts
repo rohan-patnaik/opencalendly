@@ -1,10 +1,11 @@
-import { and, eq, gt, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { Hono } from 'hono';
 
 import {
   availabilityOverrides,
   availabilityRules,
+  bookingActionTokens,
   bookings,
   createDb,
   eventTypes,
@@ -13,7 +14,10 @@ import {
 } from '@opencalendly/db';
 import {
   availabilityQuerySchema,
+  bookingActionTokenSchema,
+  bookingCancelSchema,
   bookingCreateSchema,
+  bookingRescheduleSchema,
   eventQuestionsSchema,
   eventTypeCreateSchema,
   eventTypeUpdateSchema,
@@ -34,14 +38,24 @@ import {
 } from './lib/auth';
 import { computeAvailabilitySlots } from './lib/availability';
 import {
+  evaluateBookingActionToken,
+  parseBookingMetadata,
+  resolveRequestedRescheduleSlot,
+} from './lib/booking-actions';
+import {
   BookingConflictError,
   BookingNotFoundError,
   BookingUniqueConstraintError,
   BookingValidationError,
   commitBooking,
+  createBookingActionTokenSet,
   type PublicEventType,
 } from './lib/booking';
-import { sendBookingConfirmationEmail } from './lib/email';
+import {
+  sendBookingCancellationEmail,
+  sendBookingConfirmationEmail,
+  sendBookingRescheduledEmail,
+} from './lib/email';
 
 type HyperdriveBinding = {
   connectionString: string;
@@ -69,6 +83,48 @@ type AuthenticatedUser = {
   timezone: string;
 };
 
+type BookingActionType = 'cancel' | 'reschedule';
+
+type LockedActionToken = {
+  id: string;
+  bookingId: string;
+  actionType: BookingActionType;
+  expiresAt: Date;
+  consumedAt: Date | null;
+  consumedBookingId: string | null;
+};
+
+type LockedBooking = {
+  id: string;
+  eventTypeId: string;
+  organizerId: string;
+  inviteeName: string;
+  inviteeEmail: string;
+  startsAt: Date;
+  endsAt: Date;
+  status: string;
+  metadata: string | null;
+};
+
+type OrganizerProfile = {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string;
+  timezone: string;
+};
+
+type EventTypeProfile = {
+  id: string;
+  userId: string;
+  slug: string;
+  name: string;
+  durationMinutes: number;
+  locationType: string;
+  locationValue: string | null;
+  isActive: boolean;
+};
+
 type PublicEventView = {
   eventType: {
     id: string;
@@ -89,6 +145,9 @@ type PublicEventView = {
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+class BookingActionNotFoundError extends Error {}
+class BookingActionGoneError extends Error {}
 
 type ConnectionConfig =
   | {
@@ -310,6 +369,98 @@ const resolveAuthenticatedUser = async (
     displayName: row.displayName,
     timezone: normalizeTimezone(row.timezone),
   };
+};
+
+const actionTokenMap = (
+  tokens: Array<{
+    actionType: BookingActionType;
+    token: string;
+    expiresAt: string;
+  }>,
+): {
+  cancelToken: string;
+  cancelExpiresAt: string;
+  rescheduleToken: string;
+  rescheduleExpiresAt: string;
+} => {
+  const cancel = tokens.find((token) => token.actionType === 'cancel');
+  const reschedule = tokens.find((token) => token.actionType === 'reschedule');
+
+  if (!cancel || !reschedule) {
+    throw new Error('Missing booking action token(s).');
+  }
+
+  return {
+    cancelToken: cancel.token,
+    cancelExpiresAt: cancel.expiresAt,
+    rescheduleToken: reschedule.token,
+    rescheduleExpiresAt: reschedule.expiresAt,
+  };
+};
+
+const buildActionUrls = (
+  request: Request,
+  tokenMap: {
+    cancelToken: string;
+    rescheduleToken: string;
+  },
+): {
+  lookupCancelUrl: string;
+  lookupRescheduleUrl: string;
+  cancelUrl: string;
+  rescheduleUrl: string;
+} => {
+  const origin = new URL(request.url).origin;
+
+  return {
+    lookupCancelUrl: `${origin}/v0/bookings/actions/${tokenMap.cancelToken}`,
+    lookupRescheduleUrl: `${origin}/v0/bookings/actions/${tokenMap.rescheduleToken}`,
+    cancelUrl: `${origin}/v0/bookings/actions/${tokenMap.cancelToken}/cancel`,
+    rescheduleUrl: `${origin}/v0/bookings/actions/${tokenMap.rescheduleToken}/reschedule`,
+  };
+};
+
+const lockActionToken = async (
+  db: Database | Parameters<Parameters<Database['transaction']>[0]>[0],
+  tokenHash: string,
+): Promise<LockedActionToken | null> => {
+  const locked = await db.execute<LockedActionToken>(sql`
+    select
+      id,
+      booking_id as "bookingId",
+      action_type as "actionType",
+      expires_at as "expiresAt",
+      consumed_at as "consumedAt",
+      consumed_booking_id as "consumedBookingId"
+    from booking_action_tokens
+    where token_hash = ${tokenHash}
+    for update
+  `);
+
+  return locked.rows[0] ?? null;
+};
+
+const lockBooking = async (
+  db: Database | Parameters<Parameters<Database['transaction']>[0]>[0],
+  bookingId: string,
+): Promise<LockedBooking | null> => {
+  const locked = await db.execute<LockedBooking>(sql`
+    select
+      id,
+      event_type_id as "eventTypeId",
+      organizer_id as "organizerId",
+      invitee_name as "inviteeName",
+      invitee_email as "inviteeEmail",
+      starts_at as "startsAt",
+      ends_at as "endsAt",
+      status,
+      metadata
+    from bookings
+    where id = ${bookingId}
+    for update
+  `);
+
+  return locked.rows[0] ?? null;
 };
 
 app.get('/health', (context) => {
@@ -886,6 +1037,7 @@ app.post('/v0/bookings', async (context) => {
                 listConfirmedBookings: async (organizerId, rangeStart, rangeEnd) => {
                   return transaction
                     .select({
+                      id: bookings.id,
                       startsAt: bookings.startsAt,
                       endsAt: bookings.endsAt,
                       status: bookings.status,
@@ -900,6 +1052,20 @@ app.post('/v0/bookings', async (context) => {
                         gt(bookings.endsAt, rangeStart),
                       ),
                     );
+                },
+                insertActionTokens: async (bookingId, tokens) => {
+                  if (tokens.length === 0) {
+                    return;
+                  }
+
+                  await transaction.insert(bookingActionTokens).values(
+                    tokens.map((token) => ({
+                      bookingId,
+                      actionType: token.actionType,
+                      tokenHash: token.tokenHash,
+                      expiresAt: token.expiresAt,
+                    })),
+                  );
                 },
                 insertBooking: async (input) => {
                   try {
@@ -951,6 +1117,12 @@ app.post('/v0/bookings', async (context) => {
         },
       );
 
+      const tokens = actionTokenMap(result.actionTokens);
+      const actionUrls = buildActionUrls(context.req.raw, {
+        cancelToken: tokens.cancelToken,
+        rescheduleToken: tokens.rescheduleToken,
+      });
+
       const email = await sendBookingConfirmationEmail(context.env, {
         inviteeEmail: payload.inviteeEmail,
         inviteeName: payload.inviteeName,
@@ -960,6 +1132,8 @@ app.post('/v0/bookings', async (context) => {
         timezone,
         locationType: result.eventType.locationType,
         locationValue: result.eventType.locationValue,
+        cancelLink: actionUrls.lookupCancelUrl,
+        rescheduleLink: actionUrls.lookupRescheduleUrl,
         idempotencyKey: `booking-confirmation:${result.booking.id}`,
       });
 
@@ -974,11 +1148,725 @@ app.post('/v0/bookings', async (context) => {
           startsAt: result.booking.startsAt.toISOString(),
           endsAt: result.booking.endsAt.toISOString(),
         },
+        actions: {
+          cancel: {
+            token: tokens.cancelToken,
+            expiresAt: tokens.cancelExpiresAt,
+            lookupUrl: actionUrls.lookupCancelUrl,
+            url: actionUrls.cancelUrl,
+          },
+          reschedule: {
+            token: tokens.rescheduleToken,
+            expiresAt: tokens.rescheduleExpiresAt,
+            lookupUrl: actionUrls.lookupRescheduleUrl,
+            url: actionUrls.rescheduleUrl,
+          },
+        },
         email,
       });
     } catch (error) {
       if (error instanceof BookingNotFoundError) {
         return jsonError(context, 404, 'Event type not found.');
+      }
+      if (error instanceof BookingValidationError) {
+        return jsonError(context, 400, error.message);
+      }
+      if (error instanceof BookingConflictError) {
+        return jsonError(context, 409, error.message);
+      }
+      throw error;
+    }
+  });
+});
+
+app.get('/v0/bookings/actions/:token', async (context) => {
+  return withDatabase(context, async (db) => {
+    const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
+    if (!tokenParam.success) {
+      return jsonError(context, 404, 'Action link is invalid or expired.');
+    }
+
+    const [row] = await db
+      .select({
+        actionType: bookingActionTokens.actionType,
+        expiresAt: bookingActionTokens.expiresAt,
+        consumedAt: bookingActionTokens.consumedAt,
+        consumedBookingId: bookingActionTokens.consumedBookingId,
+        bookingId: bookings.id,
+        bookingStatus: bookings.status,
+        bookingStartsAt: bookings.startsAt,
+        bookingEndsAt: bookings.endsAt,
+        bookingMetadata: bookings.metadata,
+        inviteeName: bookings.inviteeName,
+        inviteeEmail: bookings.inviteeEmail,
+        eventTypeSlug: eventTypes.slug,
+        eventTypeName: eventTypes.name,
+        eventTypeDurationMinutes: eventTypes.durationMinutes,
+        organizerUsername: users.username,
+        organizerDisplayName: users.displayName,
+        organizerTimezone: users.timezone,
+      })
+      .from(bookingActionTokens)
+      .innerJoin(bookings, eq(bookings.id, bookingActionTokens.bookingId))
+      .innerJoin(eventTypes, eq(eventTypes.id, bookings.eventTypeId))
+      .innerJoin(users, eq(users.id, bookings.organizerId))
+      .where(eq(bookingActionTokens.tokenHash, hashToken(tokenParam.data)))
+      .limit(1);
+
+    if (!row) {
+      return jsonError(context, 404, 'Action link is invalid or expired.');
+    }
+
+    const actionType = row.actionType as BookingActionType;
+    const tokenState = evaluateBookingActionToken({
+      actionType,
+      bookingStatus: row.bookingStatus,
+      expiresAt: row.expiresAt,
+      consumedAt: row.consumedAt,
+      now: new Date(),
+    });
+    if (tokenState === 'gone') {
+      return jsonError(context, 410, 'Action link is invalid or expired.');
+    }
+
+    const metadata = parseBookingMetadata(row.bookingMetadata, normalizeTimezone);
+    const timezone = metadata.timezone ?? normalizeTimezone(row.organizerTimezone);
+
+    let rescheduledTo: { id: string; startsAt: string; endsAt: string } | null = null;
+    if (row.bookingStatus === 'rescheduled') {
+      const [child] = row.consumedBookingId
+        ? await db
+            .select({
+              id: bookings.id,
+              startsAt: bookings.startsAt,
+              endsAt: bookings.endsAt,
+            })
+            .from(bookings)
+            .where(eq(bookings.id, row.consumedBookingId))
+            .limit(1)
+        : await db
+            .select({
+              id: bookings.id,
+              startsAt: bookings.startsAt,
+              endsAt: bookings.endsAt,
+            })
+            .from(bookings)
+            .where(eq(bookings.rescheduledFromBookingId, row.bookingId))
+            .orderBy(desc(bookings.createdAt))
+            .limit(1);
+
+      if (child) {
+        rescheduledTo = {
+          id: child.id,
+          startsAt: child.startsAt.toISOString(),
+          endsAt: child.endsAt.toISOString(),
+        };
+      }
+    }
+
+    return context.json({
+      ok: true,
+      actionType,
+      booking: {
+        id: row.bookingId,
+        status: row.bookingStatus,
+        startsAt: row.bookingStartsAt.toISOString(),
+        endsAt: row.bookingEndsAt.toISOString(),
+        timezone,
+        inviteeName: row.inviteeName,
+        inviteeEmail: row.inviteeEmail,
+        rescheduledTo,
+      },
+      eventType: {
+        slug: row.eventTypeSlug,
+        name: row.eventTypeName,
+        durationMinutes: row.eventTypeDurationMinutes,
+      },
+      organizer: {
+        username: row.organizerUsername,
+        displayName: row.organizerDisplayName,
+        timezone: normalizeTimezone(row.organizerTimezone),
+      },
+      actions: {
+        canCancel: actionType === 'cancel' && tokenState === 'usable',
+        canReschedule:
+          actionType === 'reschedule' && tokenState === 'usable',
+      },
+    });
+  });
+});
+
+app.post('/v0/bookings/actions/:token/cancel', async (context) => {
+  return withDatabase(context, async (db) => {
+    const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
+    if (!tokenParam.success) {
+      return jsonError(context, 404, 'Action link is invalid or expired.');
+    }
+
+    const body = await context.req.json().catch(() => ({}));
+    const parsed = bookingCancelSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const now = new Date();
+
+    try {
+      const result = await db.transaction(async (transaction) => {
+        const token = await lockActionToken(transaction, hashToken(tokenParam.data));
+        if (!token || token.actionType !== 'cancel') {
+          throw new BookingActionNotFoundError('Action link is invalid or expired.');
+        }
+
+        const booking = await lockBooking(transaction, token.bookingId);
+        if (!booking) {
+          throw new BookingActionNotFoundError('Booking not found.');
+        }
+
+        const [eventType] = await transaction
+          .select({
+            id: eventTypes.id,
+            userId: eventTypes.userId,
+            slug: eventTypes.slug,
+            name: eventTypes.name,
+            durationMinutes: eventTypes.durationMinutes,
+            locationType: eventTypes.locationType,
+            locationValue: eventTypes.locationValue,
+            isActive: eventTypes.isActive,
+          })
+          .from(eventTypes)
+          .where(eq(eventTypes.id, booking.eventTypeId))
+          .limit(1);
+
+        const [organizer] = await transaction
+          .select({
+            id: users.id,
+            email: users.email,
+            username: users.username,
+            displayName: users.displayName,
+            timezone: users.timezone,
+          })
+          .from(users)
+          .where(eq(users.id, booking.organizerId))
+          .limit(1);
+
+        if (!eventType || !organizer) {
+          throw new BookingActionNotFoundError('Booking context not found.');
+        }
+
+        const tokenState = evaluateBookingActionToken({
+          actionType: token.actionType,
+          bookingStatus: booking.status,
+          expiresAt: token.expiresAt,
+          consumedAt: token.consumedAt,
+          now,
+        });
+
+        if (tokenState === 'gone') {
+          throw new BookingActionGoneError('Action link is invalid or expired.');
+        }
+
+        if (tokenState === 'idempotent-replay') {
+          await transaction
+            .update(bookingActionTokens)
+            .set({
+              consumedAt: now,
+            })
+            .where(
+              and(
+                eq(bookingActionTokens.bookingId, booking.id),
+                isNull(bookingActionTokens.consumedAt),
+              ),
+            );
+
+          return {
+            booking,
+            eventType,
+            organizer,
+            alreadyProcessed: true,
+          };
+        }
+
+        if (tokenState !== 'usable' || booking.status !== 'confirmed') {
+          throw new BookingActionGoneError('Booking is not cancelable.');
+        }
+
+        const [canceledBooking] = await transaction
+          .update(bookings)
+          .set({
+            status: 'canceled',
+            canceledAt: now,
+            canceledBy: 'invitee',
+            cancellationReason: parsed.data.reason ?? null,
+          })
+          .where(eq(bookings.id, booking.id))
+          .returning({
+            id: bookings.id,
+            eventTypeId: bookings.eventTypeId,
+            organizerId: bookings.organizerId,
+            inviteeName: bookings.inviteeName,
+            inviteeEmail: bookings.inviteeEmail,
+            startsAt: bookings.startsAt,
+            endsAt: bookings.endsAt,
+            status: bookings.status,
+            metadata: bookings.metadata,
+          });
+
+        if (!canceledBooking) {
+          throw new Error('Failed to cancel booking.');
+        }
+
+        await transaction
+          .update(bookingActionTokens)
+          .set({
+            consumedAt: now,
+          })
+          .where(
+            and(eq(bookingActionTokens.bookingId, booking.id), isNull(bookingActionTokens.consumedAt)),
+          );
+
+        return {
+          booking: canceledBooking,
+          eventType,
+          organizer,
+          alreadyProcessed: false,
+        };
+      });
+
+      const timezone =
+        parseBookingMetadata(result.booking.metadata, normalizeTimezone).timezone ??
+        normalizeTimezone(result.organizer.timezone);
+
+      const email = result.alreadyProcessed
+        ? {
+            sent: false,
+            provider: 'none' as const,
+            error: 'Idempotent replay: cancellation already processed.',
+          }
+        : await Promise.all([
+            sendBookingCancellationEmail(context.env, {
+              recipientEmail: result.booking.inviteeEmail,
+              recipientName: result.booking.inviteeName,
+              recipientRole: 'invitee',
+              organizerDisplayName: result.organizer.displayName,
+              eventName: result.eventType.name,
+              startsAt: result.booking.startsAt.toISOString(),
+              timezone,
+              cancellationReason: parsed.data.reason ?? null,
+              idempotencyKey: `booking-cancel:${result.booking.id}:invitee`,
+            }),
+            sendBookingCancellationEmail(context.env, {
+              recipientEmail: result.organizer.email,
+              recipientName: result.organizer.displayName,
+              recipientRole: 'organizer',
+              organizerDisplayName: result.organizer.displayName,
+              eventName: result.eventType.name,
+              startsAt: result.booking.startsAt.toISOString(),
+              timezone,
+              cancellationReason: parsed.data.reason ?? null,
+              idempotencyKey: `booking-cancel:${result.booking.id}:organizer`,
+            }),
+          ]);
+
+      return context.json({
+        ok: true,
+        booking: {
+          id: result.booking.id,
+          status: result.booking.status,
+        },
+        email,
+      });
+    } catch (error) {
+      if (error instanceof BookingActionNotFoundError) {
+        return jsonError(context, 404, 'Action link is invalid or expired.');
+      }
+      if (error instanceof BookingActionGoneError) {
+        return jsonError(context, 410, 'Action link is invalid or expired.');
+      }
+      throw error;
+    }
+  });
+});
+
+app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
+  return withDatabase(context, async (db) => {
+    const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
+    if (!tokenParam.success) {
+      return jsonError(context, 404, 'Action link is invalid or expired.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = bookingRescheduleSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const timezone = normalizeTimezone(parsed.data.timezone);
+    const startsAt = DateTime.fromISO(parsed.data.startsAt, { zone: 'utc' });
+    if (!startsAt.isValid) {
+      return jsonError(context, 400, 'Invalid startsAt value.');
+    }
+
+    const now = new Date();
+    const requestedStartsAtIso = startsAt.toUTC().toISO();
+    if (!requestedStartsAtIso) {
+      return jsonError(context, 400, 'Unable to normalize startsAt.');
+    }
+
+    try {
+      const result = await db.transaction(async (transaction) => {
+        const token = await lockActionToken(transaction, hashToken(tokenParam.data));
+        if (!token || token.actionType !== 'reschedule') {
+          throw new BookingActionNotFoundError('Action link is invalid or expired.');
+        }
+
+        const booking = await lockBooking(transaction, token.bookingId);
+        if (!booking) {
+          throw new BookingActionNotFoundError('Booking not found.');
+        }
+
+        const eventTypeResult = await transaction.execute<EventTypeProfile>(sql`
+          select
+            id,
+            user_id as "userId",
+            slug,
+            name,
+            duration_minutes as "durationMinutes",
+            location_type as "locationType",
+            location_value as "locationValue",
+            is_active as "isActive"
+          from event_types
+          where id = ${booking.eventTypeId}
+          for update
+        `);
+
+        const organizerResult = await transaction.execute<OrganizerProfile>(sql`
+          select
+            id,
+            email,
+            username,
+            display_name as "displayName",
+            timezone
+          from users
+          where id = ${booking.organizerId}
+          for update
+        `);
+
+        const eventTypeRow = eventTypeResult.rows[0];
+        const organizerRow = organizerResult.rows[0];
+
+        if (!eventTypeRow || !organizerRow || !eventTypeRow.isActive) {
+          throw new BookingActionNotFoundError('Booking context not found.');
+        }
+
+        const findReplayBooking = async (): Promise<LockedBooking | null> => {
+          const [rescheduledBooking] = token.consumedBookingId
+            ? await transaction
+                .select({
+                  id: bookings.id,
+                  eventTypeId: bookings.eventTypeId,
+                  organizerId: bookings.organizerId,
+                  inviteeName: bookings.inviteeName,
+                  inviteeEmail: bookings.inviteeEmail,
+                  startsAt: bookings.startsAt,
+                  endsAt: bookings.endsAt,
+                  status: bookings.status,
+                  metadata: bookings.metadata,
+                })
+                .from(bookings)
+                .where(eq(bookings.id, token.consumedBookingId))
+                .limit(1)
+            : await transaction
+                .select({
+                  id: bookings.id,
+                  eventTypeId: bookings.eventTypeId,
+                  organizerId: bookings.organizerId,
+                  inviteeName: bookings.inviteeName,
+                  inviteeEmail: bookings.inviteeEmail,
+                  startsAt: bookings.startsAt,
+                  endsAt: bookings.endsAt,
+                  status: bookings.status,
+                  metadata: bookings.metadata,
+                })
+                .from(bookings)
+                .where(eq(bookings.rescheduledFromBookingId, booking.id))
+                .orderBy(desc(bookings.createdAt))
+                .limit(1);
+
+          return rescheduledBooking ?? null;
+        };
+
+        const tokenState = evaluateBookingActionToken({
+          actionType: token.actionType,
+          bookingStatus: booking.status,
+          expiresAt: token.expiresAt,
+          consumedAt: token.consumedAt,
+          now,
+        });
+
+        if (tokenState === 'idempotent-replay') {
+          const replayBooking = await findReplayBooking();
+          if (!replayBooking) {
+            throw new BookingActionGoneError('Action link is invalid or expired.');
+          }
+
+          return {
+            oldBooking: booking,
+            newBooking: replayBooking,
+            eventType: eventTypeRow,
+            organizer: organizerRow,
+            actionTokens: null,
+            alreadyProcessed: true,
+          };
+        }
+
+        if (tokenState === 'gone' || booking.status !== 'confirmed') {
+          throw new BookingActionGoneError('Booking is not reschedulable.');
+        }
+
+        const requestedEndsAt = startsAt.plus({ minutes: eventTypeRow.durationMinutes });
+        const requestedEndsAtIso = requestedEndsAt.toUTC().toISO();
+        if (!requestedEndsAtIso) {
+          throw new BookingValidationError('Unable to normalize end time.');
+        }
+
+        const rangeStart = startsAt.minus({ days: 1 });
+        const rangeEnd = requestedEndsAt.plus({ days: 1 });
+        const rangeStartIso = rangeStart.toUTC().toISO();
+        if (!rangeStartIso) {
+          throw new BookingValidationError('Unable to build slot validation range.');
+        }
+
+        const [rules, overrides, existingBookings] = await Promise.all([
+          transaction
+            .select({
+              dayOfWeek: availabilityRules.dayOfWeek,
+              startMinute: availabilityRules.startMinute,
+              endMinute: availabilityRules.endMinute,
+              bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
+              bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
+            })
+            .from(availabilityRules)
+            .where(eq(availabilityRules.userId, organizerRow.id)),
+          transaction
+            .select({
+              startAt: availabilityOverrides.startAt,
+              endAt: availabilityOverrides.endAt,
+              isAvailable: availabilityOverrides.isAvailable,
+            })
+            .from(availabilityOverrides)
+            .where(
+              and(
+                eq(availabilityOverrides.userId, organizerRow.id),
+                lt(availabilityOverrides.startAt, rangeEnd.toJSDate()),
+                gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
+              ),
+            ),
+          transaction
+            .select({
+              id: bookings.id,
+              startsAt: bookings.startsAt,
+              endsAt: bookings.endsAt,
+              status: bookings.status,
+              metadata: bookings.metadata,
+            })
+            .from(bookings)
+            .where(
+              and(
+                eq(bookings.organizerId, organizerRow.id),
+                eq(bookings.status, 'confirmed'),
+                lt(bookings.startsAt, rangeEnd.toJSDate()),
+                gt(bookings.endsAt, rangeStart.toJSDate()),
+              ),
+            ),
+        ]);
+
+        const slotResolution = resolveRequestedRescheduleSlot({
+          requestedStartsAtIso,
+          durationMinutes: eventTypeRow.durationMinutes,
+          organizerTimezone: normalizeTimezone(organizerRow.timezone),
+          rules,
+          overrides,
+          bookings: existingBookings,
+          excludeBookingId: booking.id,
+        });
+
+        if (!slotResolution) {
+          throw new BookingConflictError('Selected slot is no longer available.');
+        }
+
+        const existingMetadata = parseBookingMetadata(booking.metadata, normalizeTimezone);
+        const metadata = JSON.stringify({
+          answers: existingMetadata.answers,
+          timezone,
+          bufferBeforeMinutes: slotResolution.matchingSlot.bufferBeforeMinutes,
+          bufferAfterMinutes: slotResolution.matchingSlot.bufferAfterMinutes,
+        });
+
+        let insertedBooking: {
+          id: string;
+          eventTypeId: string;
+          organizerId: string;
+          inviteeName: string;
+          inviteeEmail: string;
+          startsAt: Date;
+          endsAt: Date;
+        } | null = null;
+
+        try {
+          const [inserted] = await transaction
+            .insert(bookings)
+            .values({
+              eventTypeId: booking.eventTypeId,
+              organizerId: booking.organizerId,
+              inviteeName: booking.inviteeName,
+              inviteeEmail: booking.inviteeEmail,
+              startsAt: slotResolution.requestedStartsAt,
+              endsAt: slotResolution.requestedEndsAt,
+              status: 'confirmed',
+              rescheduledFromBookingId: booking.id,
+              metadata,
+            })
+            .returning({
+              id: bookings.id,
+              eventTypeId: bookings.eventTypeId,
+              organizerId: bookings.organizerId,
+              inviteeName: bookings.inviteeName,
+              inviteeEmail: bookings.inviteeEmail,
+              startsAt: bookings.startsAt,
+              endsAt: bookings.endsAt,
+            });
+
+          insertedBooking = inserted ?? null;
+        } catch (error) {
+          if (isUniqueViolation(error, 'bookings_unique_slot')) {
+            throw new BookingConflictError('Selected slot is no longer available.');
+          }
+          throw error;
+        }
+
+        if (!insertedBooking) {
+          throw new Error('Failed to create rescheduled booking.');
+        }
+
+        await transaction
+          .update(bookings)
+          .set({
+            status: 'rescheduled',
+          })
+          .where(eq(bookings.id, booking.id));
+
+        const tokenSet = createBookingActionTokenSet(now);
+        await transaction.insert(bookingActionTokens).values(
+          tokenSet.tokenWrites.map((tokenWrite) => ({
+            bookingId: insertedBooking.id,
+            actionType: tokenWrite.actionType,
+            tokenHash: tokenWrite.tokenHash,
+            expiresAt: tokenWrite.expiresAt,
+          })),
+        );
+
+        await transaction
+          .update(bookingActionTokens)
+          .set({
+            consumedAt: now,
+            consumedBookingId: insertedBooking.id,
+          })
+          .where(
+            and(eq(bookingActionTokens.bookingId, booking.id), isNull(bookingActionTokens.consumedAt)),
+          );
+
+        return {
+          oldBooking: {
+            ...booking,
+            status: 'rescheduled',
+          },
+          newBooking: insertedBooking,
+          eventType: eventTypeRow,
+          organizer: organizerRow,
+          actionTokens: tokenSet.publicTokens,
+          alreadyProcessed: false,
+        };
+      });
+
+      const email = result.alreadyProcessed
+        ? {
+            sent: false,
+            provider: 'none' as const,
+            error: 'Idempotent replay: reschedule already processed.',
+          }
+        : await Promise.all([
+            sendBookingRescheduledEmail(context.env, {
+              recipientEmail: result.newBooking.inviteeEmail,
+              recipientName: result.newBooking.inviteeName,
+              recipientRole: 'invitee',
+              organizerDisplayName: result.organizer.displayName,
+              eventName: result.eventType.name,
+              oldStartsAt: result.oldBooking.startsAt.toISOString(),
+              newStartsAt: result.newBooking.startsAt.toISOString(),
+              timezone,
+              idempotencyKey: `booking-rescheduled:${result.oldBooking.id}:${result.newBooking.id}:invitee`,
+            }),
+            sendBookingRescheduledEmail(context.env, {
+              recipientEmail: result.organizer.email,
+              recipientName: result.organizer.displayName,
+              recipientRole: 'organizer',
+              organizerDisplayName: result.organizer.displayName,
+              eventName: result.eventType.name,
+              oldStartsAt: result.oldBooking.startsAt.toISOString(),
+              newStartsAt: result.newBooking.startsAt.toISOString(),
+              timezone,
+              idempotencyKey: `booking-rescheduled:${result.oldBooking.id}:${result.newBooking.id}:organizer`,
+            }),
+          ]);
+
+      const actions = result.actionTokens
+        ? (() => {
+            const tokens = actionTokenMap(result.actionTokens);
+            const urls = buildActionUrls(context.req.raw, {
+              cancelToken: tokens.cancelToken,
+              rescheduleToken: tokens.rescheduleToken,
+            });
+
+            return {
+              cancel: {
+                token: tokens.cancelToken,
+                expiresAt: tokens.cancelExpiresAt,
+                lookupUrl: urls.lookupCancelUrl,
+                url: urls.cancelUrl,
+              },
+              reschedule: {
+                token: tokens.rescheduleToken,
+                expiresAt: tokens.rescheduleExpiresAt,
+                lookupUrl: urls.lookupRescheduleUrl,
+                url: urls.rescheduleUrl,
+              },
+            };
+          })()
+        : null;
+
+      return context.json({
+        ok: true,
+        oldBooking: {
+          id: result.oldBooking.id,
+          status: result.oldBooking.status,
+        },
+        newBooking: {
+          id: result.newBooking.id,
+          status: 'confirmed',
+          rescheduledFromBookingId: result.oldBooking.id,
+          startsAt: result.newBooking.startsAt.toISOString(),
+          endsAt: result.newBooking.endsAt.toISOString(),
+        },
+        actions,
+        email,
+      });
+    } catch (error) {
+      if (error instanceof BookingActionNotFoundError) {
+        return jsonError(context, 404, 'Action link is invalid or expired.');
+      }
+      if (error instanceof BookingActionGoneError) {
+        return jsonError(context, 410, 'Action link is invalid or expired.');
       }
       if (error instanceof BookingValidationError) {
         return jsonError(context, 400, error.message);
