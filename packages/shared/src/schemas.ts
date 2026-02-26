@@ -190,6 +190,10 @@ export const calendarSyncRequestSchema = z
     },
   );
 
+export const calendarWritebackRunSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional(),
+});
+
 export const webhookSubscriptionCreateSchema = z.object({
   url: z.string().url().max(2000),
   events: z.array(webhookEventTypeSchema).min(1).max(3),
@@ -256,3 +260,4 @@ export type CalendarProvider = z.infer<typeof calendarProviderSchema>;
 export type CalendarConnectStartInput = z.infer<typeof calendarConnectStartSchema>;
 export type CalendarConnectCompleteInput = z.infer<typeof calendarConnectCompleteSchema>;
 export type CalendarSyncRequestInput = z.infer<typeof calendarSyncRequestSchema>;
+export type CalendarWritebackRunInput = z.infer<typeof calendarWritebackRunSchema>;

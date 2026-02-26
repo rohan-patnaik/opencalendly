@@ -71,6 +71,13 @@
       "when": 1772123018246,
       "tag": "0009_lush_peter_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772127519998,
+      "tag": "0010_square_mentor",
+      "breakpoints": true
     }
   ]
 }

@@ -26,6 +26,8 @@ type EventQuestionRecord = {
 type WebhookEventTypeRecord = 'booking.created' | 'booking.canceled' | 'booking.rescheduled';
 type WebhookDeliveryStatusRecord = 'pending' | 'succeeded' | 'failed';
 type CalendarProviderRecord = 'google' | 'microsoft';
+type CalendarWritebackOperationRecord = 'create' | 'cancel' | 'reschedule';
+type CalendarWritebackStatusRecord = 'pending' | 'succeeded' | 'failed';
 type WebhookEventPayloadRecord = {
   id: string;
   type: WebhookEventTypeRecord;
@@ -45,6 +47,16 @@ type WebhookEventPayloadRecord = {
 export const teamMemberRoleEnum = pgEnum('team_member_role', ['owner', 'member']);
 export const teamSchedulingModeEnum = pgEnum('team_scheduling_mode', ['round_robin', 'collective']);
 export const calendarProviderEnum = pgEnum('calendar_provider', ['google', 'microsoft']);
+export const calendarWritebackOperationEnum = pgEnum('calendar_writeback_operation', [
+  'create',
+  'cancel',
+  'reschedule',
+]);
+export const calendarWritebackStatusEnum = pgEnum('calendar_writeback_status', [
+  'pending',
+  'succeeded',
+  'failed',
+]);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -414,5 +426,58 @@ export const calendarBusyWindows = pgTable(
       'calendar_busy_windows_time_order_check',
       sql`${table.endsAt} > ${table.startsAt}`,
     ),
+  }),
+);
+
+export const bookingExternalEvents = pgTable(
+  'booking_external_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bookingId: uuid('booking_id')
+      .notNull()
+      .references(() => bookings.id, { onDelete: 'cascade' }),
+    organizerId: uuid('organizer_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    connectionId: uuid('connection_id').references(() => calendarConnections.id, {
+      onDelete: 'set null',
+    }),
+    provider: calendarProviderEnum('provider').$type<CalendarProviderRecord>().notNull(),
+    operation: calendarWritebackOperationEnum('operation')
+      .$type<CalendarWritebackOperationRecord>()
+      .notNull()
+      .default('create'),
+    status: calendarWritebackStatusEnum('status')
+      .$type<CalendarWritebackStatusRecord>()
+      .notNull()
+      .default('pending'),
+    externalEventId: varchar('external_event_id', { length: 255 }),
+    payload: jsonb('payload')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    maxAttempts: integer('max_attempts').notNull().default(5),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueBookingProvider: unique('booking_external_events_booking_provider_unique').on(
+      table.bookingId,
+      table.provider,
+    ),
+    organizerStatusNextAttemptIndex: index(
+      'booking_external_events_organizer_status_next_attempt_idx',
+    ).on(table.organizerId, table.status, table.nextAttemptAt),
+    statusNextAttemptIndex: index('booking_external_events_status_next_attempt_idx').on(
+      table.status,
+      table.nextAttemptAt,
+    ),
+    connectionIndex: index('booking_external_events_connection_idx').on(table.connectionId),
+    attemptCountCheck: check('booking_external_events_attempt_count_check', sql`${table.attemptCount} >= 0`),
+    maxAttemptsCheck: check('booking_external_events_max_attempts_check', sql`${table.maxAttempts} >= 1`),
   }),
 );

@@ -7,6 +7,7 @@ import {
   calendarConnectCompleteSchema,
   calendarConnectStartSchema,
   calendarSyncRequestSchema,
+  calendarWritebackRunSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
   demoCreditsConsumeSchema,
@@ -208,5 +209,13 @@ describe('shared schemas', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('accepts calendar writeback run payload', () => {
+    const payload = calendarWritebackRunSchema.parse({
+      limit: 25,
+    });
+
+    expect(payload.limit).toBe(25);
   });
 });

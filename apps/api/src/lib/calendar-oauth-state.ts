@@ -6,7 +6,7 @@ const MIN_STATE_SECRET_BYTES = 32;
 type CalendarOAuthStatePayload = {
   v: typeof STATE_VERSION;
   userId: string;
-  provider: 'google';
+  provider: 'google' | 'microsoft';
   redirectUri: string;
   exp: number;
 };
@@ -35,7 +35,7 @@ const hasStrongStateSecret = (secret: string): boolean => {
 
 export const createCalendarOAuthState = (input: {
   userId: string;
-  provider: 'google';
+  provider: 'google' | 'microsoft';
   redirectUri: string;
   expiresAt: Date;
   secret: string;
@@ -91,7 +91,7 @@ export const verifyCalendarOAuthState = (input: {
     const parsed = JSON.parse(fromBase64Url(payloadEncoded)) as CalendarOAuthStatePayload;
     if (
       parsed.v !== STATE_VERSION ||
-      parsed.provider !== 'google' ||
+      (parsed.provider !== 'google' && parsed.provider !== 'microsoft') ||
       typeof parsed.userId !== 'string' ||
       typeof parsed.redirectUri !== 'string' ||
       typeof parsed.exp !== 'number'

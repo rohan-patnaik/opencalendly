@@ -6,7 +6,7 @@ const GOOGLE_FREE_BUSY_URL = 'https://www.googleapis.com/calendar/v3/freeBusy';
 const DEFAULT_GOOGLE_SCOPES = [
   'openid',
   'email',
-  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar',
 ];
 
 type FetchLike = typeof fetch;
@@ -27,6 +27,10 @@ type GoogleUserProfile = {
 type GoogleBusyWindow = {
   start: string;
   end: string;
+};
+
+type GoogleCalendarEventResponse = {
+  id?: string;
 };
 
 const readErrorPayload = async (response: Response): Promise<string> => {
@@ -209,4 +213,132 @@ export const fetchGoogleBusyWindows = async (
       start: window.start,
       end: window.end,
     }));
+};
+
+export const createGoogleCalendarEvent = async (
+  input: {
+    accessToken: string;
+    eventName: string;
+    inviteeName: string;
+    inviteeEmail: string;
+    startsAtIso: string;
+    endsAtIso: string;
+    timezone: string;
+    locationType: string;
+    locationValue: string | null;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<{ externalEventId: string }> => {
+  const response = await fetchImpl('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${input.accessToken}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      summary: input.eventName,
+      description: `OpenCalendly booking with ${input.inviteeName} (${input.inviteeEmail})`,
+      start: {
+        dateTime: input.startsAtIso,
+        timeZone: input.timezone,
+      },
+      end: {
+        dateTime: input.endsAtIso,
+        timeZone: input.timezone,
+      },
+      attendees: [{ email: input.inviteeEmail, displayName: input.inviteeName }],
+      ...(input.locationValue
+        ? {
+            location: input.locationValue,
+          }
+        : {}),
+      extendedProperties: {
+        private: {
+          source: 'opencalendly',
+          locationType: input.locationType,
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Google calendar event create failed: ${await readErrorPayload(response)}`);
+  }
+
+  const parsed = (await response.json()) as GoogleCalendarEventResponse;
+  if (typeof parsed.id !== 'string' || parsed.id.length === 0) {
+    throw new Error('Google calendar create response missing event id.');
+  }
+
+  return { externalEventId: parsed.id };
+};
+
+export const cancelGoogleCalendarEvent = async (
+  input: {
+    accessToken: string;
+    externalEventId: string;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<void> => {
+  const response = await fetchImpl(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
+      input.externalEventId,
+    )}`,
+    {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${input.accessToken}`,
+      },
+    },
+  );
+
+  if (response.status === 404) {
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Google calendar event cancel failed: ${await readErrorPayload(response)}`);
+  }
+};
+
+export const updateGoogleCalendarEvent = async (
+  input: {
+    accessToken: string;
+    externalEventId: string;
+    startsAtIso: string;
+    endsAtIso: string;
+    timezone: string;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<void> => {
+  const response = await fetchImpl(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
+      input.externalEventId,
+    )}`,
+    {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${input.accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        start: {
+          dateTime: input.startsAtIso,
+          timeZone: input.timezone,
+        },
+        end: {
+          dateTime: input.endsAtIso,
+          timeZone: input.timezone,
+        },
+      }),
+    },
+  );
+
+  if (response.status === 404) {
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Google calendar event update failed: ${await readErrorPayload(response)}`);
+  }
 };

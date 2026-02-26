@@ -74,6 +74,8 @@ const passThroughVarKeys = [
   'SESSION_SECRET',
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
+  'MICROSOFT_CLIENT_ID',
+  'MICROSOFT_CLIENT_SECRET',
 ];
 
 for (const key of passThroughVarKeys) {

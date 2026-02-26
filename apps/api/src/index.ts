@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import {
   availabilityOverrides,
   availabilityRules,
+  bookingExternalEvents,
   bookingActionTokens,
   bookings,
   calendarBusyWindows,
@@ -30,6 +31,7 @@ import {
   calendarConnectCompleteSchema,
   calendarConnectStartSchema,
   calendarSyncRequestSchema,
+  calendarWritebackRunSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
   demoCreditsConsumeSchema,
@@ -65,7 +67,14 @@ import {
 import { computeAvailabilitySlots } from './lib/availability';
 import { encryptSecret } from './lib/calendar-crypto';
 import { createCalendarOAuthState, verifyCalendarOAuthState } from './lib/calendar-oauth-state';
-import { resolveGoogleAccessToken, resolveGoogleSyncRange, syncGoogleBusyWindows } from './lib/calendar-sync';
+import {
+  resolveGoogleAccessToken,
+  resolveGoogleSyncRange,
+  resolveMicrosoftAccessToken,
+  syncGoogleBusyWindows,
+  syncMicrosoftBusyWindows,
+} from './lib/calendar-sync';
+import { processCalendarWriteback } from './lib/calendar-writeback';
 import {
   evaluateBookingActionToken,
   parseBookingMetadata,
@@ -87,9 +96,20 @@ import {
 } from './lib/email';
 import {
   buildGoogleAuthorizationUrl,
+  cancelGoogleCalendarEvent,
+  createGoogleCalendarEvent,
   exchangeGoogleOAuthCode,
   fetchGoogleUserProfile,
+  updateGoogleCalendarEvent,
 } from './lib/google-calendar';
+import {
+  buildMicrosoftAuthorizationUrl,
+  cancelMicrosoftCalendarEvent,
+  createMicrosoftCalendarEvent,
+  exchangeMicrosoftOAuthCode,
+  fetchMicrosoftUserProfile,
+  updateMicrosoftCalendarEvent,
+} from './lib/microsoft-calendar';
 import {
   buildDemoCreditsStatus,
   consumeDemoCreditFromState,
@@ -125,6 +145,8 @@ type Bindings = {
   DEMO_DAILY_PASS_LIMIT?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
 };
 
 type ContextLike = {
@@ -284,6 +306,9 @@ type CalendarConnectionStatus = {
   lastError: string | null;
 };
 
+type CalendarWritebackOperation = 'create' | 'cancel' | 'reschedule';
+type CalendarWritebackStatus = 'pending' | 'succeeded' | 'failed';
+
 const app = new Hono<{ Bindings: Bindings }>();
 
 class BookingActionNotFoundError extends Error {}
@@ -354,6 +379,17 @@ const resolveGoogleOAuthConfig = (
   return { clientId, clientSecret };
 };
 
+const resolveMicrosoftOAuthConfig = (
+  env: Bindings,
+): { clientId: string; clientSecret: string } | null => {
+  const clientId = env.MICROSOFT_CLIENT_ID?.trim();
+  const clientSecret = env.MICROSOFT_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) {
+    return null;
+  }
+  return { clientId, clientSecret };
+};
+
 const toCalendarConnectionStatus = (input: {
   provider: CalendarProvider;
   externalEmail: string | null;
@@ -376,6 +412,10 @@ const WEBHOOK_DELIVERY_BATCH_LIMIT_MAX = 100;
 const CALENDAR_OAUTH_STATE_TTL_MINUTES = 10;
 const CALENDAR_SYNC_NEXT_MINUTES = 15;
 const GOOGLE_CALENDAR_PROVIDER: CalendarProvider = 'google';
+const MICROSOFT_CALENDAR_PROVIDER: CalendarProvider = 'microsoft';
+const CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS = 5;
+const CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT = 25;
+const CALENDAR_WRITEBACK_BATCH_LIMIT_MAX = 100;
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -391,6 +431,19 @@ const clampWebhookDeliveryBatchLimit = (rawLimit: string | undefined): number =>
   }
 
   return Math.max(1, Math.min(WEBHOOK_DELIVERY_BATCH_LIMIT_MAX, parsed));
+};
+
+const clampCalendarWritebackBatchLimit = (rawLimit: number | string | undefined): number => {
+  const parsed =
+    typeof rawLimit === 'number'
+      ? rawLimit
+      : rawLimit
+        ? Number.parseInt(rawLimit, 10)
+        : Number.NaN;
+  if (!Number.isFinite(parsed)) {
+    return CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT;
+  }
+  return Math.max(1, Math.min(CALENDAR_WRITEBACK_BATCH_LIMIT_MAX, parsed));
 };
 
 const stripTrailingSlash = (value: string): string => {
@@ -662,6 +715,527 @@ const executeWebhookDelivery = async (
     .where(eq(webhookDeliveries.id, delivery.id));
 
   return 'retried';
+};
+
+type CalendarWritebackQueueResult = {
+  queued: number;
+  rowIds: string[];
+};
+
+type CalendarWritebackRunResult = {
+  processed: number;
+  succeeded: number;
+  retried: number;
+  failed: number;
+};
+
+const parseCalendarWritebackPayload = (
+  value: unknown,
+): {
+  rescheduleTarget?: {
+    bookingId: string;
+    startsAtIso: string;
+    endsAtIso: string;
+  };
+} => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const payload = value as Record<string, unknown>;
+  const target = payload.rescheduleTarget;
+  if (!target || typeof target !== 'object' || Array.isArray(target)) {
+    return {};
+  }
+
+  const parsedTarget = target as Record<string, unknown>;
+  if (
+    typeof parsedTarget.bookingId !== 'string' ||
+    typeof parsedTarget.startsAtIso !== 'string' ||
+    typeof parsedTarget.endsAtIso !== 'string'
+  ) {
+    return {};
+  }
+
+  return {
+    rescheduleTarget: {
+      bookingId: parsedTarget.bookingId,
+      startsAtIso: parsedTarget.startsAtIso,
+      endsAtIso: parsedTarget.endsAtIso,
+    },
+  };
+};
+
+const enqueueCalendarWritebacksForBooking = async (
+  db: Database,
+  input: {
+    bookingId: string;
+    organizerId: string;
+    operation: CalendarWritebackOperation;
+    rescheduleTarget?: {
+      bookingId: string;
+      startsAtIso: string;
+      endsAtIso: string;
+    };
+  },
+): Promise<CalendarWritebackQueueResult> => {
+  const connections = await db
+    .select({
+      id: calendarConnections.id,
+      provider: calendarConnections.provider,
+    })
+    .from(calendarConnections)
+    .where(
+      and(
+        eq(calendarConnections.userId, input.organizerId),
+        inArray(calendarConnections.provider, [GOOGLE_CALENDAR_PROVIDER, MICROSOFT_CALENDAR_PROVIDER]),
+      ),
+    );
+
+  if (connections.length === 0) {
+    return {
+      queued: 0,
+      rowIds: [],
+    };
+  }
+
+  const existingRows = await db
+    .select({
+      id: bookingExternalEvents.id,
+      provider: bookingExternalEvents.provider,
+      maxAttempts: bookingExternalEvents.maxAttempts,
+    })
+    .from(bookingExternalEvents)
+    .where(eq(bookingExternalEvents.bookingId, input.bookingId));
+
+  const existingByProvider = new Map(existingRows.map((row) => [row.provider, row]));
+  const payload =
+    input.operation === 'reschedule' && input.rescheduleTarget
+      ? {
+          rescheduleTarget: input.rescheduleTarget,
+        }
+      : {};
+  const now = new Date();
+  const rowIds: string[] = [];
+
+  for (const connection of connections) {
+    const provider = toCalendarProvider(connection.provider);
+    if (!provider) {
+      continue;
+    }
+
+    const existing = existingByProvider.get(connection.provider);
+    if (existing) {
+      await db
+        .update(bookingExternalEvents)
+        .set({
+          organizerId: input.organizerId,
+          connectionId: connection.id,
+          operation: input.operation,
+          status: 'pending',
+          payload,
+          attemptCount: 0,
+          maxAttempts: existing.maxAttempts > 0 ? existing.maxAttempts : CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS,
+          nextAttemptAt: now,
+          lastError: null,
+          updatedAt: now,
+        })
+        .where(eq(bookingExternalEvents.id, existing.id));
+
+      rowIds.push(existing.id);
+      continue;
+    }
+
+    const [inserted] = await db
+      .insert(bookingExternalEvents)
+      .values({
+        bookingId: input.bookingId,
+        organizerId: input.organizerId,
+        connectionId: connection.id,
+        provider,
+        operation: input.operation,
+        status: 'pending',
+        payload,
+        attemptCount: 0,
+        maxAttempts: CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS,
+        nextAttemptAt: now,
+      })
+      .returning({
+        id: bookingExternalEvents.id,
+      });
+
+    if (inserted) {
+      rowIds.push(inserted.id);
+    }
+  }
+
+  return {
+    queued: rowIds.length,
+    rowIds,
+  };
+};
+
+const runCalendarWritebackBatch = async (
+  db: Database,
+  env: Bindings,
+  input: {
+    organizerId?: string;
+    rowIds?: string[];
+    limit: number;
+  },
+): Promise<CalendarWritebackRunResult> => {
+  const now = new Date();
+  const whereClauses = [
+    eq(bookingExternalEvents.status, 'pending' as CalendarWritebackStatus),
+    lte(bookingExternalEvents.nextAttemptAt, now),
+  ];
+
+  if (input.organizerId) {
+    whereClauses.push(eq(bookingExternalEvents.organizerId, input.organizerId));
+  }
+  if (input.rowIds && input.rowIds.length > 0) {
+    whereClauses.push(inArray(bookingExternalEvents.id, input.rowIds));
+  }
+
+  const rows = await db
+    .select({
+      id: bookingExternalEvents.id,
+      bookingId: bookingExternalEvents.bookingId,
+      organizerId: bookingExternalEvents.organizerId,
+      connectionId: bookingExternalEvents.connectionId,
+      provider: bookingExternalEvents.provider,
+      operation: bookingExternalEvents.operation,
+      status: bookingExternalEvents.status,
+      externalEventId: bookingExternalEvents.externalEventId,
+      payload: bookingExternalEvents.payload,
+      attemptCount: bookingExternalEvents.attemptCount,
+      maxAttempts: bookingExternalEvents.maxAttempts,
+      bookingStartsAt: bookings.startsAt,
+      bookingEndsAt: bookings.endsAt,
+      bookingInviteeName: bookings.inviteeName,
+      bookingInviteeEmail: bookings.inviteeEmail,
+      bookingMetadata: bookings.metadata,
+      eventTypeName: eventTypes.name,
+      eventTypeLocationType: eventTypes.locationType,
+      eventTypeLocationValue: eventTypes.locationValue,
+      organizerTimezone: users.timezone,
+      connectionAccessTokenEncrypted: calendarConnections.accessTokenEncrypted,
+      connectionRefreshTokenEncrypted: calendarConnections.refreshTokenEncrypted,
+      connectionAccessTokenExpiresAt: calendarConnections.accessTokenExpiresAt,
+    })
+    .from(bookingExternalEvents)
+    .innerJoin(bookings, eq(bookings.id, bookingExternalEvents.bookingId))
+    .innerJoin(eventTypes, eq(eventTypes.id, bookings.eventTypeId))
+    .innerJoin(users, eq(users.id, bookingExternalEvents.organizerId))
+    .leftJoin(calendarConnections, eq(calendarConnections.id, bookingExternalEvents.connectionId))
+    .where(and(...whereClauses))
+    .orderBy(asc(bookingExternalEvents.nextAttemptAt))
+    .limit(input.limit);
+
+  const encryptionSecret = resolveCalendarEncryptionSecret(env);
+  const googleConfig = resolveGoogleOAuthConfig(env);
+  const microsoftConfig = resolveMicrosoftOAuthConfig(env);
+
+  const result: CalendarWritebackRunResult = {
+    processed: 0,
+    succeeded: 0,
+    retried: 0,
+    failed: 0,
+  };
+
+  for (const row of rows) {
+    result.processed += 1;
+
+    const provider = toCalendarProvider(row.provider);
+    const operation = row.operation as CalendarWritebackOperation;
+    const payload = parseCalendarWritebackPayload(row.payload);
+    const timezone =
+      parseBookingMetadata(row.bookingMetadata, normalizeTimezone).timezone ??
+      normalizeTimezone(row.organizerTimezone);
+    const connectionId = row.connectionId;
+    const connectionAccessTokenEncrypted = row.connectionAccessTokenEncrypted;
+    const connectionRefreshTokenEncrypted = row.connectionRefreshTokenEncrypted;
+    const connectionAccessTokenExpiresAt = row.connectionAccessTokenExpiresAt;
+
+    const applyResult = async (
+      writebackResult: Awaited<ReturnType<typeof processCalendarWriteback>>,
+    ): Promise<void> => {
+      await db
+        .update(bookingExternalEvents)
+        .set({
+          status: writebackResult.status,
+          attemptCount: writebackResult.attemptCount,
+          nextAttemptAt: writebackResult.nextAttemptAt,
+          lastAttemptAt: writebackResult.lastAttemptAt,
+          lastError: writebackResult.lastError,
+          externalEventId: writebackResult.externalEventId,
+          updatedAt: now,
+        })
+        .where(eq(bookingExternalEvents.id, row.id));
+
+      if (
+        writebackResult.status === 'succeeded' &&
+        writebackResult.transferExternalEventToBookingId &&
+        writebackResult.externalEventId &&
+        provider
+      ) {
+        const [targetRow] = await db
+          .select({
+            id: bookingExternalEvents.id,
+          })
+          .from(bookingExternalEvents)
+          .where(
+            and(
+              eq(bookingExternalEvents.bookingId, writebackResult.transferExternalEventToBookingId),
+              eq(bookingExternalEvents.provider, provider),
+            ),
+          )
+          .limit(1);
+
+        if (targetRow) {
+          await db
+            .update(bookingExternalEvents)
+            .set({
+              organizerId: row.organizerId,
+              connectionId: row.connectionId,
+              operation: 'create',
+              status: 'succeeded',
+              externalEventId: writebackResult.externalEventId,
+              payload: {},
+              attemptCount: 0,
+              nextAttemptAt: now,
+              lastAttemptAt: now,
+              lastError: null,
+              updatedAt: now,
+            })
+            .where(eq(bookingExternalEvents.id, targetRow.id));
+        } else {
+          await db.insert(bookingExternalEvents).values({
+            bookingId: writebackResult.transferExternalEventToBookingId,
+            organizerId: row.organizerId,
+            connectionId: row.connectionId,
+            provider,
+            operation: 'create',
+            status: 'succeeded',
+            externalEventId: writebackResult.externalEventId,
+            payload: {},
+            attemptCount: 0,
+            maxAttempts: row.maxAttempts > 0 ? row.maxAttempts : CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS,
+            nextAttemptAt: now,
+            lastAttemptAt: now,
+          });
+        }
+      }
+
+      if (writebackResult.status === 'succeeded') {
+        result.succeeded += 1;
+      } else if (writebackResult.status === 'pending') {
+        result.retried += 1;
+      } else {
+        result.failed += 1;
+      }
+    };
+
+    if (
+      !provider ||
+      !connectionId ||
+      !connectionAccessTokenEncrypted ||
+      !connectionRefreshTokenEncrypted ||
+      !connectionAccessTokenExpiresAt ||
+      !encryptionSecret
+    ) {
+      const fallback = await processCalendarWriteback({
+        record: {
+          operation,
+          attemptCount: row.attemptCount,
+          maxAttempts: row.maxAttempts > 0 ? row.maxAttempts : CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS,
+          externalEventId: row.externalEventId,
+        },
+        booking: {
+          eventName: row.eventTypeName,
+          inviteeName: row.bookingInviteeName,
+          inviteeEmail: row.bookingInviteeEmail,
+          startsAtIso: row.bookingStartsAt.toISOString(),
+          endsAtIso: row.bookingEndsAt.toISOString(),
+          timezone,
+          locationType: row.eventTypeLocationType,
+          locationValue: row.eventTypeLocationValue,
+        },
+        ...(payload.rescheduleTarget ? { rescheduleTarget: payload.rescheduleTarget } : {}),
+        providerClient: {
+          createEvent: async () => {
+            throw new Error('Calendar writeback is not configured.');
+          },
+          cancelEvent: async () => {
+            throw new Error('Calendar writeback is not configured.');
+          },
+          updateEvent: async () => {
+            throw new Error('Calendar writeback is not configured.');
+          },
+        },
+        now,
+      });
+      await applyResult(fallback);
+      continue;
+    }
+
+    const getToken = async (): Promise<string> => {
+      if (provider === GOOGLE_CALENDAR_PROVIDER) {
+        if (!googleConfig) {
+          throw new Error('Google OAuth is not configured for calendar writeback.');
+        }
+        const resolved = await resolveGoogleAccessToken({
+          connection: {
+            accessTokenEncrypted: connectionAccessTokenEncrypted,
+            refreshTokenEncrypted: connectionRefreshTokenEncrypted,
+            accessTokenExpiresAt: connectionAccessTokenExpiresAt,
+          },
+          encryptionSecret,
+          clientId: googleConfig.clientId,
+          clientSecret: googleConfig.clientSecret,
+          now,
+        });
+        await db
+          .update(calendarConnections)
+          .set({
+            accessTokenEncrypted: encryptSecret(resolved.accessToken, encryptionSecret),
+            refreshTokenEncrypted: encryptSecret(resolved.refreshToken, encryptionSecret),
+            accessTokenExpiresAt: resolved.accessTokenExpiresAt,
+            lastError: null,
+            updatedAt: now,
+          })
+          .where(eq(calendarConnections.id, connectionId));
+        return resolved.accessToken;
+      }
+
+      if (!microsoftConfig) {
+        throw new Error('Microsoft OAuth is not configured for calendar writeback.');
+      }
+      const resolved = await resolveMicrosoftAccessToken({
+        connection: {
+          accessTokenEncrypted: connectionAccessTokenEncrypted,
+          refreshTokenEncrypted: connectionRefreshTokenEncrypted,
+          accessTokenExpiresAt: connectionAccessTokenExpiresAt,
+        },
+        encryptionSecret,
+        clientId: microsoftConfig.clientId,
+        clientSecret: microsoftConfig.clientSecret,
+        now,
+      });
+      await db
+        .update(calendarConnections)
+        .set({
+          accessTokenEncrypted: encryptSecret(resolved.accessToken, encryptionSecret),
+          refreshTokenEncrypted: encryptSecret(resolved.refreshToken, encryptionSecret),
+          accessTokenExpiresAt: resolved.accessTokenExpiresAt,
+          lastError: null,
+          updatedAt: now,
+        })
+        .where(eq(calendarConnections.id, connectionId));
+      return resolved.accessToken;
+    };
+
+    const providerClient = {
+      createEvent: async (bookingContext: {
+        eventName: string;
+        inviteeName: string;
+        inviteeEmail: string;
+        startsAtIso: string;
+        endsAtIso: string;
+        timezone: string;
+        locationType: string;
+        locationValue: string | null;
+      }) => {
+        const accessToken = await getToken();
+        if (provider === GOOGLE_CALENDAR_PROVIDER) {
+          return createGoogleCalendarEvent({
+            accessToken,
+            eventName: bookingContext.eventName,
+            inviteeName: bookingContext.inviteeName,
+            inviteeEmail: bookingContext.inviteeEmail,
+            startsAtIso: bookingContext.startsAtIso,
+            endsAtIso: bookingContext.endsAtIso,
+            timezone: bookingContext.timezone,
+            locationType: bookingContext.locationType,
+            locationValue: bookingContext.locationValue,
+          });
+        }
+
+        return createMicrosoftCalendarEvent({
+          accessToken,
+          eventName: bookingContext.eventName,
+          inviteeName: bookingContext.inviteeName,
+          inviteeEmail: bookingContext.inviteeEmail,
+          startsAtIso: bookingContext.startsAtIso,
+          endsAtIso: bookingContext.endsAtIso,
+          locationValue: bookingContext.locationValue,
+        });
+      },
+      cancelEvent: async (cancelInput: { externalEventId: string }) => {
+        const accessToken = await getToken();
+        if (provider === GOOGLE_CALENDAR_PROVIDER) {
+          await cancelGoogleCalendarEvent({
+            accessToken,
+            externalEventId: cancelInput.externalEventId,
+          });
+          return;
+        }
+        await cancelMicrosoftCalendarEvent({
+          accessToken,
+          externalEventId: cancelInput.externalEventId,
+        });
+      },
+      updateEvent: async (updateInput: {
+        externalEventId: string;
+        startsAtIso: string;
+        endsAtIso: string;
+      }) => {
+        const accessToken = await getToken();
+        if (provider === GOOGLE_CALENDAR_PROVIDER) {
+          await updateGoogleCalendarEvent({
+            accessToken,
+            externalEventId: updateInput.externalEventId,
+            startsAtIso: updateInput.startsAtIso,
+            endsAtIso: updateInput.endsAtIso,
+            timezone,
+          });
+          return;
+        }
+        await updateMicrosoftCalendarEvent({
+          accessToken,
+          externalEventId: updateInput.externalEventId,
+          startsAtIso: updateInput.startsAtIso,
+          endsAtIso: updateInput.endsAtIso,
+        });
+      },
+    };
+
+    const processed = await processCalendarWriteback({
+      record: {
+        operation,
+        attemptCount: row.attemptCount,
+        maxAttempts: row.maxAttempts > 0 ? row.maxAttempts : CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS,
+        externalEventId: row.externalEventId,
+      },
+      booking: {
+        eventName: row.eventTypeName,
+        inviteeName: row.bookingInviteeName,
+        inviteeEmail: row.bookingInviteeEmail,
+        startsAtIso: row.bookingStartsAt.toISOString(),
+        endsAtIso: row.bookingEndsAt.toISOString(),
+        timezone,
+        locationType: row.eventTypeLocationType,
+        locationValue: row.eventTypeLocationValue,
+      },
+      ...(payload.rescheduleTarget ? { rescheduleTarget: payload.rescheduleTarget } : {}),
+      providerClient,
+      now,
+    });
+
+    await applyResult(processed);
+  }
+
+  return result;
 };
 
 const isUniqueViolation = (error: unknown, constraint?: string): boolean => {
@@ -1464,15 +2038,21 @@ app.get('/v0/calendar/sync/status', async (context) => {
       })
       .filter((status): status is CalendarConnectionStatus => status !== null);
 
-    if (!statuses.some((status) => status.provider === GOOGLE_CALENDAR_PROVIDER)) {
-      statuses.unshift({
-        provider: GOOGLE_CALENDAR_PROVIDER,
-        connected: false,
-        externalEmail: null,
-        lastSyncedAt: null,
-        nextSyncAt: null,
-        lastError: null,
-      });
+    const requiredProviders: CalendarProvider[] = [
+      GOOGLE_CALENDAR_PROVIDER,
+      MICROSOFT_CALENDAR_PROVIDER,
+    ];
+    for (const provider of requiredProviders) {
+      if (!statuses.some((status) => status.provider === provider)) {
+        statuses.push({
+          provider,
+          connected: false,
+          externalEmail: null,
+          lastSyncedAt: null,
+          nextSyncAt: null,
+          lastError: null,
+        });
+      }
     }
 
     return context.json({
@@ -1866,6 +2446,502 @@ app.post('/v0/calendar/google/sync', async (context) => {
 
       return jsonError(context, 502, message);
     }
+  });
+});
+
+app.post('/v0/calendar/microsoft/connect/start', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = calendarConnectStartSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const microsoftConfig = resolveMicrosoftOAuthConfig(context.env);
+    const encryptionSecret = resolveCalendarEncryptionSecret(context.env);
+    if (!microsoftConfig || !encryptionSecret) {
+      return jsonError(
+        context,
+        500,
+        'Microsoft OAuth is not configured. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and SESSION_SECRET.',
+      );
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + CALENDAR_OAUTH_STATE_TTL_MINUTES * 60_000);
+    const state = createCalendarOAuthState({
+      userId: authedUser.id,
+      provider: MICROSOFT_CALENDAR_PROVIDER,
+      redirectUri: parsed.data.redirectUri,
+      expiresAt,
+      secret: encryptionSecret,
+    });
+
+    const authUrl = buildMicrosoftAuthorizationUrl({
+      clientId: microsoftConfig.clientId,
+      redirectUri: parsed.data.redirectUri,
+      state,
+    });
+
+    return context.json({
+      ok: true,
+      provider: MICROSOFT_CALENDAR_PROVIDER,
+      authUrl,
+      state,
+      expiresAt: expiresAt.toISOString(),
+    });
+  });
+});
+
+app.post('/v0/calendar/microsoft/connect/complete', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = calendarConnectCompleteSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const microsoftConfig = resolveMicrosoftOAuthConfig(context.env);
+    const encryptionSecret = resolveCalendarEncryptionSecret(context.env);
+    if (!microsoftConfig || !encryptionSecret) {
+      return jsonError(
+        context,
+        500,
+        'Microsoft OAuth is not configured. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and SESSION_SECRET.',
+      );
+    }
+
+    const state = verifyCalendarOAuthState({
+      token: parsed.data.state,
+      secret: encryptionSecret,
+      now: new Date(),
+    });
+    if (
+      !state ||
+      state.provider !== MICROSOFT_CALENDAR_PROVIDER ||
+      state.userId !== authedUser.id ||
+      state.redirectUri !== parsed.data.redirectUri
+    ) {
+      return jsonError(context, 400, 'OAuth state is invalid or expired.');
+    }
+
+    try {
+      const tokenPayload = await exchangeMicrosoftOAuthCode({
+        clientId: microsoftConfig.clientId,
+        clientSecret: microsoftConfig.clientSecret,
+        code: parsed.data.code,
+        redirectUri: parsed.data.redirectUri,
+      });
+      const profile = await fetchMicrosoftUserProfile(tokenPayload.access_token);
+
+      const existingConnection = await db
+        .select({
+          id: calendarConnections.id,
+          refreshTokenEncrypted: calendarConnections.refreshTokenEncrypted,
+        })
+        .from(calendarConnections)
+        .where(
+          and(
+            eq(calendarConnections.userId, authedUser.id),
+            eq(calendarConnections.provider, MICROSOFT_CALENDAR_PROVIDER),
+          ),
+        )
+        .limit(1);
+
+      const refreshTokenEncrypted =
+        tokenPayload.refresh_token && tokenPayload.refresh_token.length > 0
+          ? encryptSecret(tokenPayload.refresh_token, encryptionSecret)
+          : existingConnection[0]?.refreshTokenEncrypted ?? null;
+
+      if (!refreshTokenEncrypted) {
+        return jsonError(
+          context,
+          400,
+          'Microsoft did not return a refresh token. Reconnect and approve offline access.',
+        );
+      }
+
+      const now = new Date();
+      const accessTokenExpiresAt = new Date(now.getTime() + tokenPayload.expires_in * 1000);
+
+      await db
+        .insert(calendarConnections)
+        .values({
+          userId: authedUser.id,
+          provider: MICROSOFT_CALENDAR_PROVIDER,
+          externalAccountId: profile.sub,
+          externalEmail: profile.email ?? null,
+          accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
+          refreshTokenEncrypted,
+          accessTokenExpiresAt,
+          scope: tokenPayload.scope ?? null,
+          lastError: null,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [calendarConnections.userId, calendarConnections.provider],
+          set: {
+            externalAccountId: profile.sub,
+            externalEmail: profile.email ?? null,
+            accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
+            refreshTokenEncrypted,
+            accessTokenExpiresAt,
+            scope: tokenPayload.scope ?? null,
+            lastError: null,
+            updatedAt: now,
+          },
+        });
+
+      const [connection] = await db
+        .select({
+          provider: calendarConnections.provider,
+          externalEmail: calendarConnections.externalEmail,
+          lastSyncedAt: calendarConnections.lastSyncedAt,
+          nextSyncAt: calendarConnections.nextSyncAt,
+          lastError: calendarConnections.lastError,
+        })
+        .from(calendarConnections)
+        .where(
+          and(
+            eq(calendarConnections.userId, authedUser.id),
+            eq(calendarConnections.provider, MICROSOFT_CALENDAR_PROVIDER),
+          ),
+        )
+        .limit(1);
+
+      if (!connection) {
+        return jsonError(context, 500, 'Unable to persist calendar connection.');
+      }
+
+      return context.json({
+        ok: true,
+        connection: toCalendarConnectionStatus({
+          provider: MICROSOFT_CALENDAR_PROVIDER,
+          externalEmail: connection.externalEmail,
+          lastSyncedAt: connection.lastSyncedAt,
+          nextSyncAt: connection.nextSyncAt,
+          lastError: connection.lastError,
+        }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Microsoft OAuth exchange failed.';
+      return jsonError(context, 502, message);
+    }
+  });
+});
+
+app.post('/v0/calendar/microsoft/disconnect', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const disconnected = await db.transaction(async (transaction) => {
+      const rows = await transaction
+        .select({
+          id: calendarConnections.id,
+        })
+        .from(calendarConnections)
+        .where(
+          and(
+            eq(calendarConnections.userId, authedUser.id),
+            eq(calendarConnections.provider, MICROSOFT_CALENDAR_PROVIDER),
+          ),
+        );
+
+      if (rows.length === 0) {
+        return false;
+      }
+
+      const connectionIds = rows.map((row) => row.id);
+
+      await transaction
+        .delete(calendarBusyWindows)
+        .where(inArray(calendarBusyWindows.connectionId, connectionIds));
+
+      await transaction
+        .delete(calendarConnections)
+        .where(inArray(calendarConnections.id, connectionIds));
+
+      return true;
+    });
+
+    return context.json({
+      ok: true,
+      provider: MICROSOFT_CALENDAR_PROVIDER,
+      disconnected,
+    });
+  });
+});
+
+app.post('/v0/calendar/microsoft/sync', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    let body: unknown = {};
+    const rawBody = await context.req.text();
+    if (rawBody.trim().length > 0) {
+      try {
+        body = JSON.parse(rawBody) as unknown;
+      } catch {
+        return jsonError(context, 400, 'Malformed JSON body.');
+      }
+    }
+    const parsed = calendarSyncRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const microsoftConfig = resolveMicrosoftOAuthConfig(context.env);
+    const encryptionSecret = resolveCalendarEncryptionSecret(context.env);
+    if (!microsoftConfig || !encryptionSecret) {
+      return jsonError(
+        context,
+        500,
+        'Microsoft OAuth is not configured. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and SESSION_SECRET.',
+      );
+    }
+
+    const [connection] = await db
+      .select({
+        id: calendarConnections.id,
+        accessTokenEncrypted: calendarConnections.accessTokenEncrypted,
+        refreshTokenEncrypted: calendarConnections.refreshTokenEncrypted,
+        accessTokenExpiresAt: calendarConnections.accessTokenExpiresAt,
+      })
+      .from(calendarConnections)
+      .where(
+        and(
+          eq(calendarConnections.userId, authedUser.id),
+          eq(calendarConnections.provider, MICROSOFT_CALENDAR_PROVIDER),
+        ),
+      )
+      .limit(1);
+
+    if (!connection) {
+      return jsonError(context, 404, 'Microsoft calendar is not connected.');
+    }
+
+    const now = new Date();
+    let range: { startIso: string; endIso: string };
+    try {
+      range = resolveGoogleSyncRange(now, parsed.data.start, parsed.data.end);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sync range is invalid.';
+      return jsonError(context, 400, message);
+    }
+
+    try {
+      const token = await resolveMicrosoftAccessToken({
+        connection,
+        encryptionSecret,
+        clientId: microsoftConfig.clientId,
+        clientSecret: microsoftConfig.clientSecret,
+        now,
+      });
+
+      const busyWindows = await syncMicrosoftBusyWindows({
+        accessToken: token.accessToken,
+        startIso: range.startIso,
+        endIso: range.endIso,
+      });
+
+      const nextSyncAt = new Date(now.getTime() + CALENDAR_SYNC_NEXT_MINUTES * 60_000);
+      const dedupedBusyWindows = Array.from(
+        busyWindows.reduce((map, window) => {
+          map.set(`${window.startsAt.toISOString()}|${window.endsAt.toISOString()}`, window);
+          return map;
+        }, new Map<string, { startsAt: Date; endsAt: Date }>())
+          .values(),
+      );
+
+      await db.transaction(async (transaction) => {
+        await transaction.execute(sql`select id from users where id = ${authedUser.id} for update`);
+
+        await transaction
+          .delete(calendarBusyWindows)
+          .where(
+            and(
+              eq(calendarBusyWindows.connectionId, connection.id),
+              lt(calendarBusyWindows.startsAt, new Date(range.endIso)),
+              gt(calendarBusyWindows.endsAt, new Date(range.startIso)),
+            ),
+          );
+
+        if (dedupedBusyWindows.length > 0) {
+          await transaction.insert(calendarBusyWindows).values(
+            dedupedBusyWindows.map((window) => ({
+              connectionId: connection.id,
+              userId: authedUser.id,
+              provider: MICROSOFT_CALENDAR_PROVIDER,
+              startsAt: window.startsAt,
+              endsAt: window.endsAt,
+            })),
+          );
+        }
+
+        await transaction
+          .update(calendarConnections)
+          .set({
+            accessTokenEncrypted: encryptSecret(token.accessToken, encryptionSecret),
+            refreshTokenEncrypted: encryptSecret(token.refreshToken, encryptionSecret),
+            accessTokenExpiresAt: token.accessTokenExpiresAt,
+            lastSyncedAt: now,
+            nextSyncAt,
+            lastError: null,
+            updatedAt: now,
+          })
+          .where(eq(calendarConnections.id, connection.id));
+      });
+
+      return context.json({
+        ok: true,
+        provider: MICROSOFT_CALENDAR_PROVIDER,
+        syncWindow: range,
+        busyWindowCount: dedupedBusyWindows.length,
+        refreshedAccessToken: token.refreshed,
+        lastSyncedAt: now.toISOString(),
+        nextSyncAt: nextSyncAt.toISOString(),
+      });
+    } catch (error) {
+      const message = (error instanceof Error ? error.message : 'Calendar sync failed.').slice(0, 1000);
+      const nextSyncAt = new Date(now.getTime() + CALENDAR_SYNC_NEXT_MINUTES * 60_000);
+
+      await db
+        .update(calendarConnections)
+        .set({
+          lastError: message,
+          nextSyncAt,
+          updatedAt: now,
+        })
+        .where(eq(calendarConnections.id, connection.id));
+
+      return jsonError(context, 502, message);
+    }
+  });
+});
+
+app.get('/v0/calendar/writeback/status', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const rows = await db
+      .select({
+        status: bookingExternalEvents.status,
+      })
+      .from(bookingExternalEvents)
+      .where(eq(bookingExternalEvents.organizerId, authedUser.id));
+
+    const summary = rows.reduce(
+      (acc, row) => {
+        if (row.status === 'succeeded') {
+          acc.succeeded += 1;
+        } else if (row.status === 'failed') {
+          acc.failed += 1;
+        } else {
+          acc.pending += 1;
+        }
+        return acc;
+      },
+      {
+        pending: 0,
+        succeeded: 0,
+        failed: 0,
+      },
+    );
+
+    const failures = await db
+      .select({
+        id: bookingExternalEvents.id,
+        bookingId: bookingExternalEvents.bookingId,
+        provider: bookingExternalEvents.provider,
+        operation: bookingExternalEvents.operation,
+        attemptCount: bookingExternalEvents.attemptCount,
+        maxAttempts: bookingExternalEvents.maxAttempts,
+        nextAttemptAt: bookingExternalEvents.nextAttemptAt,
+        lastAttemptAt: bookingExternalEvents.lastAttemptAt,
+        lastError: bookingExternalEvents.lastError,
+        updatedAt: bookingExternalEvents.updatedAt,
+      })
+      .from(bookingExternalEvents)
+      .where(
+        and(
+          eq(bookingExternalEvents.organizerId, authedUser.id),
+          eq(bookingExternalEvents.status, 'failed'),
+        ),
+      )
+      .orderBy(desc(bookingExternalEvents.updatedAt))
+      .limit(20);
+
+    return context.json({
+      ok: true,
+      summary,
+      failures: failures.map((failure) => ({
+        id: failure.id,
+        bookingId: failure.bookingId,
+        provider: failure.provider,
+        operation: failure.operation,
+        attemptCount: failure.attemptCount,
+        maxAttempts: failure.maxAttempts,
+        nextAttemptAt: failure.nextAttemptAt.toISOString(),
+        lastAttemptAt: failure.lastAttemptAt ? failure.lastAttemptAt.toISOString() : null,
+        lastError: failure.lastError,
+        updatedAt: failure.updatedAt.toISOString(),
+      })),
+    });
+  });
+});
+
+app.post('/v0/calendar/writeback/run', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    let body: unknown = {};
+    const rawBody = await context.req.text();
+    if (rawBody.trim().length > 0) {
+      try {
+        body = JSON.parse(rawBody) as unknown;
+      } catch {
+        return jsonError(context, 400, 'Malformed JSON body.');
+      }
+    }
+
+    const parsed = calendarWritebackRunSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const limit = clampCalendarWritebackBatchLimit(parsed.data.limit ?? context.req.query('limit'));
+    const outcome = await runCalendarWritebackBatch(db, context.env, {
+      organizerId: authedUser.id,
+      limit,
+    });
+
+    return context.json({
+      ok: true,
+      limit,
+      ...outcome,
+    });
   });
 });
 
@@ -3329,6 +4405,25 @@ app.post('/v0/team-bookings', async (context) => {
         },
       });
 
+      const writebackQueue = await enqueueCalendarWritebacksForBooking(db, {
+        bookingId: result.booking.id,
+        organizerId: result.booking.organizerId,
+        operation: 'create',
+      });
+      const writebackResult =
+        writebackQueue.queued > 0
+          ? await runCalendarWritebackBatch(db, context.env, {
+              organizerId: result.booking.organizerId,
+              rowIds: writebackQueue.rowIds,
+              limit: clampCalendarWritebackBatchLimit(writebackQueue.queued),
+            })
+          : {
+              processed: 0,
+              succeeded: 0,
+              retried: 0,
+              failed: 0,
+            };
+
       return context.json({
         ok: true,
         booking: {
@@ -3359,6 +4454,10 @@ app.post('/v0/team-bookings', async (context) => {
         email,
         webhooks: {
           queued: queuedWebhookDeliveries,
+        },
+        calendarWriteback: {
+          queued: writebackQueue.queued,
+          ...writebackResult,
         },
       });
     } catch (error) {
@@ -3563,6 +4662,25 @@ app.post('/v0/bookings', async (context) => {
         },
       });
 
+      const writebackQueue = await enqueueCalendarWritebacksForBooking(db, {
+        bookingId: result.booking.id,
+        organizerId: result.booking.organizerId,
+        operation: 'create',
+      });
+      const writebackResult =
+        writebackQueue.queued > 0
+          ? await runCalendarWritebackBatch(db, context.env, {
+              organizerId: result.booking.organizerId,
+              rowIds: writebackQueue.rowIds,
+              limit: clampCalendarWritebackBatchLimit(writebackQueue.queued),
+            })
+          : {
+              processed: 0,
+              succeeded: 0,
+              retried: 0,
+              failed: 0,
+            };
+
       return context.json({
         ok: true,
         booking: {
@@ -3591,6 +4709,10 @@ app.post('/v0/bookings', async (context) => {
         email,
         webhooks: {
           queued: queuedWebhookDeliveries,
+        },
+        calendarWriteback: {
+          queued: writebackQueue.queued,
+          ...writebackResult,
         },
       });
     } catch (error) {
@@ -3924,6 +5046,27 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
             },
           });
 
+      const writebackQueue = result.alreadyProcessed
+        ? { queued: 0, rowIds: [] as string[] }
+        : await enqueueCalendarWritebacksForBooking(db, {
+            bookingId: result.booking.id,
+            organizerId: result.booking.organizerId,
+            operation: 'cancel',
+          });
+      const writebackResult =
+        writebackQueue.queued > 0
+          ? await runCalendarWritebackBatch(db, context.env, {
+              organizerId: result.booking.organizerId,
+              rowIds: writebackQueue.rowIds,
+              limit: clampCalendarWritebackBatchLimit(writebackQueue.queued),
+            })
+          : {
+              processed: 0,
+              succeeded: 0,
+              retried: 0,
+              failed: 0,
+            };
+
       return context.json({
         ok: true,
         booking: {
@@ -3933,6 +5076,10 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
         email,
         webhooks: {
           queued: queuedWebhookDeliveries,
+        },
+        calendarWriteback: {
+          queued: writebackQueue.queued,
+          ...writebackResult,
         },
       });
     } catch (error) {
@@ -4429,6 +5576,32 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             },
           });
 
+      const writebackQueue = result.alreadyProcessed
+        ? { queued: 0, rowIds: [] as string[] }
+        : await enqueueCalendarWritebacksForBooking(db, {
+            bookingId: result.oldBooking.id,
+            organizerId: result.newBooking.organizerId,
+            operation: 'reschedule',
+            rescheduleTarget: {
+              bookingId: result.newBooking.id,
+              startsAtIso: result.newBooking.startsAt.toISOString(),
+              endsAtIso: result.newBooking.endsAt.toISOString(),
+            },
+          });
+      const writebackResult =
+        writebackQueue.queued > 0
+          ? await runCalendarWritebackBatch(db, context.env, {
+              organizerId: result.newBooking.organizerId,
+              rowIds: writebackQueue.rowIds,
+              limit: clampCalendarWritebackBatchLimit(writebackQueue.queued),
+            })
+          : {
+              processed: 0,
+              succeeded: 0,
+              retried: 0,
+              failed: 0,
+            };
+
       const actions = result.actionTokens
         ? (() => {
             const tokens = actionTokenMap(result.actionTokens);
@@ -4471,6 +5644,10 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         email,
         webhooks: {
           queued: queuedWebhookDeliveries,
+        },
+        calendarWriteback: {
+          queued: writebackQueue.queued,
+          ...writebackResult,
         },
       });
     } catch (error) {
