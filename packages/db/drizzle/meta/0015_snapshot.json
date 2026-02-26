@@ -1406,7 +1406,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "email_deliveries_recipient_email_hash_format_check": {
+          "name": "email_deliveries_recipient_email_hash_format_check",
+          "value": "\"email_deliveries\".\"recipient_email_hash\" ~ '^[a-f0-9]{64}$'"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.event_types": {

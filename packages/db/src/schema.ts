@@ -299,6 +299,10 @@ export const emailDeliveries = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
+    recipientEmailHashFormatCheck: check(
+      'email_deliveries_recipient_email_hash_format_check',
+      sql`${table.recipientEmailHash} ~ '^[a-f0-9]{64}$'`,
+    ),
     organizerCreatedAtIndex: index('email_deliveries_organizer_created_at_idx').on(
       table.organizerId,
       table.createdAt,

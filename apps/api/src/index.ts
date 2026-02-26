@@ -4498,24 +4498,24 @@ app.put('/v0/me/availability/overrides', async (context) => {
 });
 
 app.post('/v0/analytics/funnel/events', async (context) => {
+  const body = await context.req.json().catch(() => null);
+  const parsed = analyticsTrackFunnelEventSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+  }
+
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicAnalyticsRateLimited({
+      ip: requestIp,
+      username: parsed.data.username,
+      eventSlug: parsed.data.eventSlug,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
+
   return withDatabase(context, async (db) => {
-    const body = await context.req.json().catch(() => null);
-    const parsed = analyticsTrackFunnelEventSchema.safeParse(body);
-    if (!parsed.success) {
-      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
-    }
-
-    const requestIp = resolveClientIp(context.req.raw);
-    if (
-      isPublicAnalyticsRateLimited({
-        ip: requestIp,
-        username: parsed.data.username,
-        eventSlug: parsed.data.eventSlug,
-      })
-    ) {
-      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
-    }
-
     const eventType = await findPublicEventType(db, parsed.data.username, parsed.data.eventSlug);
     if (!eventType) {
       return jsonError(context, 404, 'Event type not found.');
