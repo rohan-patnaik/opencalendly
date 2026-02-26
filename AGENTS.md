@@ -66,6 +66,7 @@
 - One-time setup requirement (GitHub side):
   - CodeRabbit GitHub App must be installed for this repository.
   - Repository access must include this repo for PR review events.
+  - In CodeRabbit repository settings, if `Use Organization Settings` is enabled and org-level auto review is disabled, disable `Use Organization Settings` and apply repository-level settings.
 - Per-PR verification:
   - Confirm a CodeRabbit status/check appears on the PR.
   - If no CodeRabbit status/check appears within 5 minutes of PR creation/update, verify app installation/access and trigger a re-check from CodeRabbit dashboard if available.
