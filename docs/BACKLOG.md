@@ -83,7 +83,7 @@ Acceptance criteria:
 - `docs/API.md` includes team and team-event draft/final contracts.
 - `docs/ARCHITECTURE.md` is updated if data model/flow changes materially.
 
-## Feature 6 (PR#9): Calendar Sync Hardening v1 (Google Busy Sync + Conflict Blocking)
+## Feature 6 (PR#10): Calendar Sync Hardening v1 (Google Busy Sync + Conflict Blocking)
 
 Acceptance criteria:
 
@@ -95,7 +95,7 @@ Acceptance criteria:
 - Tests cover token refresh, sync conflict blocking, and degraded provider behavior.
 - `docs/API.md` is updated with calendar connect/sync/status contracts.
 
-## Feature 7 (PR#10): Calendar Sync Hardening v2 (Outlook + Calendar Writeback)
+## Feature 7 (PR#11): Calendar Sync Hardening v2 (Outlook + Calendar Writeback)
 
 Acceptance criteria:
 
@@ -109,7 +109,7 @@ Acceptance criteria:
 - Tests cover create/cancel/reschedule writeback success and retry/error paths.
 - `docs/API.md` and `docs/ARCHITECTURE.md` are updated for provider abstraction + writeback flow.
 
-## Feature 8 (PR#11): Analytics + Operator Dashboard v1
+## Feature 8 (PR#12): Analytics + Operator Dashboard v1
 
 Acceptance criteria:
 
@@ -122,7 +122,7 @@ Acceptance criteria:
 - Tests cover analytics query correctness and authorization boundaries.
 - `docs/API.md` is updated with analytics contracts.
 
-## Feature 9 (PR#12): Reliability + Platform Hardening
+## Feature 9 (PR#13): Reliability + Platform Hardening
 
 Acceptance criteria:
 
@@ -135,7 +135,7 @@ Acceptance criteria:
 - Smoke + regression test suite runs in CI for critical booking flows.
 - `docs/STACK.md`/`docs/ARCHITECTURE.md` are updated for operational guardrails.
 
-## Feature 10 (PR#13): Launch Readiness + v1.0 Release
+## Feature 10 (PR#14): Launch Readiness + v1.0 Release
 
 Acceptance criteria:
 

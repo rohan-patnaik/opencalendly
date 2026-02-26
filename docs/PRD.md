@@ -35,11 +35,11 @@ Build a practical open-source scheduling platform for solo creators, consultants
 
 ### Remaining to reach v1.0
 
-- PR#9 Feature 6: Calendar Sync Hardening v1 (Google busy sync + conflict blocking).
-- PR#10 Feature 7: Calendar Sync Hardening v2 (Outlook + booking writeback).
-- PR#11 Feature 8: Analytics + operator dashboard v1.
-- PR#12 Feature 9: Reliability + platform hardening (rate limits, idempotency, CI/smoke, branch protection enforcement).
-- PR#13 Feature 10: Launch readiness + `v1.0.0` release hardening.
+- PR#10 Feature 6: Calendar Sync Hardening v1 (Google busy sync + conflict blocking).
+- PR#11 Feature 7: Calendar Sync Hardening v2 (Outlook + booking writeback).
+- PR#12 Feature 8: Analytics + operator dashboard v1.
+- PR#13 Feature 9: Reliability + platform hardening (rate limits, idempotency, CI/smoke, branch protection enforcement).
+- PR#14 Feature 10: Launch readiness + `v1.0.0` release hardening.
 
 ### Done definition for this roadmap
 
