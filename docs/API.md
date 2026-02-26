@@ -613,6 +613,92 @@ Success response:
 }
 ```
 
-## Webhook event schema (v0)
+## Feature 4 Draft Endpoints (Embeds + Webhooks v1)
+
+The following contracts are draft-first for Feature 4 and will be finalized in PR #6 implementation.
+
+### `GET /v0/embed/widget.js`
+
+Public JavaScript bootstrap for inline booking widget.
+
+Query params:
+
+- `username` (required)
+- `eventSlug` (required)
+- `timezone` (optional)
+- `theme` (optional: `light` | `dark`)
+
+Response:
+
+- `200` JavaScript asset (`content-type: application/javascript`)
+- Script renders an iframe/widget container and bootstraps booking UI.
+
+### `GET /v0/webhooks`
+
+Auth required. Lists webhook subscriptions for current organizer.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "webhooks": [
+    {
+      "id": "a9ec5dc9-bef5-4f11-9699-a6f28a31feda",
+      "url": "https://example.com/webhooks/opencalendly",
+      "isActive": true,
+      "events": ["booking.created", "booking.canceled", "booking.rescheduled"]
+    }
+  ]
+}
+```
+
+### `POST /v0/webhooks`
+
+Auth required. Creates webhook subscription.
+
+Request:
+
+```json
+{
+  "url": "https://example.com/webhooks/opencalendly",
+  "events": ["booking.created", "booking.canceled", "booking.rescheduled"],
+  "secret": "whsec_..."
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "webhook": {
+    "id": "a9ec5dc9-bef5-4f11-9699-a6f28a31feda",
+    "url": "https://example.com/webhooks/opencalendly",
+    "isActive": true
+  }
+}
+```
+
+### `PATCH /v0/webhooks/:id`
+
+Auth required. Supports partial updates for:
+
+- `url`
+- `events`
+- `secret`
+- `isActive`
+
+### `POST /v0/webhooks/deliveries/run`
+
+Protected dev/admin endpoint to process pending deliveries and retries.
+
+Behavior:
+
+- Picks eligible due deliveries.
+- Sends signed payloads with retry backoff.
+- Updates attempt count + next attempt timestamp.
+
+## Webhook Event Schema (v0)
 
 Source of truth: `packages/shared/src/schemas.ts` (`webhookEventSchema`).
