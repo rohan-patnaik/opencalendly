@@ -54,6 +54,16 @@
 - Greptile is configured via greptile.json at repo root (or .greptile/ directory config).
 - greptile.json is read from the source branch of each PR.
 
+## CodeRabbit config
+- CodeRabbit behavior is configured via `.coderabbit.yaml` in repo root.
+- Auto review is enabled (`reviews.auto_review.enabled: true`).
+- One-time setup requirement (GitHub side):
+  - CodeRabbit GitHub App must be installed for this repository.
+  - Repository access must include this repo for PR review events.
+- Per-PR verification:
+  - Confirm a CodeRabbit status/check appears on the PR.
+  - If no CodeRabbit status/check appears within 5 minutes of PR creation/update, verify app installation/access and trigger a re-check from CodeRabbit dashboard if available.
+
 ## Definition of Done
 - Feature works end-to-end in dev
 - Tests added/updated
