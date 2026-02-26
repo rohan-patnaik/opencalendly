@@ -44,7 +44,7 @@
      - what each reviewer asked to change
      - what change will be made in response
 5) Merge
-   - Merge PR only after Greptile review has run and comments are resolved
+   - Merge PR only after Greptile and CodeRabbit reviews have run and all comments are resolved
    - Do not delete the source feature branch after merge
    - Update docs/PRD.md and docs/ARCHITECTURE.md only if the feature changes plan/architecture
 6) Handoff
