@@ -68,6 +68,11 @@ export type BookingTransaction = {
   lockEventType(eventTypeId: string): Promise<void>;
   listRules(userId: string): Promise<WeeklyAvailabilityRule[]>;
   listOverrides(userId: string, rangeStart: Date, rangeEnd: Date): Promise<AvailabilityOverrideWindow[]>;
+  listExternalBusyWindows(
+    userId: string,
+    rangeStart: Date,
+    rangeEnd: Date,
+  ): Promise<Array<{ startsAt: Date; endsAt: Date }>>;
   listConfirmedBookings(
     organizerId: string,
     rangeStart: Date,
@@ -161,11 +166,18 @@ export const commitBooking = async (
   const result = await dataAccess.withEventTypeTransaction(eventType.id, async (transaction) => {
     await transaction.lockEventType(eventType.id);
 
-    const [rules, overrides, confirmedBookings] = await Promise.all([
+    const [rules, overrides, externalBusyWindows, confirmedBookings] = await Promise.all([
       transaction.listRules(eventType.userId),
       transaction.listOverrides(eventType.userId, rangeStart, rangeEnd),
+      transaction.listExternalBusyWindows(eventType.userId, rangeStart, rangeEnd),
       transaction.listConfirmedBookings(eventType.userId, rangeStart, rangeEnd),
     ]);
+
+    const blockingBusyOverrides: AvailabilityOverrideWindow[] = externalBusyWindows.map((window) => ({
+      startAt: window.startsAt,
+      endAt: window.endsAt,
+      isAvailable: false,
+    }));
 
     const slots = computeAvailabilitySlots({
       organizerTimezone: eventType.organizerTimezone,
@@ -173,7 +185,7 @@ export const commitBooking = async (
       days: 2,
       durationMinutes: eventType.durationMinutes,
       rules,
-      overrides,
+      overrides: [...overrides, ...blockingBusyOverrides],
       bookings: confirmedBookings,
     });
 

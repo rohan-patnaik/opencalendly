@@ -12,6 +12,8 @@ const REQUIRED = {
   HYPERDRIVE_ID: 'Cloudflare dashboard -> Hyperdrive configuration ID.',
   RESEND_API_KEY: 'Resend dashboard -> API Keys.',
   RESEND_FROM_EMAIL: 'Verified sender address in Resend, e.g. OpenCalendly <no-reply@yourdomain.com>.',
+  GOOGLE_CLIENT_ID: 'Google Cloud Console -> Credentials -> OAuth 2.0 Client IDs.',
+  GOOGLE_CLIENT_SECRET: 'Google Cloud Console -> Credentials -> OAuth 2.0 Client Secret.',
 };
 
 const OPTIONAL = {
@@ -98,6 +100,11 @@ if (demoDailyPassLimit) {
   if (!Number.isFinite(parsedLimit) || parsedLimit < 1) {
     errors.push('DEMO_DAILY_PASS_LIMIT must be an integer >= 1 when provided.');
   }
+}
+
+const sessionSecret = parsed.SESSION_SECRET;
+if (sessionSecret && sessionSecret.length < 32) {
+  errors.push('SESSION_SECRET must be at least 32 characters.');
 }
 
 if (apiBaseUrl && publicApiBaseUrl && apiBaseUrl !== publicApiBaseUrl) {

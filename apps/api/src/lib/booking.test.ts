@@ -35,6 +35,7 @@ const weeklyRules = [
 
 const buildDataAccess = (options?: {
   existingBookings?: Array<{ startsAt: Date; endsAt: Date; status: string }>;
+  externalBusyWindows?: Array<{ startsAt: Date; endsAt: Date }>;
   throwUniqueConflict?: boolean;
   eventType?: PublicEventType | null;
 }) => {
@@ -50,6 +51,7 @@ const buildDataAccess = (options?: {
         lockEventType: async () => undefined,
         listRules: async () => weeklyRules,
         listOverrides: async () => [],
+        listExternalBusyWindows: async () => options?.externalBusyWindows ?? [],
         listConfirmedBookings: async () => options?.existingBookings ?? [],
         insertBooking: async () => {
           if (options?.throwUniqueConflict) {
@@ -140,5 +142,29 @@ describe('commitBooking', () => {
         inviteeEmail: 'pat@example.com',
       }),
     ).rejects.toBeInstanceOf(BookingConflictError);
+  });
+
+  it('rejects booking when external calendar busy windows overlap the slot', async () => {
+    const harness = buildDataAccess({
+      externalBusyWindows: [
+        {
+          startsAt: new Date('2026-03-02T09:00:00.000Z'),
+          endsAt: new Date('2026-03-02T09:30:00.000Z'),
+        },
+      ],
+    });
+
+    await expect(
+      commitBooking(harness.dataAccess, {
+        username: 'demo',
+        eventSlug: 'intro-call',
+        startsAt: '2026-03-02T09:00:00.000Z',
+        timezone: 'UTC',
+        inviteeName: 'Pat Lee',
+        inviteeEmail: 'pat@example.com',
+      }),
+    ).rejects.toBeInstanceOf(BookingConflictError);
+
+    expect(harness.getInsertCount()).toBe(0);
   });
 });

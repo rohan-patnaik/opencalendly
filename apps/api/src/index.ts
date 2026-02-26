@@ -7,6 +7,8 @@ import {
   availabilityRules,
   bookingActionTokens,
   bookings,
+  calendarBusyWindows,
+  calendarConnections,
   createDb,
   demoCreditsDaily,
   eventTypes,
@@ -25,6 +27,9 @@ import {
   availabilityQuerySchema,
   bookingActionTokenSchema,
   bookingCancelSchema,
+  calendarConnectCompleteSchema,
+  calendarConnectStartSchema,
+  calendarSyncRequestSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
   demoCreditsConsumeSchema,
@@ -58,6 +63,9 @@ import {
   hashToken,
 } from './lib/auth';
 import { computeAvailabilitySlots } from './lib/availability';
+import { encryptSecret } from './lib/calendar-crypto';
+import { createCalendarOAuthState, verifyCalendarOAuthState } from './lib/calendar-oauth-state';
+import { resolveGoogleAccessToken, resolveGoogleSyncRange, syncGoogleBusyWindows } from './lib/calendar-sync';
 import {
   evaluateBookingActionToken,
   parseBookingMetadata,
@@ -77,6 +85,11 @@ import {
   sendBookingConfirmationEmail,
   sendBookingRescheduledEmail,
 } from './lib/email';
+import {
+  buildGoogleAuthorizationUrl,
+  exchangeGoogleOAuthCode,
+  fetchGoogleUserProfile,
+} from './lib/google-calendar';
 import {
   buildDemoCreditsStatus,
   consumeDemoCreditFromState,
@@ -106,9 +119,12 @@ type Bindings = {
   HYPERDRIVE?: HyperdriveBinding;
   DATABASE_URL?: string;
   APP_BASE_URL?: string;
+  SESSION_SECRET?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   DEMO_DAILY_PASS_LIMIT?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 };
 
 type ContextLike = {
@@ -258,6 +274,16 @@ type TeamMemberScheduleRecord = {
   }>;
 };
 
+type CalendarProvider = 'google' | 'microsoft';
+type CalendarConnectionStatus = {
+  provider: CalendarProvider;
+  connected: boolean;
+  externalEmail: string | null;
+  lastSyncedAt: string | null;
+  nextSyncAt: string | null;
+  lastError: string | null;
+};
+
 const app = new Hono<{ Bindings: Bindings }>();
 
 class BookingActionNotFoundError extends Error {}
@@ -307,8 +333,56 @@ const normalizeTimezone = (timezone: string | undefined): string => {
   return parsed.isValid ? timezone : 'UTC';
 };
 
+const MIN_CALENDAR_SECRET_LENGTH = 32;
+
+const resolveCalendarEncryptionSecret = (env: Bindings): string | null => {
+  const secret = env.SESSION_SECRET?.trim();
+  if (!secret || secret.length < MIN_CALENDAR_SECRET_LENGTH) {
+    return null;
+  }
+  return secret;
+};
+
+const resolveGoogleOAuthConfig = (
+  env: Bindings,
+): { clientId: string; clientSecret: string } | null => {
+  const clientId = env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = env.GOOGLE_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) {
+    return null;
+  }
+  return { clientId, clientSecret };
+};
+
+const toCalendarConnectionStatus = (input: {
+  provider: CalendarProvider;
+  externalEmail: string | null;
+  lastSyncedAt: Date | null;
+  nextSyncAt: Date | null;
+  lastError: string | null;
+}): CalendarConnectionStatus => {
+  return {
+    provider: input.provider,
+    connected: true,
+    externalEmail: input.externalEmail,
+    lastSyncedAt: input.lastSyncedAt ? input.lastSyncedAt.toISOString() : null,
+    nextSyncAt: input.nextSyncAt ? input.nextSyncAt.toISOString() : null,
+    lastError: input.lastError,
+  };
+};
+
 const WEBHOOK_DELIVERY_BATCH_LIMIT_DEFAULT = 25;
 const WEBHOOK_DELIVERY_BATCH_LIMIT_MAX = 100;
+const CALENDAR_OAUTH_STATE_TTL_MINUTES = 10;
+const CALENDAR_SYNC_NEXT_MINUTES = 15;
+const GOOGLE_CALENDAR_PROVIDER: CalendarProvider = 'google';
+
+const toCalendarProvider = (value: string): CalendarProvider | null => {
+  if (value === 'google' || value === 'microsoft') {
+    return value;
+  }
+  return null;
+};
 
 const clampWebhookDeliveryBatchLimit = (rawLimit: string | undefined): number => {
   const parsed = rawLimit ? Number.parseInt(rawLimit, 10) : Number.NaN;
@@ -823,6 +897,27 @@ const findTeamEventTypeContext = async (
   };
 };
 
+const listExternalBusyWindowsForUser = async (
+  db: QueryableDb,
+  userId: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+): Promise<Array<{ startsAt: Date; endsAt: Date }>> => {
+  return db
+    .select({
+      startsAt: calendarBusyWindows.startsAt,
+      endsAt: calendarBusyWindows.endsAt,
+    })
+    .from(calendarBusyWindows)
+    .where(
+      and(
+        eq(calendarBusyWindows.userId, userId),
+        lt(calendarBusyWindows.startsAt, rangeEnd),
+        gt(calendarBusyWindows.endsAt, rangeStart),
+      ),
+    );
+};
+
 const listTeamMemberSchedules = async (
   db: QueryableDb,
   memberIds: string[],
@@ -853,7 +948,7 @@ const listTeamMemberSchedules = async (
       continue;
     }
 
-    const [rules, overrides, directBookings, assignedBookings] = await Promise.all([
+    const [rules, overrides, externalBusyWindows, directBookings, assignedBookings] = await Promise.all([
       db
         .select({
           dayOfWeek: availabilityRules.dayOfWeek,
@@ -878,6 +973,7 @@ const listTeamMemberSchedules = async (
             gt(availabilityOverrides.endAt, rangeStart),
           ),
         ),
+      listExternalBusyWindowsForUser(db, userId, rangeStart, rangeEnd),
       db
         .select({
           startsAt: bookings.startsAt,
@@ -926,7 +1022,14 @@ const listTeamMemberSchedules = async (
       userId,
       timezone: timezoneByUserId.get(userId) ?? 'UTC',
       rules,
-      overrides,
+      overrides: [
+        ...overrides,
+        ...externalBusyWindows.map((window) => ({
+          startAt: window.startsAt,
+          endAt: window.endsAt,
+          isAvailable: false,
+        })),
+      ],
       bookings: Array.from(dedupedBookings.values()),
     });
   }
@@ -1323,6 +1426,446 @@ app.get('/v0/auth/me', async (context) => {
     }
 
     return context.json({ ok: true, user: authedUser });
+  });
+});
+
+app.get('/v0/calendar/sync/status', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const rows = await db
+      .select({
+        provider: calendarConnections.provider,
+        externalEmail: calendarConnections.externalEmail,
+        lastSyncedAt: calendarConnections.lastSyncedAt,
+        nextSyncAt: calendarConnections.nextSyncAt,
+        lastError: calendarConnections.lastError,
+      })
+      .from(calendarConnections)
+      .where(eq(calendarConnections.userId, authedUser.id))
+      .orderBy(asc(calendarConnections.createdAt));
+
+    const statuses = rows
+      .map((row) => {
+        const provider = toCalendarProvider(row.provider);
+        if (!provider) {
+          return null;
+        }
+        return toCalendarConnectionStatus({
+          provider,
+          externalEmail: row.externalEmail,
+          lastSyncedAt: row.lastSyncedAt,
+          nextSyncAt: row.nextSyncAt,
+          lastError: row.lastError,
+        });
+      })
+      .filter((status): status is CalendarConnectionStatus => status !== null);
+
+    if (!statuses.some((status) => status.provider === GOOGLE_CALENDAR_PROVIDER)) {
+      statuses.unshift({
+        provider: GOOGLE_CALENDAR_PROVIDER,
+        connected: false,
+        externalEmail: null,
+        lastSyncedAt: null,
+        nextSyncAt: null,
+        lastError: null,
+      });
+    }
+
+    return context.json({
+      ok: true,
+      providers: statuses,
+    });
+  });
+});
+
+app.post('/v0/calendar/google/connect/start', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = calendarConnectStartSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const googleConfig = resolveGoogleOAuthConfig(context.env);
+    const encryptionSecret = resolveCalendarEncryptionSecret(context.env);
+    if (!googleConfig || !encryptionSecret) {
+      return jsonError(
+        context,
+        500,
+        'Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and SESSION_SECRET.',
+      );
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + CALENDAR_OAUTH_STATE_TTL_MINUTES * 60_000);
+    const state = createCalendarOAuthState({
+      userId: authedUser.id,
+      provider: GOOGLE_CALENDAR_PROVIDER,
+      redirectUri: parsed.data.redirectUri,
+      expiresAt,
+      secret: encryptionSecret,
+    });
+
+    const authUrl = buildGoogleAuthorizationUrl({
+      clientId: googleConfig.clientId,
+      redirectUri: parsed.data.redirectUri,
+      state,
+    });
+
+    return context.json({
+      ok: true,
+      provider: GOOGLE_CALENDAR_PROVIDER,
+      authUrl,
+      state,
+      expiresAt: expiresAt.toISOString(),
+    });
+  });
+});
+
+app.post('/v0/calendar/google/connect/complete', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = calendarConnectCompleteSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const googleConfig = resolveGoogleOAuthConfig(context.env);
+    const encryptionSecret = resolveCalendarEncryptionSecret(context.env);
+    if (!googleConfig || !encryptionSecret) {
+      return jsonError(
+        context,
+        500,
+        'Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and SESSION_SECRET.',
+      );
+    }
+
+    const state = verifyCalendarOAuthState({
+      token: parsed.data.state,
+      secret: encryptionSecret,
+      now: new Date(),
+    });
+    if (
+      !state ||
+      state.provider !== GOOGLE_CALENDAR_PROVIDER ||
+      state.userId !== authedUser.id ||
+      state.redirectUri !== parsed.data.redirectUri
+    ) {
+      return jsonError(context, 400, 'OAuth state is invalid or expired.');
+    }
+
+    try {
+      const tokenPayload = await exchangeGoogleOAuthCode({
+        clientId: googleConfig.clientId,
+        clientSecret: googleConfig.clientSecret,
+        code: parsed.data.code,
+        redirectUri: parsed.data.redirectUri,
+      });
+      const profile = await fetchGoogleUserProfile(tokenPayload.access_token);
+
+      const existingConnection = await db
+        .select({
+          id: calendarConnections.id,
+          refreshTokenEncrypted: calendarConnections.refreshTokenEncrypted,
+        })
+        .from(calendarConnections)
+        .where(
+          and(
+            eq(calendarConnections.userId, authedUser.id),
+            eq(calendarConnections.provider, GOOGLE_CALENDAR_PROVIDER),
+          ),
+        )
+        .limit(1);
+
+      const refreshTokenEncrypted =
+        tokenPayload.refresh_token && tokenPayload.refresh_token.length > 0
+          ? encryptSecret(tokenPayload.refresh_token, encryptionSecret)
+          : existingConnection[0]?.refreshTokenEncrypted ?? null;
+
+      if (!refreshTokenEncrypted) {
+        return jsonError(
+          context,
+          400,
+          'Google did not return a refresh token. Reconnect with prompt=consent to grant offline access.',
+        );
+      }
+
+      const now = new Date();
+      const accessTokenExpiresAt = new Date(now.getTime() + tokenPayload.expires_in * 1000);
+
+      await db
+        .insert(calendarConnections)
+        .values({
+          userId: authedUser.id,
+          provider: GOOGLE_CALENDAR_PROVIDER,
+          externalAccountId: profile.sub,
+          externalEmail: profile.email ?? null,
+          accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
+          refreshTokenEncrypted,
+          accessTokenExpiresAt,
+          scope: tokenPayload.scope ?? null,
+          lastError: null,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [calendarConnections.userId, calendarConnections.provider],
+          set: {
+            externalAccountId: profile.sub,
+            externalEmail: profile.email ?? null,
+            accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
+            refreshTokenEncrypted,
+            accessTokenExpiresAt,
+            scope: tokenPayload.scope ?? null,
+            lastError: null,
+            updatedAt: now,
+          },
+        });
+
+      const [connection] = await db
+        .select({
+          provider: calendarConnections.provider,
+          externalEmail: calendarConnections.externalEmail,
+          lastSyncedAt: calendarConnections.lastSyncedAt,
+          nextSyncAt: calendarConnections.nextSyncAt,
+          lastError: calendarConnections.lastError,
+        })
+        .from(calendarConnections)
+        .where(
+          and(
+            eq(calendarConnections.userId, authedUser.id),
+            eq(calendarConnections.provider, GOOGLE_CALENDAR_PROVIDER),
+          ),
+        )
+        .limit(1);
+
+      if (!connection) {
+        return jsonError(context, 500, 'Unable to persist calendar connection.');
+      }
+
+      return context.json({
+        ok: true,
+        connection: toCalendarConnectionStatus({
+          provider: GOOGLE_CALENDAR_PROVIDER,
+          externalEmail: connection.externalEmail,
+          lastSyncedAt: connection.lastSyncedAt,
+          nextSyncAt: connection.nextSyncAt,
+          lastError: connection.lastError,
+        }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Google OAuth exchange failed.';
+      return jsonError(context, 502, message);
+    }
+  });
+});
+
+app.post('/v0/calendar/google/disconnect', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const disconnected = await db.transaction(async (transaction) => {
+      const rows = await transaction
+        .select({
+          id: calendarConnections.id,
+        })
+        .from(calendarConnections)
+        .where(
+          and(
+            eq(calendarConnections.userId, authedUser.id),
+            eq(calendarConnections.provider, GOOGLE_CALENDAR_PROVIDER),
+          ),
+        );
+
+      if (rows.length === 0) {
+        return false;
+      }
+
+      const connectionIds = rows.map((row) => row.id);
+
+      await transaction
+        .delete(calendarBusyWindows)
+        .where(inArray(calendarBusyWindows.connectionId, connectionIds));
+
+      await transaction
+        .delete(calendarConnections)
+        .where(inArray(calendarConnections.id, connectionIds));
+
+      return true;
+    });
+
+    return context.json({
+      ok: true,
+      provider: GOOGLE_CALENDAR_PROVIDER,
+      disconnected,
+    });
+  });
+});
+
+app.post('/v0/calendar/google/sync', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    let body: unknown = {};
+    const rawBody = await context.req.text();
+    if (rawBody.trim().length > 0) {
+      try {
+        body = JSON.parse(rawBody) as unknown;
+      } catch {
+        return jsonError(context, 400, 'Malformed JSON body.');
+      }
+    }
+
+    const parsed = calendarSyncRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const googleConfig = resolveGoogleOAuthConfig(context.env);
+    const encryptionSecret = resolveCalendarEncryptionSecret(context.env);
+    if (!googleConfig || !encryptionSecret) {
+      return jsonError(
+        context,
+        500,
+        'Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and SESSION_SECRET.',
+      );
+    }
+
+    const [connection] = await db
+      .select({
+        id: calendarConnections.id,
+        accessTokenEncrypted: calendarConnections.accessTokenEncrypted,
+        refreshTokenEncrypted: calendarConnections.refreshTokenEncrypted,
+        accessTokenExpiresAt: calendarConnections.accessTokenExpiresAt,
+      })
+      .from(calendarConnections)
+      .where(
+        and(
+          eq(calendarConnections.userId, authedUser.id),
+          eq(calendarConnections.provider, GOOGLE_CALENDAR_PROVIDER),
+        ),
+      )
+      .limit(1);
+
+    if (!connection) {
+      return jsonError(context, 404, 'Google calendar is not connected.');
+    }
+
+    const now = new Date();
+    let range: { startIso: string; endIso: string };
+    try {
+      range = resolveGoogleSyncRange(now, parsed.data.start, parsed.data.end);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sync range is invalid.';
+      return jsonError(context, 400, message);
+    }
+
+    try {
+      const token = await resolveGoogleAccessToken({
+        connection,
+        encryptionSecret,
+        clientId: googleConfig.clientId,
+        clientSecret: googleConfig.clientSecret,
+        now,
+      });
+
+      const busyWindows = await syncGoogleBusyWindows({
+        accessToken: token.accessToken,
+        startIso: range.startIso,
+        endIso: range.endIso,
+      });
+
+      const nextSyncAt = new Date(now.getTime() + CALENDAR_SYNC_NEXT_MINUTES * 60_000);
+      const dedupedBusyWindows = Array.from(
+        busyWindows.reduce((map, window) => {
+          map.set(`${window.startsAt.toISOString()}|${window.endsAt.toISOString()}`, window);
+          return map;
+        }, new Map<string, { startsAt: Date; endsAt: Date }>())
+          .values(),
+      );
+
+      await db.transaction(async (transaction) => {
+        await transaction.execute(sql`select id from users where id = ${authedUser.id} for update`);
+
+        await transaction
+          .delete(calendarBusyWindows)
+          .where(
+            and(
+              eq(calendarBusyWindows.connectionId, connection.id),
+              lt(calendarBusyWindows.startsAt, new Date(range.endIso)),
+              gt(calendarBusyWindows.endsAt, new Date(range.startIso)),
+            ),
+          );
+
+        if (dedupedBusyWindows.length > 0) {
+          await transaction.insert(calendarBusyWindows).values(
+            dedupedBusyWindows.map((window) => ({
+              connectionId: connection.id,
+              userId: authedUser.id,
+              provider: GOOGLE_CALENDAR_PROVIDER,
+              startsAt: window.startsAt,
+              endsAt: window.endsAt,
+            })),
+          );
+        }
+
+        await transaction
+          .update(calendarConnections)
+          .set({
+            accessTokenEncrypted: encryptSecret(token.accessToken, encryptionSecret),
+            refreshTokenEncrypted: encryptSecret(token.refreshToken, encryptionSecret),
+            accessTokenExpiresAt: token.accessTokenExpiresAt,
+            lastSyncedAt: now,
+            nextSyncAt,
+            lastError: null,
+            updatedAt: now,
+          })
+          .where(eq(calendarConnections.id, connection.id));
+      });
+
+      return context.json({
+        ok: true,
+        provider: GOOGLE_CALENDAR_PROVIDER,
+        syncWindow: range,
+        busyWindowCount: dedupedBusyWindows.length,
+        refreshedAccessToken: token.refreshed,
+        lastSyncedAt: now.toISOString(),
+        nextSyncAt: nextSyncAt.toISOString(),
+      });
+    } catch (error) {
+      const message = (error instanceof Error ? error.message : 'Calendar sync failed.').slice(0, 1000);
+      const nextSyncAt = new Date(now.getTime() + CALENDAR_SYNC_NEXT_MINUTES * 60_000);
+
+      await db
+        .update(calendarConnections)
+        .set({
+          lastError: message,
+          nextSyncAt,
+          updatedAt: now,
+        })
+        .where(eq(calendarConnections.id, connection.id));
+
+      return jsonError(context, 502, message);
+    }
   });
 });
 
@@ -2369,7 +2912,7 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
     const days = query.data.days ?? 7;
     const rangeEnd = rangeStart.plus({ days });
 
-    const [rules, overrides, existingBookings] = await Promise.all([
+    const [rules, overrides, externalBusyWindows, existingBookings] = await Promise.all([
       db
         .select({
           dayOfWeek: availabilityRules.dayOfWeek,
@@ -2394,6 +2937,7 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
             gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
           ),
         ),
+      listExternalBusyWindowsForUser(db, eventType.userId, rangeStart.toJSDate(), rangeEnd.toJSDate()),
       db
         .select({
           startsAt: bookings.startsAt,
@@ -2418,7 +2962,14 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
       days,
       durationMinutes: eventType.durationMinutes,
       rules,
-      overrides,
+      overrides: [
+        ...overrides,
+        ...externalBusyWindows.map((window) => ({
+          startAt: window.startsAt,
+          endAt: window.endsAt,
+          isAvailable: false,
+        })),
+      ],
       bookings: existingBookings,
     });
 
@@ -2886,6 +3437,9 @@ app.post('/v0/bookings', async (context) => {
                         gt(availabilityOverrides.endAt, rangeStart),
                       ),
                     );
+                },
+                listExternalBusyWindows: async (userId, rangeStart, rangeEnd) => {
+                  return listExternalBusyWindowsForUser(transaction, userId, rangeStart, rangeEnd);
                 },
                 listConfirmedBookings: async (organizerId, rangeStart, rangeEnd) => {
                   return transaction
@@ -3558,7 +4112,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           null;
 
         if (existingTeamAssignments.length === 0) {
-          const [rules, overrides, existingBookings] = await Promise.all([
+          const [rules, overrides, externalBusyWindows, existingBookings] = await Promise.all([
             transaction
               .select({
                 dayOfWeek: availabilityRules.dayOfWeek,
@@ -3583,6 +4137,12 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
                   gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
                 ),
               ),
+            listExternalBusyWindowsForUser(
+              transaction,
+              organizerRow.id,
+              rangeStart.toJSDate(),
+              rangeEnd.toJSDate(),
+            ),
             transaction
               .select({
                 id: bookings.id,
@@ -3607,7 +4167,14 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             durationMinutes: eventTypeRow.durationMinutes,
             organizerTimezone: normalizeTimezone(organizerRow.timezone),
             rules,
-            overrides,
+            overrides: [
+              ...overrides,
+              ...externalBusyWindows.map((window) => ({
+                startAt: window.startsAt,
+                endAt: window.endsAt,
+                isAvailable: false,
+              })),
+            ],
             bookings: existingBookings,
             excludeBookingId: booking.id,
           });

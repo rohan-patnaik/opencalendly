@@ -4,6 +4,9 @@ import {
   availabilityRuleSchema,
   bookingActionTokenSchema,
   bookingCancelSchema,
+  calendarConnectCompleteSchema,
+  calendarConnectStartSchema,
+  calendarSyncRequestSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
   demoCreditsConsumeSchema,
@@ -175,6 +178,33 @@ describe('shared schemas', () => {
   it('rejects malformed auth payload', () => {
     const result = magicLinkRequestSchema.safeParse({
       email: 'not-an-email',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts calendar OAuth start payload', () => {
+    const payload = calendarConnectStartSchema.parse({
+      redirectUri: 'http://localhost:3000/settings/calendar/google/callback',
+    });
+
+    expect(payload.redirectUri).toContain('/settings/calendar/google/callback');
+  });
+
+  it('accepts calendar OAuth completion payload', () => {
+    const payload = calendarConnectCompleteSchema.parse({
+      code: '4/0AbCDefg123',
+      state: 'x'.repeat(64),
+      redirectUri: 'http://localhost:3000/settings/calendar/google/callback',
+    });
+
+    expect(payload.code).toContain('4/0');
+  });
+
+  it('rejects invalid calendar sync ranges', () => {
+    const result = calendarSyncRequestSchema.safeParse({
+      start: '2026-03-10T12:00:00.000Z',
+      end: '2026-03-10T11:00:00.000Z',
     });
 
     expect(result.success).toBe(false);

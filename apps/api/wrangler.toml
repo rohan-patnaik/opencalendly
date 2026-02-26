@@ -11,7 +11,10 @@ enabled = true
 # - Use Hyperdrive binding for runtime traffic.
 # - DATABASE_URL fallback (if used) must be a Neon URL (*.neon.tech).
 [vars]
-DATABASE_URL = ""
+APP_BASE_URL = ""
+RESEND_FROM_EMAIL = ""
+DEMO_DAILY_PASS_LIMIT = ""
+GOOGLE_CLIENT_ID = ""
 
 [[hyperdrive]]
 binding = "HYPERDRIVE"
