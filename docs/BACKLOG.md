@@ -30,10 +30,14 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- Secure tokenized reschedule/cancel links.
-- Email notifications on reschedule/cancel.
-- Booking history maintained.
-- Tests and docs updated.
+- Each confirmed booking issues opaque, high-entropy cancel/reschedule tokens (stored hashed) for invitee self-service links.
+- Token validation endpoint returns booking details for the action page and rejects invalid, expired, or already-used tokens with `404/410`.
+- Cancel flow marks booking as `canceled`, stores cancellation metadata (`reason`, `canceledAt`, `canceledBy`), and sends cancellation email notifications.
+- Reschedule flow preserves history by keeping the old booking row (status `rescheduled`) and creating a new confirmed booking linked via `rescheduledFromBookingId`.
+- Reschedule correctness is transaction-safe: organizer-level overlap checks and unique-slot constraints still prevent double-booking races.
+- Reschedule and cancel actions are idempotent for repeated token submissions.
+- Feature adds unit/integration tests for token validation, cancel, reschedule success, and conflict/error paths.
+- `docs/API.md` is updated with reschedule/cancel token contracts and response examples.
 
 ## Feature 3 (PR#5): Demo Credits Pool (daily passes) + waitlist
 
