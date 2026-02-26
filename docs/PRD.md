@@ -12,9 +12,9 @@ Build a practical open-source scheduling platform for solo creators, consultants
 
 ## Non-goals (for MVP)
 
-- Full team round-robin routing.
 - Marketplace/discovery features.
 - Complex billing/subscriptions.
+- Enterprise SSO/SCIM and advanced compliance workflows (post-v1).
 
 ## Target users
 
@@ -24,22 +24,26 @@ Build a practical open-source scheduling platform for solo creators, consultants
 
 ## Roadmap
 
-### MVP (PR#2-PR#4)
+### Completed foundation (PR#2-PR#7)
 
 - Monorepo + infra bootstrap.
-- One-on-one event types and public booking links.
-- Reschedule/cancel via secure tokens.
- - Booking confirmation/cancellation/reschedule notifications.
+- One-on-one event types + public booking links + timezone/buffer handling.
+- Secure token-based cancel/reschedule + lifecycle emails.
+- Demo Credits Pool + waitlist + reset controls.
+- Embeds + outbound webhooks with retry/signature.
+- Team scheduling modes (`round_robin`, `collective`) with correctness-safe commit.
 
-### V1 (PR#5-PR#6)
+### Remaining to reach v1.0
 
-- Demo Credits Pool for free-tier protection (daily pass limit with atomic consume).
-- Waitlist flow when daily passes are exhausted.
-- Admin/dev daily reset route for demo operations.
-- Embeds and outbound webhooks with retries.
+- PR#9 Feature 6: Calendar Sync Hardening v1 (Google busy sync + conflict blocking).
+- PR#10 Feature 7: Calendar Sync Hardening v2 (Outlook + booking writeback).
+- PR#11 Feature 8: Analytics + operator dashboard v1.
+- PR#12 Feature 9: Reliability + platform hardening (rate limits, idempotency, CI/smoke, branch protection enforcement).
+- PR#13 Feature 10: Launch readiness + `v1.0.0` release hardening.
 
-### V2 (post-PR#6)
+### Done definition for this roadmap
 
-- Team scheduling modes (round robin/collective).
-- Calendar sync hardening.
-- Analytics and operational dashboards.
+- Feature 6 through Feature 10 are merged to `main` with CI green.
+- CodeRabbit and Greptile review gates are satisfied for each feature PR.
+- API/architecture/stack docs are updated in the same PR as each feature.
+- `v1.0.0` release notes and operator runbook are published.
