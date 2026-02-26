@@ -6,9 +6,11 @@ import {
   bookingCancelSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
+  demoCreditsConsumeSchema,
   eventTypeCreateSchema,
   healthCheckSchema,
   magicLinkRequestSchema,
+  waitlistJoinSchema,
   webhookEventSchema,
 } from './schemas';
 
@@ -86,6 +88,24 @@ describe('shared schemas', () => {
     });
 
     expect(payload.timezone).toBe('Asia/Kolkata');
+  });
+
+  it('accepts demo credits consume payloads', () => {
+    const payload = demoCreditsConsumeSchema.parse({
+      email: 'demo@opencalendly.dev',
+    });
+
+    expect(payload.email).toBe('demo@opencalendly.dev');
+  });
+
+  it('accepts waitlist join payloads', () => {
+    const payload = waitlistJoinSchema.parse({
+      email: 'demo@opencalendly.dev',
+      source: 'demo-credits-exhausted',
+      metadata: { timezone: 'Asia/Kolkata' },
+    });
+
+    expect(payload.source).toBe('demo-credits-exhausted');
   });
 
   it('rejects malformed auth payload', () => {

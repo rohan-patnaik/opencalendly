@@ -495,9 +495,7 @@ Behavior:
 - Reschedule sends notification emails to invitee + organizer.
 - Repeated submissions of the same token are idempotent.
 
-## Feature 3 Draft Endpoints (Demo Credits + Waitlist)
-
-The following contracts are draft-first for Feature 3 and will be finalized in PR #5 implementation.
+## Feature 3 Endpoints (Demo Credits + Waitlist)
 
 ### `GET /v0/demo-credits/status`
 

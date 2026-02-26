@@ -143,3 +143,26 @@ export const bookingActionTokens = pgTable(
     ),
   }),
 );
+
+export const demoCreditsDaily = pgTable('demo_credits_daily', {
+  dateKey: varchar('date_key', { length: 10 }).primaryKey(),
+  used: integer('used').notNull().default(0),
+  dailyLimit: integer('daily_limit').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const waitlistEntries = pgTable(
+  'waitlist_entries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    dateKey: varchar('date_key', { length: 10 }).notNull(),
+    email: varchar('email', { length: 320 }).notNull(),
+    source: varchar('source', { length: 80 }).notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueDailyEmail: unique('waitlist_entries_daily_email_unique').on(table.dateKey, table.email),
+  }),
+);

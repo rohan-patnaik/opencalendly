@@ -15,6 +15,7 @@ const REQUIRED = {
 };
 
 const OPTIONAL = {
+  DEMO_DAILY_PASS_LIMIT: 'Optional integer daily pass limit (Feature 3).',
   GITHUB_CLIENT_ID: 'GitHub Developer Settings -> OAuth Apps.',
   GITHUB_CLIENT_SECRET: 'GitHub Developer Settings -> OAuth Apps.',
 };
@@ -89,6 +90,14 @@ if (apiBaseUrl && !/^https?:\/\/.+/i.test(apiBaseUrl)) {
 const publicApiBaseUrl = parsed.NEXT_PUBLIC_API_BASE_URL;
 if (publicApiBaseUrl && !/^https?:\/\/.+/i.test(publicApiBaseUrl)) {
   errors.push('NEXT_PUBLIC_API_BASE_URL must be an absolute http(s) URL.');
+}
+
+const demoDailyPassLimit = parsed.DEMO_DAILY_PASS_LIMIT;
+if (demoDailyPassLimit) {
+  const parsedLimit = Number.parseInt(demoDailyPassLimit, 10);
+  if (!Number.isFinite(parsedLimit) || parsedLimit < 1) {
+    errors.push('DEMO_DAILY_PASS_LIMIT must be an integer >= 1 when provided.');
+  }
 }
 
 if (apiBaseUrl && publicApiBaseUrl && apiBaseUrl !== publicApiBaseUrl) {

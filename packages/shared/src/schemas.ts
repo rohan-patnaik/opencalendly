@@ -111,6 +111,16 @@ export const bookingRescheduleSchema = z.object({
   timezone: timezoneSchema.optional(),
 });
 
+export const demoCreditsConsumeSchema = z.object({
+  email: emailSchema,
+});
+
+export const waitlistJoinSchema = z.object({
+  email: emailSchema,
+  source: z.string().min(1).max(80).default('demo-credits-exhausted'),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const webhookEventSchema = z.object({
   id: z.string().uuid(),
   type: z.enum(['booking.created', 'booking.canceled', 'booking.rescheduled']),
@@ -139,4 +149,6 @@ export type AvailabilityQueryInput = z.infer<typeof availabilityQuerySchema>;
 export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
 export type BookingCancelInput = z.infer<typeof bookingCancelSchema>;
 export type BookingRescheduleInput = z.infer<typeof bookingRescheduleSchema>;
+export type DemoCreditsConsumeInput = z.infer<typeof demoCreditsConsumeSchema>;
+export type WaitlistJoinInput = z.infer<typeof waitlistJoinSchema>;
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;
