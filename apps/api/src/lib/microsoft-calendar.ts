@@ -195,11 +195,17 @@ export const fetchMicrosoftUserProfile = async (
 export const fetchMicrosoftBusyWindows = async (
   input: {
     accessToken: string;
+    scheduleSmtp: string;
     startIso: string;
     endIso: string;
   },
   fetchImpl: FetchLike = fetch,
 ): Promise<MicrosoftBusyWindow[]> => {
+  const scheduleSmtp = input.scheduleSmtp.trim();
+  if (!scheduleSmtp) {
+    throw new Error('Microsoft schedule SMTP address is required.');
+  }
+
   const response = await fetchImpl(MICROSOFT_GET_SCHEDULE_URL, {
     method: 'POST',
     headers: {
@@ -207,7 +213,7 @@ export const fetchMicrosoftBusyWindows = async (
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      schedules: ['me'],
+      schedules: [scheduleSmtp],
       startTime: {
         dateTime: toGraphDateTime(input.startIso),
         timeZone: 'UTC',

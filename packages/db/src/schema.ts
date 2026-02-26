@@ -480,7 +480,7 @@ export const bookingExternalEvents = pgTable(
       columns: [table.connectionId, table.provider],
       foreignColumns: [calendarConnections.id, calendarConnections.provider],
       name: 'booking_external_events_connection_provider_fk',
-    }).onDelete('set null'),
+    }).onDelete('no action'),
     attemptCountCheck: check('booking_external_events_attempt_count_check', sql`${table.attemptCount} >= 0`),
     maxAttemptsCheck: check('booking_external_events_max_attempts_check', sql`${table.maxAttempts} >= 1`),
   }),

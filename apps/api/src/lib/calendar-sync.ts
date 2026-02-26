@@ -20,6 +20,7 @@ export type CalendarTokenResolution = {
 };
 
 const REFRESH_SKEW_SECONDS = 60;
+const MICROSOFT_SYNC_MAX_RANGE_DAYS = 62;
 
 export const resolveGoogleSyncRange = (
   now: Date,
@@ -180,14 +181,25 @@ export const syncGoogleBusyWindows = async (
 export const syncMicrosoftBusyWindows = async (
   input: {
     accessToken: string;
+    scheduleSmtp: string;
     startIso: string;
     endIso: string;
   },
   fetchImpl: FetchLike = fetch,
 ): Promise<Array<{ startsAt: Date; endsAt: Date }>> => {
+  const start = DateTime.fromISO(input.startIso, { zone: 'utc' });
+  const end = DateTime.fromISO(input.endIso, { zone: 'utc' });
+  if (!start.isValid || !end.isValid || end.toMillis() <= start.toMillis()) {
+    throw new Error('Sync range start/end is invalid.');
+  }
+  if (end.diff(start, 'days').days >= MICROSOFT_SYNC_MAX_RANGE_DAYS) {
+    throw new Error('Microsoft sync range must be less than 62 days.');
+  }
+
   const windows = await fetchMicrosoftBusyWindows(
     {
       accessToken: input.accessToken,
+      scheduleSmtp: input.scheduleSmtp,
       startIso: input.startIso,
       endIso: input.endIso,
     },

@@ -57,8 +57,18 @@ export const computeNextWritebackAttemptAt = (attemptCount: number, now: Date): 
 };
 
 const toErrorMessage = (error: unknown): string => {
-  const value = error instanceof Error ? error.message : 'Calendar writeback failed.';
-  return value.slice(0, MAX_ERROR_LENGTH);
+  void error;
+  return 'Calendar writeback failed.'.slice(0, MAX_ERROR_LENGTH);
+};
+
+const toProviderScopedIdempotencyKey = (baseIdempotencyKey: string, bookingId: string): string => {
+  const delimiterIndex = baseIdempotencyKey.indexOf(':');
+  if (delimiterIndex <= 0) {
+    return bookingId;
+  }
+
+  const providerPrefix = baseIdempotencyKey.slice(0, delimiterIndex);
+  return `${providerPrefix}:${bookingId}`;
 };
 
 export const processCalendarWriteback = async (input: {
@@ -131,7 +141,7 @@ export const processCalendarWriteback = async (input: {
             startsAtIso: input.rescheduleTarget.startsAtIso,
             endsAtIso: input.rescheduleTarget.endsAtIso,
           },
-          input.rescheduleTarget.bookingId,
+          toProviderScopedIdempotencyKey(input.record.idempotencyKey, input.rescheduleTarget.bookingId),
         );
       }
 

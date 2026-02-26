@@ -2351,6 +2351,14 @@ app.post('/v0/calendar/google/disconnect', async (context) => {
         .where(inArray(calendarBusyWindows.connectionId, connectionIds));
 
       await transaction
+        .update(bookingExternalEvents)
+        .set({
+          connectionId: null,
+          updatedAt: new Date(),
+        })
+        .where(inArray(bookingExternalEvents.connectionId, connectionIds));
+
+      await transaction
         .delete(calendarConnections)
         .where(inArray(calendarConnections.id, connectionIds));
 
@@ -2738,6 +2746,14 @@ app.post('/v0/calendar/microsoft/disconnect', async (context) => {
         .where(inArray(calendarBusyWindows.connectionId, connectionIds));
 
       await transaction
+        .update(bookingExternalEvents)
+        .set({
+          connectionId: null,
+          updatedAt: new Date(),
+        })
+        .where(inArray(bookingExternalEvents.connectionId, connectionIds));
+
+      await transaction
         .delete(calendarConnections)
         .where(inArray(calendarConnections.id, connectionIds));
 
@@ -2823,6 +2839,7 @@ app.post('/v0/calendar/microsoft/sync', async (context) => {
 
       const busyWindows = await syncMicrosoftBusyWindows({
         accessToken: token.accessToken,
+        scheduleSmtp: authedUser.email,
         startIso: range.startIso,
         endIso: range.endIso,
       });

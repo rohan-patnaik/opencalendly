@@ -151,6 +151,7 @@ describe('calendar-sync', () => {
     const windows = await syncMicrosoftBusyWindows(
       {
         accessToken: 'token',
+        scheduleSmtp: 'demo@example.com',
         startIso: '2026-03-02T00:00:00.000Z',
         endIso: '2026-03-03T00:00:00.000Z',
       },
@@ -178,5 +179,19 @@ describe('calendar-sync', () => {
 
     expect(windows).toHaveLength(1);
     expect(windows[0]?.startsAt.toISOString()).toBe('2026-03-02T09:00:00.000Z');
+  });
+
+  it('rejects Microsoft sync ranges that exceed provider limits', async () => {
+    await expect(
+      syncMicrosoftBusyWindows(
+        {
+          accessToken: 'token',
+          scheduleSmtp: 'demo@example.com',
+          startIso: '2026-03-02T00:00:00.000Z',
+          endIso: '2026-05-10T00:00:00.000Z',
+        },
+        async () => new Response('{}', { status: 200 }),
+      ),
+    ).rejects.toThrow('Microsoft sync range must be less than 62 days.');
   });
 });

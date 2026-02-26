@@ -123,7 +123,7 @@ describe('calendar-writeback', () => {
     expect(result.status).toBe('pending');
     expect(result.attemptCount).toBe(2);
     expect(result.nextAttemptAt.toISOString()).toBe(computeNextWritebackAttemptAt(2, now).toISOString());
-    expect(result.lastError).toContain('Provider is temporarily unavailable');
+    expect(result.lastError).toBe('Calendar writeback failed.');
   });
 
   it('marks failure when max attempts are exhausted', async () => {
@@ -149,7 +149,7 @@ describe('calendar-writeback', () => {
     expect(result.status).toBe('failed');
     expect(result.attemptCount).toBe(3);
     expect(result.nextAttemptAt.toISOString()).toBe(now.toISOString());
-    expect(result.lastError).toContain('Provider rejected request');
+    expect(result.lastError).toBe('Calendar writeback failed.');
   });
 
   it('reuses an already existing event by idempotency key', async () => {
@@ -175,5 +175,35 @@ describe('calendar-writeback', () => {
     expect(result.status).toBe('succeeded');
     expect(result.externalEventId).toBe('provider-event-existing');
     expect(providerClient.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('uses provider-scoped idempotency key for reschedule-create fallback', async () => {
+    const now = new Date('2026-03-10T08:00:00.000Z');
+    const providerClient = createProviderClient();
+
+    await processCalendarWriteback({
+      record: {
+        operation: 'reschedule',
+        attemptCount: 0,
+        maxAttempts: 5,
+        externalEventId: null,
+        idempotencyKey: 'google:old-booking-id',
+      },
+      booking: baseBooking,
+      rescheduleTarget: {
+        bookingId: 'new-booking-id',
+        startsAtIso: '2026-03-10T11:00:00.000Z',
+        endsAtIso: '2026-03-10T11:30:00.000Z',
+      },
+      providerClient,
+      now,
+    });
+
+    expect(providerClient.createEvent).toHaveBeenCalledWith({
+      ...baseBooking,
+      startsAtIso: '2026-03-10T11:00:00.000Z',
+      endsAtIso: '2026-03-10T11:30:00.000Z',
+      idempotencyKey: 'google:new-booking-id',
+    });
   });
 });
