@@ -43,11 +43,15 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- Configurable daily pass limit.
-- Trial action consumes one pass.
-- Exhausted pool shows waitlist/come-back state.
-- Admin/dev route can reset passes.
-- README + PRD updates.
+- System supports a configurable per-day pass limit (`DEMO_DAILY_PASS_LIMIT`) without code changes.
+- A public trial action endpoint atomically consumes exactly one pass and returns remaining passes.
+- Daily usage resets by date boundary (UTC day) and does not carry yesterday's usage into today.
+- When passes are exhausted, trial action returns a deterministic exhausted response and does not over-consume.
+- Exhausted path supports waitlist capture (email + optional metadata) with deduping per day/email.
+- A protected dev/admin endpoint can reset today's pass usage for local/demo operations.
+- Feature includes tests for consume success, exhaustion behavior, race safety, reset flow, and waitlist dedupe.
+- `docs/API.md` is updated with credits + waitlist contracts.
+- `README.md` and `docs/PRD.md` are updated for operator setup and product behavior notes.
 
 ## Feature 4 (PR#6): Embeds + Webhooks v1
 

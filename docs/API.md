@@ -495,6 +495,124 @@ Behavior:
 - Reschedule sends notification emails to invitee + organizer.
 - Repeated submissions of the same token are idempotent.
 
+## Feature 3 Draft Endpoints (Demo Credits + Waitlist)
+
+The following contracts are draft-first for Feature 3 and will be finalized in PR #5 implementation.
+
+### `GET /v0/demo-credits/status`
+
+Public endpoint returning current daily pass usage.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "date": "2026-02-26",
+  "dailyLimit": 25,
+  "used": 10,
+  "remaining": 15,
+  "isExhausted": false
+}
+```
+
+### `POST /v0/demo-credits/consume`
+
+Public endpoint to consume one daily demo pass.
+
+Request:
+
+```json
+{
+  "email": "pat@example.com"
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "consumed": true,
+  "date": "2026-02-26",
+  "dailyLimit": 25,
+  "used": 11,
+  "remaining": 14
+}
+```
+
+Exhausted response (`429`):
+
+```json
+{
+  "ok": false,
+  "error": "Daily demo passes are exhausted.",
+  "date": "2026-02-26",
+  "dailyLimit": 25,
+  "used": 25,
+  "remaining": 0
+}
+```
+
+Behavior:
+
+- Must be transaction-safe under concurrency so one request consumes exactly one pass.
+- Must reset usage by UTC date boundary.
+
+### `POST /v0/waitlist`
+
+Public endpoint to join waitlist when demo passes are exhausted.
+
+Request:
+
+```json
+{
+  "email": "pat@example.com",
+  "source": "demo-credits-exhausted",
+  "metadata": {
+    "timezone": "Asia/Kolkata"
+  }
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "joined": true
+}
+```
+
+Idempotent duplicate response:
+
+```json
+{
+  "ok": true,
+  "joined": false
+}
+```
+
+### `POST /v0/dev/demo-credits/reset`
+
+Protected dev/admin endpoint to reset today’s usage counters.
+
+Auth:
+
+- bearer session required
+- can be restricted further in implementation to dev/admin users or environments
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "date": "2026-02-26",
+  "used": 0,
+  "remaining": 25
+}
+```
+
 ## Webhook event schema (v0)
 
 Source of truth: `packages/shared/src/schemas.ts` (`webhookEventSchema`).
