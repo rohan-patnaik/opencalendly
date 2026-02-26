@@ -7,7 +7,8 @@ flowchart LR
   U["User Browser"] --> W["Web App (Next.js on Pages)"]
   W --> A["API (Hono on Workers)"]
   A -->|"Hyperdrive"| D["Neon Postgres"]
-  A --> G["Google OAuth + Calendar API"]
+  A --> G["Google Calendar API"]
+  A --> M["Microsoft Graph Calendar API"]
   A --> E["Resend"]
 ```
 
@@ -26,6 +27,7 @@ flowchart LR
 - `team_booking_assignments`: per-member slot assignment rows for team bookings (enforces member-level uniqueness).
 - `calendar_connections`: encrypted OAuth credentials + sync cursor/status per user/provider.
 - `calendar_busy_windows`: normalized external busy windows used for slot conflict blocking.
+- `booking_external_events`: provider writeback state per booking (`create`/`cancel`/`reschedule`) with retry metadata.
 - `webhook_subscriptions`: organizer-managed outbound webhook endpoints/secrets/event filters.
 - `webhook_deliveries`: queued delivery attempts with retry state and final status.
 
@@ -82,11 +84,20 @@ flowchart LR
 5. Availability + booking commit paths treat those windows as hard conflict blocks.
 6. Disconnect removes connection + busy-window cache atomically.
 
+### Calendar writeback hardening (Feature 7)
+
+1. Booking lifecycle events enqueue provider writeback rows in `booking_external_events`.
+2. Writeback operations are `create`, `cancel`, and `reschedule`.
+3. Provider adapters (Google + Microsoft) execute external event writes using encrypted connection tokens.
+4. Failures retry with bounded exponential backoff (`next_attempt_at`) until `max_attempts`.
+5. Final failed rows remain visible through writeback status endpoints for operator action.
+
 ## Correctness and idempotency notes
 
 - Booking writes must be transactional.
 - Slot uniqueness is enforced in DB (not only in app logic).
 - Team bookings additionally enforce per-member slot uniqueness through `team_booking_assignments`.
 - External calendar conflicts are enforced at compute-time and re-checked at commit-time.
+- External event writeback state is idempotent per booking+provider and retry-safe.
 - Email sends should be keyed by idempotency token to avoid duplicates on retries.
 - Webhooks use exponential backoff and dedupe by subscription + event id.

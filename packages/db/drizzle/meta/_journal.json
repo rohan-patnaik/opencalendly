@@ -71,6 +71,27 @@
       "when": 1772123018246,
       "tag": "0009_lush_peter_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772127519998,
+      "tag": "0010_square_mentor",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772129084366,
+      "tag": "0011_hard_hardball",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772130218056,
+      "tag": "0012_early_expediter",
+      "breakpoints": true
     }
   ]
 }

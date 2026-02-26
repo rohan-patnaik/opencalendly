@@ -74,4 +74,23 @@ describe('calendar-oauth-state', () => {
       }),
     ).toBeNull();
   });
+
+  it('supports microsoft provider in state payload', () => {
+    const secret = 'oauth-state-secret-for-tests-012345';
+    const token = createCalendarOAuthState({
+      userId: 'user-ms',
+      provider: 'microsoft',
+      redirectUri: 'http://localhost:3000/settings/calendar/microsoft/callback',
+      expiresAt: new Date('2026-03-02T00:10:00.000Z'),
+      secret,
+    });
+
+    const verified = verifyCalendarOAuthState({
+      token,
+      secret,
+      now: new Date('2026-03-02T00:00:00.000Z'),
+    });
+
+    expect(verified?.provider).toBe('microsoft');
+  });
 });

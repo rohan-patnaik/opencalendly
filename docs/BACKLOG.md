@@ -109,6 +109,30 @@ Acceptance criteria:
 - Tests cover create/cancel/reschedule writeback success and retry/error paths.
 - `docs/API.md` and `docs/ARCHITECTURE.md` are updated for provider abstraction + writeback flow.
 
+Execution plan (Feature 7 PR flow):
+
+1. Schema + migrations
+   - add provider-agnostic external booking writeback table (`booking_external_events`) with:
+     - `booking_id`, `provider`, `external_event_id`, `status`, `attempt_count`, `next_attempt_at`, `last_error`
+   - add indexes for retry runner selection and booking/provider idempotency
+2. Provider abstraction
+   - split provider integration into `google` and `microsoft` adapters with shared interface:
+     - connect/start + connect/complete + refresh token
+     - free/busy sync (existing behavior retained)
+     - external event create/cancel/update
+3. API + writeback orchestration
+   - add Microsoft connect/disconnect/sync endpoints with same auth + encryption model as Google
+   - on booking create/cancel/reschedule:
+     - enqueue/update writeback row
+     - execute provider call (or runner call) with bounded retries and persisted failure state
+4. Runner + failure visibility
+   - add authenticated runner endpoint to process due writeback retries
+   - expose status fields so operators can see pending/failed writebacks
+5. Tests + docs + merge gate
+   - add unit/integration tests for provider adapters and retry behavior
+   - finalize docs/API.md + docs/ARCHITECTURE.md contracts
+   - require CodeRabbit + Greptile + CI green before merge
+
 ## Feature 8 (PR#12): Analytics + Operator Dashboard v1
 
 Acceptance criteria:

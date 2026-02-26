@@ -55,6 +55,8 @@ Populate required values in `.env` once, up front:
 | `RESEND_FROM_EMAIL` | Resend dashboard -> verified sender identity |
 | `GOOGLE_CLIENT_ID` | Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID (Web application) |
 | `GOOGLE_CLIENT_SECRET` | Same Google OAuth credential as above |
+| `MICROSOFT_CLIENT_ID` | Microsoft Entra -> App registrations -> Application (client) ID |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft Entra -> App registrations -> client secret |
 | `DEMO_DAILY_PASS_LIMIT` | Optional integer daily cap for Feature 3 demo credits (default `25`) |
 
 Optional (not required for current feature set):
@@ -65,6 +67,10 @@ Optional (not required for current feature set):
 Google OAuth setup note (for local dev):
 
 - In Google Cloud OAuth app, add your callback URL under Authorized redirect URIs (for example `http://localhost:3000/settings/calendar/google/callback`).
+
+Microsoft OAuth setup note (for local dev):
+
+- In Microsoft Entra App Registration, add a Web redirect URI for `http://localhost:3000/settings/calendar/microsoft/callback` and use that app's client ID/secret for `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET`.
 
 Then validate before doing feature work:
 
@@ -156,6 +162,15 @@ Calendar sync endpoints (authenticated, Feature 6):
 - `POST /v0/calendar/google/connect/complete`
 - `POST /v0/calendar/google/disconnect`
 - `POST /v0/calendar/google/sync`
+
+Calendar sync + writeback endpoints (authenticated, Feature 7):
+
+- `POST /v0/calendar/microsoft/connect/start`
+- `POST /v0/calendar/microsoft/connect/complete`
+- `POST /v0/calendar/microsoft/disconnect`
+- `POST /v0/calendar/microsoft/sync`
+- `GET /v0/calendar/writeback/status`
+- `POST /v0/calendar/writeback/run`
 
 ## Documentation Index
 

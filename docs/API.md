@@ -290,6 +290,7 @@ Behavior:
 - Uses DB unique slot constraint to avoid duplicate commits.
 - Creates secure cancel/reschedule action tokens (stored hashed server-side).
 - Sends booking confirmation email after successful write.
+- Enqueues and runs immediate calendar writeback for connected providers.
 
 Success response:
 
@@ -326,6 +327,13 @@ Success response:
   },
   "webhooks": {
     "queued": 1
+  },
+  "calendarWriteback": {
+    "queued": 1,
+    "processed": 1,
+    "succeeded": 1,
+    "retried": 0,
+    "failed": 0
   }
 }
 ```
@@ -420,6 +428,13 @@ Success response:
   ],
   "webhooks": {
     "queued": 1
+  },
+  "calendarWriteback": {
+    "queued": 1,
+    "processed": 1,
+    "succeeded": 1,
+    "retried": 0,
+    "failed": 0
   }
 }
 ```
@@ -440,6 +455,13 @@ Idempotent replay response:
   },
   "webhooks": {
     "queued": 0
+  },
+  "calendarWriteback": {
+    "queued": 0,
+    "processed": 0,
+    "succeeded": 0,
+    "retried": 0,
+    "failed": 0
   }
 }
 ```
@@ -500,6 +522,13 @@ Success response:
   ],
   "webhooks": {
     "queued": 1
+  },
+  "calendarWriteback": {
+    "queued": 1,
+    "processed": 1,
+    "succeeded": 1,
+    "retried": 0,
+    "failed": 0
   }
 }
 ```
@@ -518,6 +547,7 @@ Behavior:
 - Transaction-safe organizer-level conflict checks are required before confirming the new slot.
 - Reschedule sends notification emails to invitee + organizer.
 - Repeated submissions of the same token are idempotent.
+- Reschedule enqueues calendar writeback update for connected providers.
 
 ## Feature 3 Endpoints (Demo Credits + Waitlist)
 
@@ -967,6 +997,13 @@ Success response:
   },
   "webhooks": {
     "queued": 1
+  },
+  "calendarWriteback": {
+    "queued": 1,
+    "processed": 1,
+    "succeeded": 1,
+    "retried": 0,
+    "failed": 0
   }
 }
 ```
@@ -1130,3 +1167,67 @@ Error responses:
 - `404` Google calendar not connected.
 - `500` Google OAuth env config missing.
 - `502` provider sync failure (also records `lastError` + `nextSyncAt`).
+
+## Feature 7 Endpoints (Outlook + Calendar Writeback)
+
+### Microsoft calendar connection/sync
+
+- `POST /v0/calendar/microsoft/connect/start`
+- `POST /v0/calendar/microsoft/connect/complete`
+- `POST /v0/calendar/microsoft/disconnect`
+- `POST /v0/calendar/microsoft/sync`
+
+Behavior:
+
+- Same auth model and encrypted credential handling as Google endpoints.
+- Same sync status representation under `GET /v0/calendar/sync/status`.
+- `/v0/calendar/microsoft/sync` response shape matches Google sync endpoint and returns `provider: "microsoft"`.
+
+### `GET /v0/calendar/writeback/status`
+
+Auth required. Returns external writeback summary for the authenticated organizer.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "summary": {
+    "pending": 1,
+    "succeeded": 42,
+    "failed": 0
+  },
+  "failures": []
+}
+```
+
+### `POST /v0/calendar/writeback/run`
+
+Auth required. Processes due external writeback rows for the authenticated organizer.
+
+Request body (optional):
+
+```json
+{
+  "limit": 25
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "limit": 25,
+  "processed": 3,
+  "succeeded": 2,
+  "retried": 1,
+  "failed": 0
+}
+```
+
+Notes:
+
+- Writeback operations are `create`, `cancel`, and `reschedule`.
+- Retries use bounded exponential backoff.
+- Final failures are visible through `GET /v0/calendar/writeback/status`.

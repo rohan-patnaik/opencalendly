@@ -32,13 +32,15 @@ const parseEnvFile = (contents) => {
   return values;
 };
 
+const ROOT_ENV_PATH = resolve(process.cwd(), '..', '..', '.env');
+const API_DEV_VARS_PATH = resolve(process.cwd(), '.dev.vars');
+
 const loadRootEnv = () => {
-  const rootEnvPath = resolve(process.cwd(), '..', '..', '.env');
-  if (!existsSync(rootEnvPath)) {
+  if (!existsSync(ROOT_ENV_PATH)) {
     return;
   }
 
-  const values = parseEnvFile(readFileSync(rootEnvPath, 'utf8'));
+  const values = parseEnvFile(readFileSync(ROOT_ENV_PATH, 'utf8'));
   for (const [key, value] of Object.entries(values)) {
     if (!process.env[key]) {
       process.env[key] = value;
@@ -65,16 +67,25 @@ if (!process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE) {
 const wranglerCommand = process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler';
 const wranglerArgs = ['dev', '--config', 'wrangler.toml'];
 
+if (existsSync(API_DEV_VARS_PATH)) {
+  wranglerArgs.push('--env-file', API_DEV_VARS_PATH);
+}
+if (existsSync(ROOT_ENV_PATH)) {
+  wranglerArgs.push('--env-file', ROOT_ENV_PATH);
+}
+
 const passThroughVarKeys = [
   'DATABASE_URL',
   'APP_BASE_URL',
-  'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
   'DEMO_DAILY_PASS_LIMIT',
-  'SESSION_SECRET',
   'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
+  'MICROSOFT_CLIENT_ID',
 ];
+
+// Security: keep secrets out of CLI args (`--var`) to avoid leaking in process listings.
+// Secret bindings (SESSION_SECRET, RESEND_API_KEY, GOOGLE_CLIENT_SECRET, MICROSOFT_CLIENT_SECRET)
+// should be sourced from Wrangler's secure local config (`.dev.vars`) or remote secrets.
 
 for (const key of passThroughVarKeys) {
   const value = process.env[key]?.trim();

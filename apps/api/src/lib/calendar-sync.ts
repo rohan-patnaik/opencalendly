@@ -2,16 +2,17 @@ import { DateTime } from 'luxon';
 
 import { decryptSecret } from './calendar-crypto';
 import { fetchGoogleBusyWindows, refreshGoogleOAuthToken } from './google-calendar';
+import { fetchMicrosoftBusyWindows, refreshMicrosoftOAuthToken } from './microsoft-calendar';
 
 type FetchLike = typeof fetch;
 
-export type GoogleConnectionSecretState = {
+export type CalendarConnectionSecretState = {
   accessTokenEncrypted: string;
   refreshTokenEncrypted: string;
   accessTokenExpiresAt: Date;
 };
 
-export type GoogleTokenResolution = {
+export type CalendarTokenResolution = {
   accessToken: string;
   refreshToken: string;
   accessTokenExpiresAt: Date;
@@ -19,6 +20,7 @@ export type GoogleTokenResolution = {
 };
 
 const REFRESH_SKEW_SECONDS = 60;
+const MICROSOFT_SYNC_MAX_RANGE_DAYS = 62;
 
 export const resolveGoogleSyncRange = (
   now: Date,
@@ -58,14 +60,68 @@ export const resolveGoogleSyncRange = (
 
 export const resolveGoogleAccessToken = async (
   input: {
-    connection: GoogleConnectionSecretState;
+    connection: CalendarConnectionSecretState;
     encryptionSecret: string;
     clientId: string;
     clientSecret: string;
     now: Date;
   },
   fetchImpl: FetchLike = fetch,
-): Promise<GoogleTokenResolution> => {
+): Promise<CalendarTokenResolution> => {
+  return resolveProviderAccessToken(
+    input,
+    async (refreshToken) =>
+      refreshGoogleOAuthToken(
+        {
+          clientId: input.clientId,
+          clientSecret: input.clientSecret,
+          refreshToken,
+        },
+        fetchImpl,
+      ),
+  );
+};
+
+export const resolveMicrosoftAccessToken = async (
+  input: {
+    connection: CalendarConnectionSecretState;
+    encryptionSecret: string;
+    clientId: string;
+    clientSecret: string;
+    now: Date;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<CalendarTokenResolution> => {
+  return resolveProviderAccessToken(
+    input,
+    async (refreshToken) =>
+      refreshMicrosoftOAuthToken(
+        {
+          clientId: input.clientId,
+          clientSecret: input.clientSecret,
+          refreshToken,
+        },
+        fetchImpl,
+      ),
+  );
+};
+
+const resolveProviderAccessToken = async (
+  input: {
+    connection: CalendarConnectionSecretState;
+    encryptionSecret: string;
+    clientId: string;
+    clientSecret: string;
+    now: Date;
+  },
+  refreshTokenFn: (
+    refreshToken: string,
+  ) => Promise<{
+    access_token: string;
+    expires_in: number;
+    refresh_token?: string;
+  }>,
+): Promise<CalendarTokenResolution> => {
   const accessToken = decryptSecret(input.connection.accessTokenEncrypted, input.encryptionSecret);
   const refreshToken = decryptSecret(input.connection.refreshTokenEncrypted, input.encryptionSecret);
 
@@ -82,14 +138,7 @@ export const resolveGoogleAccessToken = async (
     };
   }
 
-  const refreshed = await refreshGoogleOAuthToken(
-    {
-      clientId: input.clientId,
-      clientSecret: input.clientSecret,
-      refreshToken,
-    },
-    fetchImpl,
-  );
+  const refreshed = await refreshTokenFn(refreshToken);
 
   return {
     accessToken: refreshed.access_token,
@@ -110,6 +159,47 @@ export const syncGoogleBusyWindows = async (
   const windows = await fetchGoogleBusyWindows(
     {
       accessToken: input.accessToken,
+      startIso: input.startIso,
+      endIso: input.endIso,
+    },
+    fetchImpl,
+  );
+
+  return windows
+    .map((window) => ({
+      startsAt: DateTime.fromISO(window.start, { zone: 'utc' }),
+      endsAt: DateTime.fromISO(window.end, { zone: 'utc' }),
+    }))
+    .filter((window) => window.startsAt.isValid && window.endsAt.isValid)
+    .filter((window) => window.endsAt.toMillis() > window.startsAt.toMillis())
+    .map((window) => ({
+      startsAt: window.startsAt.toJSDate(),
+      endsAt: window.endsAt.toJSDate(),
+    }));
+};
+
+export const syncMicrosoftBusyWindows = async (
+  input: {
+    accessToken: string;
+    scheduleSmtp: string;
+    startIso: string;
+    endIso: string;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<Array<{ startsAt: Date; endsAt: Date }>> => {
+  const start = DateTime.fromISO(input.startIso, { zone: 'utc' });
+  const end = DateTime.fromISO(input.endIso, { zone: 'utc' });
+  if (!start.isValid || !end.isValid || end.toMillis() <= start.toMillis()) {
+    throw new Error('Sync range start/end is invalid.');
+  }
+  if (end.diff(start, 'days').days >= MICROSOFT_SYNC_MAX_RANGE_DAYS) {
+    throw new Error('Microsoft sync range must be less than 62 days.');
+  }
+
+  const windows = await fetchMicrosoftBusyWindows(
+    {
+      accessToken: input.accessToken,
+      scheduleSmtp: input.scheduleSmtp,
       startIso: input.startIso,
       endIso: input.endIso,
     },

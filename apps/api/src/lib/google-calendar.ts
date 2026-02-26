@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
@@ -6,7 +8,7 @@ const GOOGLE_FREE_BUSY_URL = 'https://www.googleapis.com/calendar/v3/freeBusy';
 const DEFAULT_GOOGLE_SCOPES = [
   'openid',
   'email',
-  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar',
 ];
 
 type FetchLike = typeof fetch;
@@ -27,6 +29,15 @@ type GoogleUserProfile = {
 type GoogleBusyWindow = {
   start: string;
   end: string;
+};
+
+type GoogleCalendarEventResponse = {
+  id?: string;
+};
+
+const toGoogleCalendarEventId = (idempotencyKey: string): string => {
+  const hash = createHash('sha256').update(idempotencyKey).digest('hex');
+  return `oc${hash.slice(0, 30)}`;
 };
 
 const readErrorPayload = async (response: Response): Promise<string> => {
@@ -209,4 +220,169 @@ export const fetchGoogleBusyWindows = async (
       start: window.start,
       end: window.end,
     }));
+};
+
+export const createGoogleCalendarEvent = async (
+  input: {
+    accessToken: string;
+    idempotencyKey: string;
+    eventName: string;
+    inviteeName: string;
+    inviteeEmail: string;
+    startsAtIso: string;
+    endsAtIso: string;
+    timezone: string;
+    locationType: string;
+    locationValue: string | null;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<{ externalEventId: string }> => {
+  const externalEventId = toGoogleCalendarEventId(input.idempotencyKey);
+  const response = await fetchImpl('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${input.accessToken}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      id: externalEventId,
+      summary: input.eventName,
+      description: `OpenCalendly booking with ${input.inviteeName} (${input.inviteeEmail})`,
+      start: {
+        dateTime: input.startsAtIso,
+        timeZone: input.timezone,
+      },
+      end: {
+        dateTime: input.endsAtIso,
+        timeZone: input.timezone,
+      },
+      attendees: [{ email: input.inviteeEmail, displayName: input.inviteeName }],
+      ...(input.locationValue
+        ? {
+            location: input.locationValue,
+          }
+        : {}),
+      extendedProperties: {
+        private: {
+          source: 'opencalendly',
+          locationType: input.locationType,
+          idempotencyKey: input.idempotencyKey,
+        },
+      },
+    }),
+  });
+
+  if (response.status === 409) {
+    return { externalEventId };
+  }
+
+  if (!response.ok) {
+    throw new Error(`Google calendar event create failed: ${await readErrorPayload(response)}`);
+  }
+
+  const parsed = (await response.json()) as GoogleCalendarEventResponse;
+  if (typeof parsed.id !== 'string' || parsed.id.length === 0) {
+    throw new Error('Google calendar create response missing event id.');
+  }
+
+  return { externalEventId: parsed.id };
+};
+
+export const findGoogleCalendarEventByIdempotencyKey = async (
+  input: {
+    accessToken: string;
+    idempotencyKey: string;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<{ externalEventId: string } | null> => {
+  const externalEventId = toGoogleCalendarEventId(input.idempotencyKey);
+  const response = await fetchImpl(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(externalEventId)}`,
+    {
+      method: 'GET',
+      headers: {
+        authorization: `Bearer ${input.accessToken}`,
+      },
+    },
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Google calendar event lookup failed: ${await readErrorPayload(response)}`);
+  }
+
+  return { externalEventId };
+};
+
+export const cancelGoogleCalendarEvent = async (
+  input: {
+    accessToken: string;
+    externalEventId: string;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<void> => {
+  const response = await fetchImpl(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
+      input.externalEventId,
+    )}`,
+    {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${input.accessToken}`,
+      },
+    },
+  );
+
+  if (response.status === 404) {
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Google calendar event cancel failed: ${await readErrorPayload(response)}`);
+  }
+};
+
+export const updateGoogleCalendarEvent = async (
+  input: {
+    accessToken: string;
+    externalEventId: string;
+    startsAtIso: string;
+    endsAtIso: string;
+    timezone: string;
+  },
+  fetchImpl: FetchLike = fetch,
+): Promise<void> => {
+  const response = await fetchImpl(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
+      input.externalEventId,
+    )}`,
+    {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${input.accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        start: {
+          dateTime: input.startsAtIso,
+          timeZone: input.timezone,
+        },
+        end: {
+          dateTime: input.endsAtIso,
+          timeZone: input.timezone,
+        },
+      }),
+    },
+  );
+
+  if (response.status === 404) {
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Google calendar event update failed: ${await readErrorPayload(response)}`);
+  }
 };
