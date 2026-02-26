@@ -1256,12 +1256,22 @@ Notes:
 
 - Allowed `stage` values here: `page_view`, `slot_selection`.
 - `booking_confirmed` is written server-side on booking commit.
+- Route is rate-limited per IP + booking link key (returns `429` when exceeded).
 
 Success response:
 
 ```json
 {
   "ok": true
+}
+```
+
+Rate-limit response (`429`):
+
+```json
+{
+  "ok": false,
+  "error": "Rate limit exceeded. Try again in a minute."
 }
 ```
 

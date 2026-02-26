@@ -440,6 +440,10 @@ const CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS = 5;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT = 25;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_MAX = 100;
 const CALENDAR_WRITEBACK_LEASE_MINUTES = 3;
+const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
+const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS = 120;
+const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS = 5_000;
+const publicAnalyticsRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -468,6 +472,68 @@ const clampCalendarWritebackBatchLimit = (rawLimit: number | string | undefined)
     return CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT;
   }
   return Math.max(1, Math.min(CALENDAR_WRITEBACK_BATCH_LIMIT_MAX, parsed));
+};
+
+const resolveClientIp = (request: Request): string => {
+  const cloudflareIp = request.headers.get('cf-connecting-ip')?.trim();
+  if (cloudflareIp) {
+    return cloudflareIp;
+  }
+
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const [firstIp] = forwardedFor.split(',');
+    if (firstIp?.trim()) {
+      return firstIp.trim();
+    }
+  }
+
+  return 'unknown';
+};
+
+const isPublicAnalyticsRateLimited = (input: {
+  ip: string;
+  username: string;
+  eventSlug: string;
+  nowMs?: number;
+}): boolean => {
+  const nowMs = input.nowMs ?? Date.now();
+  const cutoffMs = nowMs - PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS;
+
+  for (const [key, state] of publicAnalyticsRateLimitState) {
+    if (state.windowStartMs < cutoffMs) {
+      publicAnalyticsRateLimitState.delete(key);
+    }
+  }
+
+  if (publicAnalyticsRateLimitState.size > PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS) {
+    const overflow = publicAnalyticsRateLimitState.size - PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS;
+    let removed = 0;
+    for (const key of publicAnalyticsRateLimitState.keys()) {
+      publicAnalyticsRateLimitState.delete(key);
+      removed += 1;
+      if (removed >= overflow) {
+        break;
+      }
+    }
+  }
+
+  const key = `${input.ip}|${input.username}|${input.eventSlug}`;
+  const existing = publicAnalyticsRateLimitState.get(key);
+  if (!existing || existing.windowStartMs < cutoffMs) {
+    publicAnalyticsRateLimitState.set(key, {
+      windowStartMs: nowMs,
+      count: 1,
+    });
+    return false;
+  }
+
+  if (existing.count >= PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS) {
+    return true;
+  }
+
+  existing.count += 1;
+  return false;
 };
 
 const recordAnalyticsFunnelEvent = async (
@@ -4437,6 +4503,17 @@ app.post('/v0/analytics/funnel/events', async (context) => {
     const parsed = analyticsTrackFunnelEventSchema.safeParse(body);
     if (!parsed.success) {
       return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const requestIp = resolveClientIp(context.req.raw);
+    if (
+      isPublicAnalyticsRateLimited({
+        ip: requestIp,
+        username: parsed.data.username,
+        eventSlug: parsed.data.eventSlug,
+      })
+    ) {
+      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
     }
 
     const eventType = await findPublicEventType(db, parsed.data.username, parsed.data.eventSlug);
