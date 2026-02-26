@@ -23,6 +23,7 @@
 2) Implement
    - Keep changes minimal and scoped
    - Add/update tests
+   - After first push on the feature branch, open a Draft PR immediately to start CI and bot reviews early
 3) Auditor verification (mandatory)
    - Confirm every acceptance criterion is met
    - Confirm migrations are included (if schema changes)
@@ -30,15 +31,24 @@
    - Confirm docs updated
 4) Reviews (mandatory order)
    - Codex self-review checklist
-   - Open PR
-   - Greptile PR review must run
+   - Mark Draft PR ready for review when acceptance criteria are implemented
+   - Greptile PR review must run (auto-trigger expected)
+   - If Greptile status check does not appear within 5 minutes of PR update, trigger Greptile manually from dashboard and continue waiting for review
    - Resolve all Greptile review comments before merge
+   - CodeRabbit review must run (not skipped) before merge
+   - If CodeRabbit shows "Review skipped", treat it as unmet review gate:
+     - verify CodeRabbit dashboard repo settings for auto review
+     - trigger `@coderabbitai review` on the PR after config fix
+   - Resolve all CodeRabbit review comments before merge
+   - After each Greptile/CodeRabbit comment batch, provide a concise in-chat summary:
+     - what each reviewer asked to change
+     - what change will be made in response
 5) Merge
-   - Merge PR only after Greptile review has run and comments are resolved
+   - Merge PR only after Greptile and CodeRabbit reviews have run and all comments are resolved
    - Do not delete the source feature branch after merge
    - Update docs/PRD.md and docs/ARCHITECTURE.md only if the feature changes plan/architecture
 6) Handoff
-   - After merge, produce NEXT_CHAT_PROMPT including:
+   - After merge, provide an in-chat handoff summary including:
      - what shipped
      - what’s next
      - commands/env vars
@@ -49,9 +59,22 @@
 - Greptile is configured via greptile.json at repo root (or .greptile/ directory config).
 - greptile.json is read from the source branch of each PR.
 
+## CodeRabbit config
+- CodeRabbit behavior is configured via `.coderabbit.yaml` in repo root.
+- Auto review is enabled (`reviews.auto_review.enabled: true`).
+- GitHub Action `.github/workflows/coderabbit-review-trigger.yml` posts `@coderabbitai review` on every PR open/update/ready-for-review event to force review trigger even when dashboard auto settings are restrictive.
+- One-time setup requirement (GitHub side):
+  - CodeRabbit GitHub App must be installed for this repository.
+  - Repository access must include this repo for PR review events.
+  - In CodeRabbit repository settings, if `Use Organization Settings` is enabled and org-level auto review is disabled, disable `Use Organization Settings` and apply repository-level settings.
+- Per-PR verification:
+  - Confirm a CodeRabbit status/check appears on the PR.
+  - If no CodeRabbit status/check appears within 5 minutes of PR creation/update, verify app installation/access and trigger a re-check from CodeRabbit dashboard if available.
+  - If CodeRabbit status is present but review is skipped, fix dashboard/repo config and re-trigger review with `@coderabbitai review`.
+
 ## Definition of Done
 - Feature works end-to-end in dev
 - Tests added/updated
 - Docs updated
 - CI green
-- NEXT_CHAT_PROMPT generated after merge
+- In-chat handoff summary posted after merge
