@@ -24,19 +24,21 @@ Build a practical open-source scheduling platform for solo creators, consultants
 
 ## Roadmap
 
-### MVP (PR#1-PR#3)
+### MVP (PR#2-PR#4)
 
 - Monorepo + infra bootstrap.
 - One-on-one event types and public booking links.
 - Reschedule/cancel via secure tokens.
+ - Booking confirmation/cancellation/reschedule notifications.
 
-### V1 (PR#4-PR#5)
+### V1 (PR#5-PR#6)
 
-- Demo Credits Pool for free-tier protection.
+- Demo Credits Pool for free-tier protection (daily pass limit with atomic consume).
 - Waitlist flow when daily passes are exhausted.
+- Admin/dev daily reset route for demo operations.
 - Embeds and outbound webhooks with retries.
 
-### V2 (post-PR#5)
+### V2 (post-PR#6)
 
 - Team scheduling modes (round robin/collective).
 - Calendar sync hardening.

@@ -53,6 +53,7 @@ Populate required values in `.env` once, up front:
 | `HYPERDRIVE_ID` | Cloudflare dashboard -> Hyperdrive -> created config ID |
 | `RESEND_API_KEY` | Resend dashboard -> API Keys |
 | `RESEND_FROM_EMAIL` | Resend dashboard -> verified sender identity |
+| `DEMO_DAILY_PASS_LIMIT` | Optional integer daily cap for Feature 3 demo credits (default `25`) |
 | `GITHUB_CLIENT_ID` | GitHub -> Settings -> Developer settings -> OAuth Apps |
 | `GITHUB_CLIENT_SECRET` | GitHub -> Settings -> Developer settings -> OAuth Apps |
 
@@ -98,7 +99,7 @@ npm run dev:web
 
 Details: [docs/STACK.md](docs/STACK.md)
 
-## Demo Credits Pool Policy (Daily Passes)
+## Demo Credits Pool (Feature 3)
 
 To keep usage within free-tier limits, OpenCalendly will enforce a Demo Credits Pool:
 
@@ -107,7 +108,12 @@ To keep usage within free-tier limits, OpenCalendly will enforce a Demo Credits 
 - When passes are exhausted, users see a waitlist/come-back flow.
 - Passes reset daily and can be manually reset via admin/dev route.
 
-Implementation is planned for Feature 3. Product policy is defined now to shape architecture and cost controls.
+Feature 3 API endpoints:
+
+- `GET /v0/demo-credits/status`
+- `POST /v0/demo-credits/consume`
+- `POST /v0/waitlist`
+- `POST /v0/dev/demo-credits/reset` (authenticated)
 
 ## Documentation Index
 

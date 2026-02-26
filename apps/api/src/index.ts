@@ -8,9 +8,11 @@ import {
   bookingActionTokens,
   bookings,
   createDb,
+  demoCreditsDaily,
   eventTypes,
   sessions,
   users,
+  waitlistEntries,
 } from '@opencalendly/db';
 import {
   availabilityQuerySchema,
@@ -18,6 +20,7 @@ import {
   bookingCancelSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
+  demoCreditsConsumeSchema,
   eventQuestionsSchema,
   eventTypeCreateSchema,
   eventTypeUpdateSchema,
@@ -25,6 +28,7 @@ import {
   magicLinkRequestSchema,
   setAvailabilityOverridesSchema,
   setAvailabilityRulesSchema,
+  waitlistJoinSchema,
   verifyMagicLinkRequestSchema,
   type EventQuestion,
 } from '@opencalendly/shared';
@@ -56,6 +60,12 @@ import {
   sendBookingConfirmationEmail,
   sendBookingRescheduledEmail,
 } from './lib/email';
+import {
+  buildDemoCreditsStatus,
+  consumeDemoCreditFromState,
+  parseDemoDailyPassLimit,
+  toUtcDateKey,
+} from './lib/demo-credits';
 
 type HyperdriveBinding = {
   connectionString: string;
@@ -66,6 +76,7 @@ type Bindings = {
   DATABASE_URL?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  DEMO_DAILY_PASS_LIMIT?: string;
 };
 
 type ContextLike = {
@@ -123,6 +134,12 @@ type EventTypeProfile = {
   locationType: string;
   locationValue: string | null;
   isActive: boolean;
+};
+
+type DemoCreditsDailyRow = {
+  dateKey: string;
+  used: number;
+  dailyLimit: number;
 };
 
 type PublicEventView = {
@@ -369,6 +386,10 @@ const resolveAuthenticatedUser = async (
     displayName: row.displayName,
     timezone: normalizeTimezone(row.timezone),
   };
+};
+
+const resolveDemoDailyPassLimit = (env: Bindings): number => {
+  return parseDemoDailyPassLimit(env.DEMO_DAILY_PASS_LIMIT?.trim());
 };
 
 const actionTokenMap = (
@@ -624,6 +645,190 @@ app.get('/v0/auth/me', async (context) => {
     }
 
     return context.json({ ok: true, user: authedUser });
+  });
+});
+
+app.get('/v0/demo-credits/status', async (context) => {
+  return withDatabase(context, async (db) => {
+    const now = new Date();
+    const dateKey = toUtcDateKey(now);
+    const dailyLimit = resolveDemoDailyPassLimit(context.env);
+
+    const [row] = await db
+      .select({
+        used: demoCreditsDaily.used,
+      })
+      .from(demoCreditsDaily)
+      .where(eq(demoCreditsDaily.dateKey, dateKey))
+      .limit(1);
+
+    const status = buildDemoCreditsStatus({
+      date: dateKey,
+      dailyLimit,
+      used: row?.used ?? 0,
+    });
+
+    return context.json({
+      ok: true,
+      ...status,
+    });
+  });
+});
+
+app.post('/v0/demo-credits/consume', async (context) => {
+  return withDatabase(context, async (db) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = demoCreditsConsumeSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+    const normalizedEmail = parsed.data.email.trim().toLowerCase();
+
+    const now = new Date();
+    const dateKey = toUtcDateKey(now);
+    const dailyLimit = resolveDemoDailyPassLimit(context.env);
+
+    const result = await db.transaction(async (transaction) => {
+      await transaction
+        .insert(demoCreditsDaily)
+        .values({
+          dateKey,
+          used: 0,
+          dailyLimit,
+        })
+        .onConflictDoNothing({ target: demoCreditsDaily.dateKey });
+
+      const locked = await transaction.execute<DemoCreditsDailyRow>(sql`
+        select
+          date_key as "dateKey",
+          used,
+          daily_limit as "dailyLimit"
+        from demo_credits_daily
+        where date_key = ${dateKey}
+        for update
+      `);
+
+      const row = locked.rows[0];
+      if (!row) {
+        throw new Error('Unable to resolve daily credits row.');
+      }
+
+      const consumed = consumeDemoCreditFromState({
+        date: dateKey,
+        dailyLimit,
+        used: row.used,
+      });
+
+      if (!consumed.consumed) {
+        return consumed;
+      }
+
+      await transaction
+        .update(demoCreditsDaily)
+        .set({
+          used: consumed.status.used,
+          dailyLimit,
+          updatedAt: now,
+        })
+        .where(eq(demoCreditsDaily.dateKey, dateKey));
+
+      return consumed;
+    });
+
+    if (!result.consumed) {
+      return context.json(
+        {
+          ok: false,
+          error: 'Daily demo passes are exhausted.',
+          email: normalizedEmail,
+          ...result.status,
+        },
+        429,
+      );
+    }
+
+    return context.json({
+      ok: true,
+      consumed: true,
+      email: normalizedEmail,
+      ...result.status,
+    });
+  });
+});
+
+app.post('/v0/waitlist', async (context) => {
+  return withDatabase(context, async (db) => {
+    const body = await context.req.json().catch(() => null);
+    const parsed = waitlistJoinSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const now = new Date();
+    const dateKey = toUtcDateKey(now);
+    const normalizedEmail = parsed.data.email.trim().toLowerCase();
+
+    const inserted = await db
+      .insert(waitlistEntries)
+      .values({
+        dateKey,
+        email: normalizedEmail,
+        source: parsed.data.source.trim(),
+        metadata: parsed.data.metadata ?? {},
+      })
+      .onConflictDoNothing({
+        target: [waitlistEntries.dateKey, waitlistEntries.email],
+      })
+      .returning({ id: waitlistEntries.id });
+
+    return context.json({
+      ok: true,
+      joined: inserted.length > 0,
+    });
+  });
+});
+
+app.post('/v0/dev/demo-credits/reset', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const now = new Date();
+    const dateKey = toUtcDateKey(now);
+    const dailyLimit = resolveDemoDailyPassLimit(context.env);
+
+    await db.transaction(async (transaction) => {
+      await transaction
+        .insert(demoCreditsDaily)
+        .values({
+          dateKey,
+          used: 0,
+          dailyLimit,
+        })
+        .onConflictDoNothing({ target: demoCreditsDaily.dateKey });
+
+      await transaction
+        .update(demoCreditsDaily)
+        .set({
+          used: 0,
+          dailyLimit,
+          updatedAt: now,
+        })
+        .where(eq(demoCreditsDaily.dateKey, dateKey));
+    });
+
+    const status = buildDemoCreditsStatus({
+      date: dateKey,
+      dailyLimit,
+      used: 0,
+    });
+
+    return context.json({
+      ok: true,
+      ...status,
+    });
   });
 });
 
