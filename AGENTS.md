@@ -35,7 +35,11 @@
    - Greptile PR review must run (auto-trigger expected)
    - If Greptile status check does not appear within 5 minutes of PR update, trigger Greptile manually from dashboard and continue waiting for review
    - Resolve all Greptile review comments before merge
-   - Resolve all CodeRabbit review comments before merge when CodeRabbit posts review comments
+   - CodeRabbit review must run (not skipped) before merge
+   - If CodeRabbit shows "Review skipped", treat it as unmet review gate:
+     - verify CodeRabbit dashboard repo settings for auto review
+     - trigger `@coderabbitai review` on the PR after config fix
+   - Resolve all CodeRabbit review comments before merge
    - After each Greptile/CodeRabbit comment batch, provide a concise in-chat summary:
      - what each reviewer asked to change
      - what change will be made in response
@@ -64,6 +68,7 @@
 - Per-PR verification:
   - Confirm a CodeRabbit status/check appears on the PR.
   - If no CodeRabbit status/check appears within 5 minutes of PR creation/update, verify app installation/access and trigger a re-check from CodeRabbit dashboard if available.
+  - If CodeRabbit status is present but review is skipped, fix dashboard/repo config and re-trigger review with `@coderabbitai review`.
 
 ## Definition of Done
 - Feature works end-to-end in dev
