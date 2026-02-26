@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import styles from './page.module.css';
 
@@ -100,14 +100,6 @@ const toIsoDate = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
-const loadStoredSessionToken = (): string => {
-  if (typeof window === 'undefined') {
-    return '';
-  }
-
-  return window.localStorage.getItem('opencalendly.sessionToken') ?? '';
-};
-
 export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientProps) {
   const defaultRange = useMemo(() => {
     const end = new Date();
@@ -150,6 +142,9 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
 
   const loadDashboard = useCallback(async () => {
     if (!sessionToken.trim()) {
+      setFunnel(null);
+      setTeam(null);
+      setOperatorHealth(null);
       setError('Session token is required. Generate one via /v0/auth/magic-link + /v0/auth/verify.');
       return;
     }
@@ -196,10 +191,6 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
       setFunnel(funnelPayload);
       setTeam(teamPayload);
       setOperatorHealth(operatorPayload);
-
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('opencalendly.sessionToken', sessionToken.trim());
-      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to load analytics dashboard.');
       setFunnel(null);
@@ -209,10 +200,6 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
       setLoading(false);
     }
   }, [apiBaseUrl, queryString, sessionToken]);
-
-  useEffect(() => {
-    setSessionToken(loadStoredSessionToken());
-  }, []);
 
   return (
     <main className={styles.page}>

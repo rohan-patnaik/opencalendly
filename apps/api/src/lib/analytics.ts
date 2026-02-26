@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
-
-export type AnalyticsFunnelStage = 'page_view' | 'slot_selection' | 'booking_confirmed';
+import type { AnalyticsFunnelStage } from '@opencalendly/shared';
+export type { AnalyticsFunnelStage } from '@opencalendly/shared';
 
 export const ANALYTICS_RANGE_DAYS_DEFAULT = 30;
 export const ANALYTICS_RANGE_DAYS_MAX = 90;

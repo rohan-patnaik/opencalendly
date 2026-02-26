@@ -249,4 +249,13 @@ describe('shared schemas', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('rejects malformed analytics calendar dates', () => {
+    const result = analyticsRangeQuerySchema.safeParse({
+      startDate: '2026-02-31',
+      endDate: '2026-03-01',
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

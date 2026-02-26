@@ -97,6 +97,21 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
   }, [timezone]);
 
+  const trackFunnelEvent = useCallback(
+    (stage: 'page_view' | 'slot_selection') => {
+      void fetch(`${apiBaseUrl}/v0/analytics/funnel/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          eventSlug,
+          stage,
+        }),
+      }).catch(() => undefined);
+    },
+    [apiBaseUrl, eventSlug, username],
+  );
+
   const loadEvent = useCallback(async () => {
     setLoadingEvent(true);
     setPageError(null);
@@ -114,22 +129,14 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       }
 
       setEventData(payload);
-      void fetch(`${apiBaseUrl}/v0/analytics/funnel/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          eventSlug,
-          stage: 'page_view',
-        }),
-      }).catch(() => undefined);
+      trackFunnelEvent('page_view');
     } catch {
       setPageError('Unable to load event details.');
       setEventData(null);
     } finally {
       setLoadingEvent(false);
     }
-  }, [apiBaseUrl, eventSlug, username]);
+  }, [eventSlug, trackFunnelEvent, username, apiBaseUrl]);
 
   const loadAvailability = useCallback(async () => {
     setLoadingSlots(true);
@@ -285,16 +292,11 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
               type="button"
               className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
               onClick={() => {
+                if (selectedSlot === slot.startsAt) {
+                  return;
+                }
                 setSelectedSlot(slot.startsAt);
-                void fetch(`${apiBaseUrl}/v0/analytics/funnel/events`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    username,
-                    eventSlug,
-                    stage: 'slot_selection',
-                  }),
-                }).catch(() => undefined);
+                trackFunnelEvent('slot_selection');
               }}
             >
               {formatSlot(slot.startsAt, timezone)}

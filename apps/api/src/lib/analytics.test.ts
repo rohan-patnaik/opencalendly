@@ -34,6 +34,24 @@ describe('resolveAnalyticsRange', () => {
       }),
     ).toThrow('Invalid startDate. Use YYYY-MM-DD.');
   });
+
+  it('rejects invalid endDate input', () => {
+    expect(() =>
+      resolveAnalyticsRange({
+        startDate: '2026-03-01',
+        endDate: '2026-02-30',
+      }),
+    ).toThrow('Invalid endDate. Use YYYY-MM-DD.');
+  });
+
+  it('rejects endDate earlier than startDate', () => {
+    expect(() =>
+      resolveAnalyticsRange({
+        startDate: '2026-03-10',
+        endDate: '2026-03-01',
+      }),
+    ).toThrow('endDate must be on or after startDate.');
+  });
 });
 
 describe('summarizeFunnelAnalytics', () => {

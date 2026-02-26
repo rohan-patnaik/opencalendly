@@ -275,6 +275,9 @@ export const analyticsFunnelEvents = pgTable(
       table.eventTypeId,
       table.occurredAt,
     ),
+    teamEventTypeOccurredAtIndex: index(
+      'analytics_funnel_events_team_event_type_occurred_at_idx',
+    ).on(table.teamEventTypeId, table.occurredAt),
   }),
 );
 

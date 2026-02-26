@@ -9,6 +9,23 @@ const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const questionIdPattern = /^[a-zA-Z0-9_-]+$/;
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 
+const isValidIsoDate = (value: string): boolean => {
+  if (!isoDatePattern.test(value)) {
+    return false;
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return false;
+  }
+
+  return parsed.toISOString().slice(0, 10) === value;
+};
+
+const isoDateSchema = z.string().refine(isValidIsoDate, {
+  message: 'Invalid date. Use YYYY-MM-DD.',
+});
+
 export const timezoneSchema = z.string().min(1).max(80);
 export const usernameSchema = z.string().min(3).max(64).regex(usernamePattern);
 export const eventSlugSchema = z.string().min(2).max(80).regex(slugPattern);
@@ -204,8 +221,8 @@ export const analyticsTrackFunnelEventSchema = z.object({
 
 export const analyticsRangeQuerySchema = z
   .object({
-    startDate: z.string().regex(isoDatePattern).optional(),
-    endDate: z.string().regex(isoDatePattern).optional(),
+    startDate: isoDateSchema.optional(),
+    endDate: isoDateSchema.optional(),
     eventTypeId: z.string().uuid().optional(),
     teamId: z.string().uuid().optional(),
   })

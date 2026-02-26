@@ -487,9 +487,18 @@ const tryRecordAnalyticsFunnelEvent = async (
 ): Promise<void> => {
   try {
     await recordAnalyticsFunnelEvent(db, input);
-  } catch {
+  } catch (error) {
     // Analytics writes are best-effort and must not block booking flows.
+    console.warn('analytics_funnel_event_write_failed', {
+      eventTypeId: input.eventTypeId,
+      stage: input.stage,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
   }
+};
+
+const hashEmailForTelemetry = (email: string): string => {
+  return hashToken(email.trim().toLowerCase());
 };
 
 const recordEmailDelivery = async (
@@ -510,7 +519,7 @@ const recordEmailDelivery = async (
     organizerId: input.organizerId,
     bookingId: input.bookingId,
     eventTypeId: input.eventTypeId,
-    recipientEmail: input.recipientEmail,
+    recipientEmail: hashEmailForTelemetry(input.recipientEmail),
     emailType: input.emailType,
     provider: input.provider,
     status: input.status,
@@ -525,8 +534,14 @@ const tryRecordEmailDelivery = async (
 ): Promise<void> => {
   try {
     await recordEmailDelivery(db, input);
-  } catch {
+  } catch (error) {
     // Delivery telemetry is best-effort and should not fail request paths.
+    console.warn('email_delivery_write_failed', {
+      bookingId: input.bookingId,
+      emailType: input.emailType,
+      status: input.status,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
   }
 };
 
@@ -2227,7 +2242,7 @@ app.get('/v0/analytics/funnel', async (context) => {
           name: eventTypes.name,
         })
         .from(eventTypes)
-        .where(and(eq(eventTypes.userId, authedUser.id), inArray(eventTypes.id, eventTypeIds)));
+        .where(inArray(eventTypes.id, eventTypeIds));
       for (const row of eventRows) {
         eventTypeNameById.set(row.id, row.name);
       }
@@ -2325,7 +2340,6 @@ app.get('/v0/analytics/team', async (context) => {
         .where(
           and(
             inArray(teamBookingAssignments.teamEventTypeId, teamEventTypeIds),
-            eq(bookings.organizerId, authedUser.id),
             eq(teamEventTypes.mode, 'round_robin'),
             gte(bookings.createdAt, range.start),
             lt(bookings.createdAt, range.endExclusive),
@@ -2342,7 +2356,6 @@ app.get('/v0/analytics/team', async (context) => {
         .where(
           and(
             inArray(teamBookingAssignments.teamEventTypeId, teamEventTypeIds),
-            eq(bookings.organizerId, authedUser.id),
             eq(teamEventTypes.mode, 'collective'),
             gte(bookings.createdAt, range.start),
             lt(bookings.createdAt, range.endExclusive),
