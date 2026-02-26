@@ -10,6 +10,10 @@ import {
   eventTypeCreateSchema,
   healthCheckSchema,
   magicLinkRequestSchema,
+  teamAddMemberSchema,
+  teamBookingCreateSchema,
+  teamCreateSchema,
+  teamEventTypeCreateSchema,
   waitlistJoinSchema,
   webhookSubscriptionCreateSchema,
   webhookSubscriptionUpdateSchema,
@@ -123,6 +127,49 @@ describe('shared schemas', () => {
     });
 
     expect(payload.source).toBe('demo-credits-exhausted');
+  });
+
+  it('accepts team create payloads', () => {
+    const payload = teamCreateSchema.parse({
+      name: 'Customer Success Team',
+      slug: 'customer-success',
+    });
+
+    expect(payload.slug).toBe('customer-success');
+  });
+
+  it('accepts team member payloads', () => {
+    const payload = teamAddMemberSchema.parse({
+      userId: '5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2',
+      role: 'member',
+    });
+
+    expect(payload.role).toBe('member');
+  });
+
+  it('accepts team event type payloads', () => {
+    const payload = teamEventTypeCreateSchema.parse({
+      teamId: '88d979f3-4700-4a1b-b8c0-b3e0940d8e9f',
+      name: 'Team Intro',
+      slug: 'team-intro',
+      durationMinutes: 30,
+      mode: 'round_robin',
+      requiredMemberUserIds: ['5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2'],
+    });
+
+    expect(payload.mode).toBe('round_robin');
+  });
+
+  it('accepts team booking payloads', () => {
+    const payload = teamBookingCreateSchema.parse({
+      teamSlug: 'customer-success',
+      eventSlug: 'team-intro',
+      startsAt: '2026-03-01T15:00:00.000Z',
+      inviteeName: 'Pat Lee',
+      inviteeEmail: 'pat@example.com',
+    });
+
+    expect(payload.teamSlug).toBe('customer-success');
   });
 
   it('rejects malformed auth payload', () => {

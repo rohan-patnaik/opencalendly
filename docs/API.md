@@ -760,7 +760,7 @@ Delivery request headers:
 
 Source of truth: `packages/shared/src/schemas.ts` (`webhookEventSchema`).
 
-## Feature 5 Draft Endpoints (Team Scheduling v1)
+## Feature 5 Endpoints (Team Scheduling v1)
 
 ### `POST /v0/teams`
 
@@ -772,6 +772,20 @@ Request:
 {
   "name": "Customer Success Team",
   "slug": "customer-success"
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "team": {
+    "id": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+    "ownerUserId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+    "name": "Customer Success Team",
+    "slug": "customer-success"
+  }
 }
 ```
 
@@ -788,6 +802,25 @@ Request:
 }
 ```
 
+Success response:
+
+```json
+{
+  "ok": true,
+  "member": {
+    "teamId": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+    "userId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+    "role": "member",
+    "user": {
+      "id": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+      "email": "owner@example.com",
+      "username": "owner",
+      "displayName": "Owner User"
+    }
+  }
+}
+```
+
 ### `POST /v0/team-event-types`
 
 Auth required. Creates a team event type with scheduling mode.
@@ -800,7 +833,36 @@ Request:
   "name": "Team Intro",
   "slug": "team-intro",
   "durationMinutes": 30,
-  "mode": "round_robin"
+  "mode": "round_robin",
+  "locationType": "video",
+  "locationValue": "https://meet.example.com/team",
+  "questions": [],
+  "requiredMemberUserIds": ["5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2"]
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "teamEventType": {
+    "id": "4f06b5a0-a3d9-4e96-9d90-2f9ec5d4d2f7",
+    "teamId": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+    "mode": "round_robin",
+    "roundRobinCursor": 0,
+    "requiredMemberUserIds": ["5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2"],
+    "eventType": {
+      "id": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+      "slug": "team-intro",
+      "name": "Team Intro",
+      "durationMinutes": 30,
+      "locationType": "video",
+      "locationValue": "https://meet.example.com/team",
+      "questions": [],
+      "isActive": true
+    }
+  }
 }
 ```
 
@@ -814,6 +876,85 @@ Query params:
 - `start` (optional ISO datetime)
 - `days` (optional integer `1..30`)
 
+Success response:
+
+```json
+{
+  "ok": true,
+  "mode": "round_robin",
+  "timezone": "Asia/Kolkata",
+  "slots": [
+    {
+      "startsAt": "2026-03-04T17:00:00.000Z",
+      "endsAt": "2026-03-04T17:30:00.000Z",
+      "assignmentUserIds": ["5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2"]
+    }
+  ]
+}
+```
+
 ### `POST /v0/team-bookings`
 
-Public booking commit endpoint for team event types. Behavior and response contract will align with existing booking correctness guarantees while adding assignment metadata.
+Public booking commit endpoint for team event types.
+
+Request:
+
+```json
+{
+  "teamSlug": "customer-success",
+  "eventSlug": "team-intro",
+  "startsAt": "2026-03-04T17:00:00.000Z",
+  "timezone": "Asia/Kolkata",
+  "inviteeName": "Pat Lee",
+  "inviteeEmail": "pat@example.com",
+  "answers": {
+    "company": "Acme"
+  }
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "booking": {
+    "id": "1f843e14-460f-4b24-b36c-175c51be1c15",
+    "eventTypeId": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+    "organizerId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+    "inviteeName": "Pat Lee",
+    "inviteeEmail": "pat@example.com",
+    "startsAt": "2026-03-04T17:00:00.000Z",
+    "endsAt": "2026-03-04T17:30:00.000Z",
+    "assignmentUserIds": ["5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2"],
+    "teamMode": "round_robin"
+  },
+  "actions": {
+    "cancel": {
+      "token": "opaque-token",
+      "expiresAt": "2026-04-03T17:00:00.000Z",
+      "lookupUrl": "https://api.example.com/v0/bookings/actions/opaque-token",
+      "url": "https://api.example.com/v0/bookings/actions/opaque-token/cancel"
+    },
+    "reschedule": {
+      "token": "opaque-token",
+      "expiresAt": "2026-04-03T17:00:00.000Z",
+      "lookupUrl": "https://api.example.com/v0/bookings/actions/opaque-token",
+      "url": "https://api.example.com/v0/bookings/actions/opaque-token/reschedule"
+    }
+  },
+  "email": {
+    "sent": true,
+    "provider": "resend"
+  },
+  "webhooks": {
+    "queued": 1
+  }
+}
+```
+
+Notes:
+
+- Booking write remains transaction-safe.
+- Team assignment rows enforce per-member slot uniqueness.
+- Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.

@@ -19,6 +19,9 @@ type EventQuestionRecord = {
   placeholder?: string | undefined;
 };
 
+type TeamMemberRoleRecord = 'owner' | 'member';
+type TeamSchedulingModeRecord = 'round_robin' | 'collective';
+
 type WebhookEventTypeRecord = 'booking.created' | 'booking.canceled' | 'booking.rescheduled';
 type WebhookDeliveryStatusRecord = 'pending' | 'succeeded' | 'failed';
 type WebhookEventPayloadRecord = {
@@ -78,6 +81,81 @@ export const eventTypes = pgTable(
   },
   (table) => ({
     uniqueSlugPerUser: unique('event_types_user_slug_unique').on(table.userId, table.slug),
+  }),
+);
+
+export const teams = pgTable(
+  'teams',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    slug: varchar('slug', { length: 80 }).notNull(),
+    name: varchar('name', { length: 120 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueSlugPerOwner: unique('teams_owner_slug_unique').on(table.ownerUserId, table.slug),
+  }),
+);
+
+export const teamMembers = pgTable(
+  'team_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: varchar('role', { length: 20 }).$type<TeamMemberRoleRecord>().notNull().default('member'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueTeamUser: unique('team_members_team_user_unique').on(table.teamId, table.userId),
+  }),
+);
+
+export const teamEventTypes = pgTable(
+  'team_event_types',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => teams.id, { onDelete: 'cascade' }),
+    eventTypeId: uuid('event_type_id')
+      .notNull()
+      .references(() => eventTypes.id, { onDelete: 'cascade' }),
+    mode: varchar('mode', { length: 20 }).$type<TeamSchedulingModeRecord>().notNull(),
+    roundRobinCursor: integer('round_robin_cursor').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueTeamEventType: unique('team_event_types_team_event_type_unique').on(table.teamId, table.eventTypeId),
+    uniqueEventType: unique('team_event_types_event_type_unique').on(table.eventTypeId),
+  }),
+);
+
+export const teamEventTypeMembers = pgTable(
+  'team_event_type_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    teamEventTypeId: uuid('team_event_type_id')
+      .notNull()
+      .references(() => teamEventTypes.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    isRequired: boolean('is_required').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueTeamEventTypeUser: unique('team_event_type_members_event_type_user_unique').on(
+      table.teamEventTypeId,
+      table.userId,
+    ),
   }),
 );
 
@@ -158,6 +236,36 @@ export const bookingActionTokens = pgTable(
     uniqueBookingAction: unique('booking_action_tokens_booking_action_unique').on(
       table.bookingId,
       table.actionType,
+    ),
+  }),
+);
+
+export const teamBookingAssignments = pgTable(
+  'team_booking_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bookingId: uuid('booking_id')
+      .notNull()
+      .references(() => bookings.id, { onDelete: 'cascade' }),
+    teamEventTypeId: uuid('team_event_type_id')
+      .notNull()
+      .references(() => teamEventTypes.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueBookingUser: unique('team_booking_assignments_booking_user_unique').on(
+      table.bookingId,
+      table.userId,
+    ),
+    uniqueMemberSlot: unique('team_booking_assignments_user_slot_unique').on(
+      table.userId,
+      table.startsAt,
+      table.endsAt,
     ),
   }),
 );
