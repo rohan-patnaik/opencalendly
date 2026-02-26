@@ -18,6 +18,7 @@ export type ExistingBooking = {
   startsAt: Date;
   endsAt: Date;
   status: string;
+  metadata?: string | null;
 };
 
 export type AvailabilitySlot = {
@@ -96,12 +97,43 @@ const hasBookingConflict = (
   const bufferedStartMs = startsAtMs - bufferBeforeMinutes * 60_000;
   const bufferedEndMs = endsAtMs + bufferAfterMinutes * 60_000;
 
+  const readBookingBuffers = (
+    metadata: ExistingBooking['metadata'],
+  ): { beforeMinutes: number; afterMinutes: number } => {
+    if (!metadata) {
+      return { beforeMinutes: 0, afterMinutes: 0 };
+    }
+
+    try {
+      const parsed = JSON.parse(metadata) as {
+        bufferBeforeMinutes?: unknown;
+        bufferAfterMinutes?: unknown;
+      };
+      const beforeMinutes =
+        typeof parsed.bufferBeforeMinutes === 'number' && parsed.bufferBeforeMinutes >= 0
+          ? parsed.bufferBeforeMinutes
+          : 0;
+      const afterMinutes =
+        typeof parsed.bufferAfterMinutes === 'number' && parsed.bufferAfterMinutes >= 0
+          ? parsed.bufferAfterMinutes
+          : 0;
+
+      return { beforeMinutes, afterMinutes };
+    } catch {
+      return { beforeMinutes: 0, afterMinutes: 0 };
+    }
+  };
+
   return confirmedBookings.some((booking) => {
+    const existingBuffers = readBookingBuffers(booking.metadata);
+    const existingStartMs = booking.startsAt.getTime() - existingBuffers.beforeMinutes * 60_000;
+    const existingEndMs = booking.endsAt.getTime() + existingBuffers.afterMinutes * 60_000;
+
     return overlaps(
       bufferedStartMs,
       bufferedEndMs,
-      booking.startsAt.getTime(),
-      booking.endsAt.getTime(),
+      existingStartMs,
+      existingEndMs,
     );
   });
 };

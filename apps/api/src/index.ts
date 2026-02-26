@@ -787,6 +787,7 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
           startsAt: bookings.startsAt,
           endsAt: bookings.endsAt,
           status: bookings.status,
+          metadata: bookings.metadata,
         })
         .from(bookings)
         .where(
@@ -884,6 +885,7 @@ app.post('/v0/bookings', async (context) => {
                       startsAt: bookings.startsAt,
                       endsAt: bookings.endsAt,
                       status: bookings.status,
+                      metadata: bookings.metadata,
                     })
                     .from(bookings)
                     .where(

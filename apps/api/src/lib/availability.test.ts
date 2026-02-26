@@ -88,4 +88,39 @@ describe('computeAvailabilitySlots', () => {
       '2026-03-02T14:15:00.000Z',
     ]);
   });
+
+  it('respects existing booking buffers saved in booking metadata', () => {
+    const slots = computeAvailabilitySlots({
+      organizerTimezone: 'UTC',
+      rangeStartIso: '2026-03-02T00:00:00.000Z',
+      days: 1,
+      durationMinutes: 30,
+      rules: [
+        {
+          dayOfWeek: 1,
+          startMinute: 540,
+          endMinute: 690,
+          bufferBeforeMinutes: 0,
+          bufferAfterMinutes: 0,
+        },
+      ],
+      overrides: [],
+      bookings: [
+        {
+          startsAt: new Date('2026-03-02T10:00:00.000Z'),
+          endsAt: new Date('2026-03-02T10:30:00.000Z'),
+          status: 'confirmed',
+          metadata: JSON.stringify({
+            bufferBeforeMinutes: 30,
+            bufferAfterMinutes: 30,
+          }),
+        },
+      ],
+    });
+
+    const startsAtList = slots.map((slot) => slot.startsAt);
+    expect(startsAtList).toContain('2026-03-02T09:00:00.000Z');
+    expect(startsAtList).not.toContain('2026-03-02T09:30:00.000Z');
+    expect(startsAtList).not.toContain('2026-03-02T10:30:00.000Z');
+  });
 });
