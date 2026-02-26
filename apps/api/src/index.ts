@@ -843,13 +843,17 @@ app.post('/v0/bookings', async (context) => {
             return db.transaction(async (transaction) => {
               return callback({
                 lockEventType: async (lockedEventTypeId) => {
-                  const locked = await transaction.execute<{ id: string }>(
-                    sql`select id from event_types where id = ${lockedEventTypeId} and is_active = true for update`,
+                  const locked = await transaction.execute<{ id: string; userId: string }>(
+                    sql`select id, user_id as "userId" from event_types where id = ${lockedEventTypeId} and is_active = true for update`,
                   );
 
                   if (!locked.rows[0] || locked.rows[0].id !== eventTypeId) {
                     throw new BookingNotFoundError('Event type not found.');
                   }
+
+                  await transaction.execute(
+                    sql`select id from users where id = ${locked.rows[0].userId} for update`,
+                  );
                 },
                 listRules: async (userId) => {
                   return transaction
