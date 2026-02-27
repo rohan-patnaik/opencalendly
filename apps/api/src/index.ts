@@ -446,7 +446,8 @@ const CALENDAR_WRITEBACK_LEASE_MINUTES = 3;
 const IDEMPOTENCY_KEY_HEADER = 'Idempotency-Key';
 const IDEMPOTENCY_KEY_MIN_LENGTH = 16;
 const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
-const IDEMPOTENCY_REQUEST_TTL_HOURS = 24;
+const IDEMPOTENCY_IN_PROGRESS_TTL_MINUTES = 10;
+const IDEMPOTENCY_COMPLETED_TTL_HOURS = 24;
 const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE = 120;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP = 300;
@@ -497,15 +498,6 @@ const resolveClientIp = (request: Request): string => {
   if (cloudflareIp) {
     return cloudflareIp;
   }
-
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) {
-    const [firstIp] = forwardedFor.split(',');
-    if (firstIp?.trim()) {
-      return firstIp.trim();
-    }
-  }
-
   return 'unknown';
 };
 
@@ -1665,6 +1657,14 @@ const hashIdempotencyRequestPayload = (input: Record<string, unknown>): string =
   return hashToken(toCanonicalJson(input));
 };
 
+const buildInProgressIdempotencyExpiry = (from: Date): Date => {
+  return new Date(from.getTime() + IDEMPOTENCY_IN_PROGRESS_TTL_MINUTES * 60 * 1000);
+};
+
+const buildCompletedIdempotencyExpiry = (from: Date): Date => {
+  return new Date(from.getTime() + IDEMPOTENCY_COMPLETED_TTL_HOURS * 60 * 60 * 1000);
+};
+
 const claimIdempotencyRequest = async (
   db: Database,
   input: {
@@ -1692,7 +1692,7 @@ const claimIdempotencyRequest = async (
 > => {
   const now = input.now ?? new Date();
   const keyHash = hashToken(input.rawKey);
-  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_REQUEST_TTL_HOURS * 60 * 60 * 1000);
+  const expiresAt = buildInProgressIdempotencyExpiry(now);
 
   try {
     await db.insert(idempotencyRequests).values({
@@ -1811,12 +1811,13 @@ const completeIdempotencyRequest = async (
       responseStatusCode: input.statusCode,
       responseBody: input.responseBody,
       completedAt: now,
-      expiresAt: new Date(now.getTime() + IDEMPOTENCY_REQUEST_TTL_HOURS * 60 * 60 * 1000),
+      expiresAt: buildCompletedIdempotencyExpiry(now),
     })
     .where(
       and(
         eq(idempotencyRequests.scope, input.scope),
         eq(idempotencyRequests.idempotencyKeyHash, input.keyHash),
+        eq(idempotencyRequests.status, 'in_progress'),
       ),
     );
 };
@@ -5640,6 +5641,7 @@ app.post('/v0/team-bookings', async (context) => {
         });
         return context.json(responseBody, 409);
       }
+      console.error('Unexpected error in team booking create:', error);
       const responseBody: Record<string, unknown> = {
         ok: false,
         error: 'Internal server error.',
@@ -6005,6 +6007,7 @@ app.post('/v0/bookings', async (context) => {
         });
         return context.json(responseBody, 409);
       }
+      console.error('Unexpected error in booking create:', error);
       const responseBody: Record<string, unknown> = {
         ok: false,
         error: 'Internal server error.',
@@ -7109,6 +7112,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         });
         return context.json(responseBody, 409);
       }
+      console.error('Unexpected error in booking reschedule:', error);
       const responseBody: Record<string, unknown> = {
         ok: false,
         error: 'Internal server error.',
