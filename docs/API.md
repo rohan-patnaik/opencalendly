@@ -1202,7 +1202,6 @@ Success response:
       "role": "owner",
       "user": {
         "id": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
-        "email": "demo@opencalendly.dev",
         "username": "demo",
         "displayName": "Demo Organizer",
         "timezone": "UTC"
@@ -1211,6 +1210,10 @@ Success response:
   ]
 }
 ```
+
+Notes:
+
+- Public member profiles intentionally omit email addresses.
 
 ### `GET /v0/teams/:teamSlug/event-types/:eventSlug/availability`
 

@@ -47,9 +47,12 @@ export type SlotWindow = {
 };
 
 export const groupSlotsByDay = (slots: SlotWindow[], timezone: string) => {
+  const sortedSlots = [...slots].sort((left, right) => {
+    return new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime();
+  });
   const grouped = new Map<string, SlotWindow[]>();
 
-  for (const slot of slots) {
+  for (const slot of sortedSlots) {
     const key = new Intl.DateTimeFormat('en-CA', {
       year: 'numeric',
       month: '2-digit',
@@ -68,6 +71,8 @@ export const groupSlotsByDay = (slots: SlotWindow[], timezone: string) => {
   return Array.from(grouped.entries()).map(([dateKey, daySlots]) => ({
     dateKey,
     label: formatDayLabel(daySlots[0]?.startsAt ?? new Date().toISOString(), timezone),
-    slots: daySlots,
+    slots: [...daySlots].sort((left, right) => {
+      return new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime();
+    }),
   }));
 };

@@ -5607,7 +5607,6 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug', async (context) => {
         ? await db
             .select({
               id: users.id,
-              email: users.email,
               username: users.username,
               displayName: users.displayName,
               timezone: users.timezone,
@@ -5643,7 +5642,6 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug', async (context) => {
           }
           return {
             id: profile.id,
-            email: profile.email,
             username: profile.username,
             displayName: profile.displayName,
             timezone: normalizeTimezone(profile.timezone),

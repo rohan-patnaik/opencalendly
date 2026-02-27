@@ -126,6 +126,7 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
   const [timezone, setTimezone] = useState('UTC');
   const [slots, setSlots] = useState<Array<{ startsAt: string; endsAt: string; assignmentUserIds?: string[] }>>([]);
   const [selectedSlot, setSelectedSlot] = useState('');
+  const [rescheduleRequestKey, setRescheduleRequestKey] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [loadingAction, setLoadingAction] = useState(true);
   const [loadingAvailability, setLoadingAvailability] = useState(false);
@@ -251,6 +252,13 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     void loadAvailability();
   }, [actionData?.actions.canReschedule, loadAvailability]);
 
+  useEffect(() => {
+    if (selectedSlot) {
+      return;
+    }
+    setRescheduleRequestKey('');
+  }, [selectedSlot]);
+
   const submitCancel = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!actionData || !actionData.actions.canCancel) {
@@ -327,11 +335,15 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     setSuccess(null);
 
     try {
+      const requestIdempotencyKey = rescheduleRequestKey || createIdempotencyKey();
+      if (!rescheduleRequestKey) {
+        setRescheduleRequestKey(requestIdempotencyKey);
+      }
       const response = await fetch(`${apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(token)}/reschedule`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': createIdempotencyKey(),
+          'Idempotency-Key': requestIdempotencyKey,
         },
         body: JSON.stringify({
           startsAt: selectedSlot,
@@ -353,9 +365,11 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
         if (response.status === 410) {
           setActionStatus('expired');
           setActionData(null);
+          setRescheduleRequestKey('');
         } else if (response.status === 404) {
           setActionStatus('invalid');
           setActionData(null);
+          setRescheduleRequestKey('');
         }
         setError(message);
         return;
@@ -369,6 +383,7 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
 
       setSuccess(`Rescheduled successfully to ${formatSlot(newBooking.startsAt, timezone)}.`);
       setSelectedSlot('');
+      setRescheduleRequestKey('');
       setSlots([]);
       setActionData((current) => {
         if (!current) {
@@ -484,7 +499,10 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
                         key={slot.startsAt}
                         type="button"
                         className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
-                        onClick={() => setSelectedSlot(slot.startsAt)}
+                        onClick={() => {
+                          setSelectedSlot(slot.startsAt);
+                          setRescheduleRequestKey(createIdempotencyKey());
+                        }}
                       >
                         {new Intl.DateTimeFormat(undefined, {
                           timeStyle: 'short',

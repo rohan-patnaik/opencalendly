@@ -32,7 +32,6 @@ type TeamEventResponse = {
     role: 'owner' | 'member';
     user: {
       id: string;
-      email: string;
       username: string;
       displayName: string;
       timezone: string;
@@ -75,7 +74,7 @@ const readableLocation = (locationType: string, locationValue: string | null): s
   if (locationValue && locationValue.trim().length > 0) {
     return locationValue;
   }
-  return locationType.replace('_', ' ');
+  return locationType.replaceAll('_', ' ');
 };
 
 export default function TeamBookingPageClient({

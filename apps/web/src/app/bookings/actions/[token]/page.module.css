@@ -128,6 +128,16 @@
   transform: translateY(-1px);
 }
 
+.slot:focus-visible,
+.slotActive:focus-visible {
+  border-color: color-mix(in oklab, var(--accent-1) 60%, var(--border-strong));
+  background: color-mix(in oklab, var(--accent-1) 16%, var(--surface-2));
+  box-shadow: 0 8px 20px color-mix(in oklab, var(--accent-1) 22%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--accent-1) 72%, white);
+  outline-offset: 2px;
+  transform: translateY(-1px);
+}
+
 .slotActive {
   border-color: color-mix(in oklab, var(--accent-1) 60%, var(--border-strong));
   background: color-mix(in oklab, var(--accent-1) 16%, var(--surface-2));
@@ -194,6 +204,14 @@
   margin-top: 0.75rem;
   display: inline-block;
   color: var(--accent-1);
+}
+
+.primaryButton:focus-visible,
+.dangerButton:focus-visible,
+.secondaryButton:focus-visible,
+.inlineLink:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--accent-1) 72%, white);
+  outline-offset: 2px;
 }
 
 .muted {

@@ -64,7 +64,7 @@ const readableLocation = (locationType: string, locationValue: string | null): s
   if (locationValue && locationValue.trim().length > 0) {
     return locationValue;
   }
-  return locationType.replace('_', ' ');
+  return locationType.replaceAll('_', ' ');
 };
 
 export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: BookingPageClientProps) {
