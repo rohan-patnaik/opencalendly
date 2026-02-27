@@ -179,6 +179,10 @@ Calendar sync + writeback endpoints (authenticated, Feature 7):
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/BACKLOG.md](docs/BACKLOG.md)
 - [docs/API.md](docs/API.md)
+- [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md)
+- [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md)
+- [docs/PROD_DEPLOY_CHECKLIST.md](docs/PROD_DEPLOY_CHECKLIST.md)
+- [docs/releases/v1.0.0.md](docs/releases/v1.0.0.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [AGENTS.md](AGENTS.md)
 
