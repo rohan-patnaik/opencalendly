@@ -2445,44 +2445,173 @@ app.get('/v0/analytics/team', async (context) => {
       });
     }
 
-    const teamEventTypeIds = teamEventTypeRows.map((row) => row.teamEventTypeId);
+    const teamEventTypeById = new Map(
+      teamEventTypeRows.map((row) => [row.teamEventTypeId, row] as const),
+    );
+    const teamEventTypeIdsByEventTypeId = new Map<string, string[]>();
+    for (const row of teamEventTypeRows) {
+      const existing = teamEventTypeIdsByEventTypeId.get(row.eventTypeId);
+      if (existing) {
+        existing.push(row.teamEventTypeId);
+      } else {
+        teamEventTypeIdsByEventTypeId.set(row.eventTypeId, [row.teamEventTypeId]);
+      }
+    }
 
-    const [roundRobinRows, collectiveRows] = await Promise.all([
-      db
+    const bookingEventTypeIds = Array.from(teamEventTypeIdsByEventTypeId.keys());
+    const teamBookingRows =
+      bookingEventTypeIds.length === 0
+        ? []
+        : await db
+            .select({
+              bookingId: bookings.id,
+              eventTypeId: bookings.eventTypeId,
+              metadata: bookings.metadata,
+            })
+            .from(bookings)
+            .where(
+              and(
+                inArray(bookings.eventTypeId, bookingEventTypeIds),
+                gte(bookings.createdAt, range.start),
+                lt(bookings.createdAt, range.endExclusive),
+              ),
+            );
+
+    const bookingIds = teamBookingRows.map((row) => row.bookingId);
+    const assignmentRows =
+      bookingIds.length === 0
+        ? []
+        : await db
+            .select({
+              bookingId: teamBookingAssignments.bookingId,
+              teamEventTypeId: teamBookingAssignments.teamEventTypeId,
+              memberUserId: teamBookingAssignments.userId,
+              memberDisplayName: users.displayName,
+            })
+            .from(teamBookingAssignments)
+            .innerJoin(users, eq(users.id, teamBookingAssignments.userId))
+            .where(inArray(teamBookingAssignments.bookingId, bookingIds));
+
+    const assignmentRowsByBookingId = new Map<
+      string,
+      Array<{
+        teamEventTypeId: string;
+        memberUserId: string;
+        memberDisplayName: string;
+      }>
+    >();
+    for (const row of assignmentRows) {
+      const existing = assignmentRowsByBookingId.get(row.bookingId);
+      if (existing) {
+        existing.push(row);
+      } else {
+        assignmentRowsByBookingId.set(row.bookingId, [row]);
+      }
+    }
+
+    const metadataByBookingId = new Map<
+      string,
+      ReturnType<typeof parseBookingMetadata>['team'] | undefined
+    >();
+    const metadataMemberUserIds = new Set<string>();
+    for (const row of teamBookingRows) {
+      const parsedTeamMetadata = parseBookingMetadata(row.metadata, normalizeTimezone).team;
+      metadataByBookingId.set(row.bookingId, parsedTeamMetadata);
+      for (const memberUserId of parsedTeamMetadata?.assignmentUserIds ?? []) {
+        metadataMemberUserIds.add(memberUserId);
+      }
+    }
+
+    const memberDisplayNameByUserId = new Map<string, string>();
+    for (const row of assignmentRows) {
+      memberDisplayNameByUserId.set(row.memberUserId, row.memberDisplayName);
+    }
+
+    const missingMemberUserIds = Array.from(metadataMemberUserIds).filter(
+      (memberUserId) => !memberDisplayNameByUserId.has(memberUserId),
+    );
+    if (missingMemberUserIds.length > 0) {
+      const missingMemberRows = await db
         .select({
-          teamEventTypeId: teamBookingAssignments.teamEventTypeId,
-          memberUserId: teamBookingAssignments.userId,
-          memberDisplayName: users.displayName,
+          id: users.id,
+          displayName: users.displayName,
         })
-        .from(teamBookingAssignments)
-        .innerJoin(bookings, eq(bookings.id, teamBookingAssignments.bookingId))
-        .innerJoin(teamEventTypes, eq(teamEventTypes.id, teamBookingAssignments.teamEventTypeId))
-        .innerJoin(users, eq(users.id, teamBookingAssignments.userId))
-        .where(
-          and(
-            inArray(teamBookingAssignments.teamEventTypeId, teamEventTypeIds),
-            eq(teamEventTypes.mode, 'round_robin'),
-            gte(bookings.createdAt, range.start),
-            lt(bookings.createdAt, range.endExclusive),
-          ),
-        ),
-      db
-        .select({
-          bookingId: teamBookingAssignments.bookingId,
-          teamEventTypeId: teamBookingAssignments.teamEventTypeId,
-        })
-        .from(teamBookingAssignments)
-        .innerJoin(bookings, eq(bookings.id, teamBookingAssignments.bookingId))
-        .innerJoin(teamEventTypes, eq(teamEventTypes.id, teamBookingAssignments.teamEventTypeId))
-        .where(
-          and(
-            inArray(teamBookingAssignments.teamEventTypeId, teamEventTypeIds),
-            eq(teamEventTypes.mode, 'collective'),
-            gte(bookings.createdAt, range.start),
-            lt(bookings.createdAt, range.endExclusive),
-          ),
-        ),
-    ]);
+        .from(users)
+        .where(inArray(users.id, missingMemberUserIds));
+      for (const row of missingMemberRows) {
+        memberDisplayNameByUserId.set(row.id, row.displayName);
+      }
+    }
+
+    const roundRobinRows: Array<{
+      teamEventTypeId: string;
+      memberUserId: string;
+      memberDisplayName: string;
+    }> = [];
+    const collectiveRows: Array<{
+      bookingId: string;
+      teamEventTypeId: string;
+    }> = [];
+
+    for (const row of teamBookingRows) {
+      const bookingAssignmentRows = assignmentRowsByBookingId.get(row.bookingId) ?? [];
+      const parsedTeamMetadata = metadataByBookingId.get(row.bookingId);
+
+      let teamEventTypeId: string | null = null;
+      if (
+        parsedTeamMetadata?.teamEventTypeId &&
+        teamEventTypeById.has(parsedTeamMetadata.teamEventTypeId)
+      ) {
+        teamEventTypeId = parsedTeamMetadata.teamEventTypeId;
+      } else if (bookingAssignmentRows.length > 0) {
+        teamEventTypeId = bookingAssignmentRows[0]?.teamEventTypeId ?? null;
+      } else {
+        const fallbackTeamEventTypeIds = teamEventTypeIdsByEventTypeId.get(row.eventTypeId) ?? [];
+        if (fallbackTeamEventTypeIds.length === 1) {
+          teamEventTypeId = fallbackTeamEventTypeIds[0] ?? null;
+        }
+      }
+
+      if (!teamEventTypeId) {
+        continue;
+      }
+
+      const teamEventTypeMeta = teamEventTypeById.get(teamEventTypeId);
+      if (!teamEventTypeMeta) {
+        continue;
+      }
+
+      const mode = parsedTeamMetadata?.mode ?? teamEventTypeMeta.mode;
+      if (mode === 'collective') {
+        collectiveRows.push({
+          bookingId: row.bookingId,
+          teamEventTypeId,
+        });
+        continue;
+      }
+
+      const assignmentSource =
+        bookingAssignmentRows.length > 0
+          ? bookingAssignmentRows
+              .filter((assignment) => assignment.teamEventTypeId === teamEventTypeId)
+              .map((assignment) => ({
+                memberUserId: assignment.memberUserId,
+                memberDisplayName: assignment.memberDisplayName,
+              }))
+          : (parsedTeamMetadata?.assignmentUserIds ?? []).map((memberUserId) => ({
+              memberUserId,
+              memberDisplayName:
+                memberDisplayNameByUserId.get(memberUserId) ?? 'Unknown Member',
+            }));
+
+      for (const assignment of assignmentSource) {
+        roundRobinRows.push({
+          teamEventTypeId,
+          memberUserId: assignment.memberUserId,
+          memberDisplayName: assignment.memberDisplayName,
+        });
+      }
+    }
 
     const metrics = summarizeTeamAnalytics({
       teamEventTypeRows,
