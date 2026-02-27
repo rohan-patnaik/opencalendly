@@ -1,0 +1,172 @@
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 2.2rem 1.1rem 3.2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 1.2rem;
+  background:
+    linear-gradient(138deg, color-mix(in oklab, var(--accent-1) 12%, transparent), transparent 58%),
+    color-mix(in oklab, var(--surface-1) 94%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+.kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent-1);
+}
+
+.card h1 {
+  margin: 0.55rem 0 0.65rem;
+  font-size: clamp(1.62rem, 4vw, 2.2rem);
+  letter-spacing: -0.02em;
+}
+
+.card p {
+  margin: 0;
+}
+
+.form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.95rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.label {
+  display: grid;
+  gap: 0.34rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.input {
+  border: 1px solid var(--border-strong);
+  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 0.65rem 0.74rem;
+  font-size: 0.95rem;
+}
+
+.hint {
+  margin: -0.2rem 0 0;
+  font-size: 0.8rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.primaryButton,
+.secondaryButton,
+.linkButton {
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 0.58rem 0.92rem;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.primaryButton {
+  border-color: color-mix(in oklab, var(--accent-1) 64%, transparent);
+  color: #0d1224;
+  background: linear-gradient(
+    102deg,
+    color-mix(in oklab, var(--accent-1) 84%, white),
+    color-mix(in oklab, var(--accent-2) 73%, white)
+  );
+}
+
+.secondaryButton,
+.linkButton {
+  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
+  color: var(--text);
+}
+
+.primaryButton:hover,
+.secondaryButton:hover,
+.linkButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px color-mix(in oklab, var(--accent-1) 22%, transparent);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.error,
+.success {
+  border-radius: 12px;
+  padding: 0.62rem 0.74rem;
+  font-size: 0.89rem;
+  border: 1px solid;
+}
+
+.error {
+  color: var(--error-text);
+  background: color-mix(in oklab, #ef4444 18%, var(--surface-1));
+  border-color: color-mix(in oklab, #ef4444 42%, var(--border-strong));
+}
+
+.success {
+  color: var(--success-text);
+  background: color-mix(in oklab, #14b8a6 18%, var(--surface-1));
+  border-color: color-mix(in oklab, #14b8a6 42%, var(--border-strong));
+}
+
+.tokenBox {
+  margin-top: 0.8rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
+  padding: 0.72rem;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  font-size: 0.78rem;
+  line-break: anywhere;
+  color: var(--text);
+}
+
+.meta {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,274 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2.5rem 1.15rem 4rem;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(132deg, color-mix(in oklab, var(--accent-1) 17%, transparent), transparent 55%),
+    linear-gradient(220deg, color-mix(in oklab, var(--accent-2) 22%, transparent), transparent 62%),
+    var(--surface-1);
+  box-shadow: var(--shadow-soft);
+}
+
+.heroOrbit {
+  position: absolute;
+  inset: -18% auto auto 52%;
+  width: 32rem;
+  height: 32rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at center,
+      color-mix(in oklab, var(--accent-3) 56%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      circle at 62% 28%,
+      color-mix(in oklab, var(--accent-2) 48%, transparent) 0%,
+      transparent 72%
+    );
+  opacity: 0.45;
+  filter: blur(2px);
+  pointer-events: none;
+  animation: pulse-orbit 7.4s ease-in-out infinite;
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+  padding: 2rem 2rem 2.15rem;
+  max-width: 44rem;
+}
+
+.kicker {
+  margin: 0;
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-1);
+  background: color-mix(in oklab, var(--accent-1) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent-1) 30%, transparent);
+  border-radius: 999px;
+  padding: 0.34rem 0.56rem;
+}
+
+.hero h1 {
+  margin: 0.85rem 0 0.9rem;
+  font-size: clamp(2rem, 3.5vw, 3.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.hero p {
+  margin: 0;
+  font-size: 1.03rem;
+  max-width: 38rem;
+}
+
+.heroActions {
+  margin-top: 1.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.72rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.primaryButton {
+  background: linear-gradient(
+    105deg,
+    color-mix(in oklab, var(--accent-1) 88%, white),
+    color-mix(in oklab, var(--accent-2) 72%, white)
+  );
+  color: #0a1022;
+  border: 1px solid color-mix(in oklab, var(--accent-1) 70%, transparent);
+  padding: 0.66rem 1.12rem;
+}
+
+.secondaryButton {
+  background: color-mix(in oklab, var(--surface-1) 88%, transparent);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  padding: 0.64rem 1.05rem;
+}
+
+.primaryButton:hover,
+.secondaryButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px color-mix(in oklab, var(--accent-1) 25%, transparent);
+}
+
+.valueGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.valueCard {
+  border-radius: 18px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-1) 94%, transparent);
+  padding: 1rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.valueCard h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  letter-spacing: -0.01em;
+}
+
+.valueCard p {
+  margin: 0.6rem 0 0;
+}
+
+.routePanel {
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-1) 95%, transparent);
+  padding: 1.2rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.routePanel h2 {
+  margin: 0;
+  font-size: 1.34rem;
+}
+
+.routePanel > p {
+  margin: 0.5rem 0 0;
+}
+
+.routeGrid {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.routeCard {
+  text-decoration: none;
+  border-radius: 14px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
+  display: grid;
+  gap: 0.34rem;
+  padding: 0.86rem;
+  color: var(--text);
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.routeCard strong {
+  font-size: 0.97rem;
+}
+
+.routeCard span:last-child {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.routeCard:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--accent-1) 58%, var(--border-subtle));
+  box-shadow: 0 10px 22px color-mix(in oklab, var(--accent-2) 20%, transparent);
+}
+
+.badge {
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--accent-1) 30%, transparent);
+  background: color-mix(in oklab, var(--accent-1) 12%, transparent);
+  color: var(--accent-1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 0.18rem 0.42rem;
+}
+
+.metaStrip {
+  margin-top: 1rem;
+  border-radius: 14px;
+  border: 1px dashed var(--border-strong);
+  background: color-mix(in oklab, var(--surface-2) 85%, transparent);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  padding: 0.9rem;
+}
+
+.metaStrip > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.metaStrip > div p {
+  margin: 0;
+}
+
+.metaNumber {
+  color: var(--text);
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+@keyframes pulse-orbit {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: translateY(6px) scale(1.05);
+    opacity: 0.56;
+  }
+}
+
+@media (max-width: 980px) {
+  .valueGrid,
+  .routeGrid,
+  .metaStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .heroContent {
+    padding: 1.35rem 1.1rem 1.55rem;
+  }
+
+  .heroOrbit {
+    left: 22%;
+    top: -30%;
+    width: 23rem;
+    height: 23rem;
+  }
+}

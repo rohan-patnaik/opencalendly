@@ -1,7 +1,10 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { authedGetJson } from '../../lib/api-client';
+import { useAuthSession } from '../../lib/use-auth-session';
 import styles from './page.module.css';
 
 type DashboardPageClientProps = {
@@ -29,18 +32,6 @@ type FunnelResponse = {
     canceled: number;
     rescheduled: number;
   }>;
-  daily: Array<{
-    date: string;
-    eventTypeId: string;
-    eventTypeName: string;
-    pageViews: number;
-    slotSelections: number;
-    bookingConfirmations: number;
-    confirmed: number;
-    canceled: number;
-    rescheduled: number;
-  }>;
-  error?: string;
 };
 
 type TeamResponse = {
@@ -63,7 +54,6 @@ type TeamResponse = {
     eventTypeName: string;
     bookings: number;
   }>;
-  error?: string;
 };
 
 type OperatorHealthResponse = {
@@ -85,12 +75,17 @@ type OperatorHealthResponse = {
       failed: number;
     }>;
   };
-  error?: string;
 };
 
-type ApiErrorResponse = {
-  ok?: boolean;
-  error?: string;
+type AuthMeResponse = {
+  ok: boolean;
+  user: {
+    id: string;
+    email: string;
+    username: string;
+    displayName: string;
+    timezone: string;
+  };
 };
 
 const toIsoDate = (date: Date): string => {
@@ -101,6 +96,8 @@ const toIsoDate = (date: Date): string => {
 };
 
 export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientProps) {
+  const { session, ready, clear } = useAuthSession();
+
   const defaultRange = useMemo(() => {
     const end = new Date();
     const start = new Date(end);
@@ -111,17 +108,58 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
     };
   }, []);
 
-  const [sessionToken, setSessionToken] = useState('');
   const [startDate, setStartDate] = useState(defaultRange.startDate);
   const [endDate, setEndDate] = useState(defaultRange.endDate);
   const [eventTypeId, setEventTypeId] = useState('');
   const [teamId, setTeamId] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [authChecking, setAuthChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authedUser, setAuthedUser] = useState<AuthMeResponse['user'] | null>(null);
+
   const [funnel, setFunnel] = useState<FunnelResponse | null>(null);
   const [team, setTeam] = useState<TeamResponse | null>(null);
   const [operatorHealth, setOperatorHealth] = useState<OperatorHealthResponse | null>(null);
+
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+
+    if (!session) {
+      setAuthedUser(null);
+      setAuthError(null);
+      setAuthChecking(false);
+      setFunnel(null);
+      setTeam(null);
+      setOperatorHealth(null);
+      return;
+    }
+
+    const bootstrap = async () => {
+      setAuthChecking(true);
+      setAuthError(null);
+
+      try {
+        const payload = await authedGetJson<AuthMeResponse>({
+          url: `${apiBaseUrl}/v0/auth/me`,
+          session,
+          fallbackError: 'Unable to restore session.',
+        });
+        setAuthedUser(payload.user);
+      } catch (caught) {
+        setAuthedUser(null);
+        setAuthError(caught instanceof Error ? caught.message : 'Unable to restore session.');
+        clear();
+      } finally {
+        setAuthChecking(false);
+      }
+    };
+
+    void bootstrap();
+  }, [apiBaseUrl, clear, ready, session]);
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -141,11 +179,8 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
   }, [endDate, eventTypeId, startDate, teamId]);
 
   const loadDashboard = useCallback(async () => {
-    if (!sessionToken.trim()) {
-      setFunnel(null);
-      setTeam(null);
-      setOperatorHealth(null);
-      setError('Session token is required. Generate one via /v0/auth/magic-link + /v0/auth/verify.');
+    if (!session) {
+      setError('Sign in first to access dashboard analytics.');
       return;
     }
 
@@ -160,41 +195,24 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
     setLoading(true);
     setError(null);
 
-    const headers = {
-      Authorization: `Bearer ${sessionToken.trim()}`,
-    };
-
     try {
-      const [funnelResponse, teamResponse, operatorResponse] = await Promise.all([
-        fetch(`${apiBaseUrl}/v0/analytics/funnel?${queryString}`, {
-          cache: 'no-store',
-          headers,
+      const [funnelPayload, teamPayload, operatorPayload] = await Promise.all([
+        authedGetJson<FunnelResponse>({
+          url: `${apiBaseUrl}/v0/analytics/funnel?${queryString}`,
+          session,
+          fallbackError: 'Unable to load funnel analytics.',
         }),
-        fetch(`${apiBaseUrl}/v0/analytics/team?${queryString}`, {
-          cache: 'no-store',
-          headers,
+        authedGetJson<TeamResponse>({
+          url: `${apiBaseUrl}/v0/analytics/team?${queryString}`,
+          session,
+          fallbackError: 'Unable to load team analytics.',
         }),
-        fetch(`${apiBaseUrl}/v0/analytics/operator/health?${queryString}`, {
-          cache: 'no-store',
-          headers,
+        authedGetJson<OperatorHealthResponse>({
+          url: `${apiBaseUrl}/v0/analytics/operator/health?${queryString}`,
+          session,
+          fallbackError: 'Unable to load operator health analytics.',
         }),
       ]);
-
-      const [funnelPayload, teamPayload, operatorPayload] = (await Promise.all([
-        funnelResponse.json(),
-        teamResponse.json(),
-        operatorResponse.json(),
-      ])) as [FunnelResponse & ApiErrorResponse, TeamResponse & ApiErrorResponse, OperatorHealthResponse & ApiErrorResponse];
-
-      if (!funnelResponse.ok || !funnelPayload.ok) {
-        throw new Error(funnelPayload.error || 'Unable to load funnel analytics.');
-      }
-      if (!teamResponse.ok || !teamPayload.ok) {
-        throw new Error(teamPayload.error || 'Unable to load team analytics.');
-      }
-      if (!operatorResponse.ok || !operatorPayload.ok) {
-        throw new Error(operatorPayload.error || 'Unable to load operator health analytics.');
-      }
 
       setFunnel(funnelPayload);
       setTeam(teamPayload);
@@ -207,33 +225,64 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
     } finally {
       setLoading(false);
     }
-  }, [apiBaseUrl, queryString, sessionToken]);
+  }, [apiBaseUrl, endDate, queryString, session, startDate]);
+
+  if (!ready || authChecking) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.card}>
+          <p className={styles.kicker}>Feature 8</p>
+          <h1>Analytics Dashboard (v1)</h1>
+          <p>Restoring your session…</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!session || !authedUser) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.card}>
+          <p className={styles.kicker}>Authentication required</p>
+          <h1>Analytics Dashboard (v1)</h1>
+          <p>Sign in with magic-link auth to access organizer analytics dashboards.</p>
+          {authError ? <p className={styles.error}>{authError}</p> : null}
+          <div className={styles.actions}>
+            <Link className={styles.primaryButton} href="/auth/sign-in">
+              Sign in
+            </Link>
+            <Link className={styles.secondaryButton} href="/demo/intro-call">
+              View booking demo
+            </Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className={styles.page}>
       <section className={styles.card}>
         <p className={styles.kicker}>Feature 8</p>
         <h1>Analytics Dashboard (v1)</h1>
-        <p>Read-only organizer analytics for funnel, team scheduling distribution, and operator health.</p>
+        <p>
+          Read-only organizer analytics for funnel, team scheduling distribution, and operator
+          health.
+        </p>
+        <div className={styles.metaRow}>
+          <span>
+            Signed in as <strong>{authedUser.email}</strong>
+          </span>
+          <span>Timezone: {authedUser.timezone}</span>
+          <button type="button" className={styles.linkButton} onClick={clear}>
+            Sign out
+          </button>
+        </div>
       </section>
 
       <section className={styles.card}>
         <h2>Filters</h2>
         <div className={styles.grid}>
-          <label className={styles.label}>
-            Session token
-            <input
-              className={styles.input}
-              type="password"
-              value={sessionToken}
-              onChange={(event) => setSessionToken(event.target.value)}
-              placeholder="Paste bearer session token"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-            />
-          </label>
           <label className={styles.label}>
             Start date
             <input
@@ -271,7 +320,12 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
             />
           </label>
         </div>
-        <button className={styles.primaryButton} type="button" onClick={() => void loadDashboard()} disabled={loading}>
+        <button
+          className={styles.primaryButton}
+          type="button"
+          onClick={() => void loadDashboard()}
+          disabled={loading}
+        >
           {loading ? 'Loading...' : 'Load analytics'}
         </button>
         {error ? <p className={styles.error}>{error}</p> : null}
