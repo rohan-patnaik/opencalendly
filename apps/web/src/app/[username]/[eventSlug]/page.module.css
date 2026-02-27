@@ -138,9 +138,22 @@
   margin-top: 0.6rem;
 }
 
-.primaryButton {
+.primaryButton,
+.secondaryButton {
   margin-top: 1rem;
+  width: 100%;
   border-radius: 999px;
+  padding: 0.73rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.primaryButton {
   border: 1px solid color-mix(in oklab, var(--accent-1) 70%, transparent);
   background: linear-gradient(
     110deg,
@@ -148,10 +161,12 @@
     color-mix(in oklab, var(--accent-2) 76%, white)
   );
   color: #081126;
-  width: 100%;
-  padding: 0.73rem 1rem;
-  font-weight: 700;
-  cursor: pointer;
+}
+
+.secondaryButton {
+  border: 1px solid var(--border-strong);
+  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
+  color: var(--text);
 }
 
 .primaryButton:disabled {
@@ -181,6 +196,17 @@
   margin-top: 0.75rem;
   color: var(--success-text);
   font-weight: 600;
+}
+
+.notice {
+  margin-top: 0.5rem;
+  color: var(--muted);
+}
+
+.actionLinks {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.45rem;
 }
 
 @media (max-width: 960px) {

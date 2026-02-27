@@ -9,6 +9,7 @@ import {
   getBrowserTimezone,
   groupSlotsByDay,
 } from '../../../../lib/public-booking';
+import { buildEmailDeliveryMessage } from '../../../../lib/booking-outcome';
 import styles from './page.module.css';
 
 type TeamEventResponse = {
@@ -67,6 +68,19 @@ type TeamBookingResponse = {
     assignmentUserIds: string[];
     teamMode: 'round_robin' | 'collective';
   };
+  actions?: {
+    cancel: {
+      pageUrl: string;
+    };
+    reschedule: {
+      pageUrl: string;
+    };
+  };
+  email?: {
+    sent: boolean;
+    provider: string;
+    error?: string;
+  };
   error?: string;
 };
 
@@ -112,6 +126,11 @@ export default function TeamBookingPageClient({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [deliveryStatus, setDeliveryStatus] = useState<string | null>(null);
+  const [actionLinks, setActionLinks] = useState<{
+    cancelPageUrl: string;
+    reschedulePageUrl: string;
+  } | null>(null);
 
   const timezoneOptions = useMemo(() => {
     return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
@@ -214,6 +233,8 @@ export default function TeamBookingPageClient({
     event.preventDefault();
     setError(null);
     setConfirmation(null);
+    setDeliveryStatus(null);
+    setActionLinks(null);
 
     if (!selectedSlot) {
       setError('Select a timeslot before booking.');
@@ -262,9 +283,17 @@ export default function TeamBookingPageClient({
         return;
       }
 
+      const inviteeEmailForNotice = inviteeEmail;
       setConfirmation(
         `Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} with ${payload.booking.assignmentUserIds.length} assigned team member(s).`,
       );
+      setDeliveryStatus(buildEmailDeliveryMessage(payload.email, inviteeEmailForNotice));
+      if (payload.actions?.cancel.pageUrl && payload.actions.reschedule.pageUrl) {
+        setActionLinks({
+          cancelPageUrl: payload.actions.cancel.pageUrl,
+          reschedulePageUrl: payload.actions.reschedule.pageUrl,
+        });
+      }
       setInviteeName('');
       setInviteeEmail('');
       setSelectedSlot('');
@@ -436,6 +465,17 @@ export default function TeamBookingPageClient({
 
           {error ? <p className={styles.error}>{error}</p> : null}
           {confirmation ? <p className={styles.confirmation}>{confirmation}</p> : null}
+          {deliveryStatus ? <p className={styles.notice}>{deliveryStatus}</p> : null}
+          {actionLinks ? (
+            <div className={styles.actionLinks}>
+              <a className={styles.secondaryButton} href={actionLinks.cancelPageUrl}>
+                Open cancel link
+              </a>
+              <a className={styles.secondaryButton} href={actionLinks.reschedulePageUrl}>
+                Open reschedule link
+              </a>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>

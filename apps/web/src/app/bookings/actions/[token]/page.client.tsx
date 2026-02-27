@@ -160,6 +160,16 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     return `/${encodeURIComponent(actionData.organizer.username)}/${encodeURIComponent(actionData.eventType.slug)}`;
   }, [actionData]);
 
+  const actionStatusLabel = useMemo(() => {
+    if (actionStatus === 'expired') {
+      return 'Expired';
+    }
+    if (actionStatus === 'invalid') {
+      return 'Invalid';
+    }
+    return 'Active';
+  }, [actionStatus]);
+
   const loadAction = useCallback(async () => {
     setLoadingAction(true);
     setError(null);
@@ -359,7 +369,10 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
       if (!response.ok || !payload || !('ok' in payload) || payload.ok !== true) {
         const message = getErrorMessage(payload, 'Unable to reschedule booking.');
         if (response.status === 409) {
-          setError(message);
+          const conflictMessage = message.toLowerCase().includes('slot')
+            ? message
+            : `Selected slot is no longer available. ${message}`;
+          setError(conflictMessage);
           void loadAvailability();
           return;
         }
@@ -444,6 +457,7 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     <main className={styles.page}>
       <section className={styles.heroCard}>
         <p className={styles.kicker}>Booking actions</p>
+        <p className={styles.statusPill}>Link status: {actionStatusLabel}</p>
         <h1>{actionData.eventType.name}</h1>
         <p>
           Invitee: <strong>{actionData.booking.inviteeName}</strong> ({actionData.booking.inviteeEmail})

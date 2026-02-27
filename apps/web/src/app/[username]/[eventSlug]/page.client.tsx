@@ -9,6 +9,7 @@ import {
   getBrowserTimezone,
   groupSlotsByDay,
 } from '../../../lib/public-booking';
+import { buildEmailDeliveryMessage } from '../../../lib/booking-outcome';
 import styles from './page.module.css';
 
 type PublicEventResponse = {
@@ -51,6 +52,19 @@ type BookingResponse = {
     startsAt: string;
     endsAt: string;
   };
+  actions?: {
+    cancel: {
+      pageUrl: string;
+    };
+    reschedule: {
+      pageUrl: string;
+    };
+  };
+  email?: {
+    sent: boolean;
+    provider: string;
+    error?: string;
+  };
   error?: string;
 };
 
@@ -90,6 +104,11 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [deliveryStatus, setDeliveryStatus] = useState<string | null>(null);
+  const [actionLinks, setActionLinks] = useState<{
+    cancelPageUrl: string;
+    reschedulePageUrl: string;
+  } | null>(null);
 
   const timezoneOptions = useMemo(() => {
     return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
@@ -208,6 +227,8 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   const submitBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setConfirmation(null);
+    setDeliveryStatus(null);
+    setActionLinks(null);
     setPageError(null);
 
     if (!selectedSlot) {
@@ -256,7 +277,15 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
         return;
       }
 
+      const inviteeEmailForNotice = inviteeEmail;
       setConfirmation(`Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} (${timezone}).`);
+      setDeliveryStatus(buildEmailDeliveryMessage(payload.email, inviteeEmailForNotice));
+      if (payload.actions?.cancel.pageUrl && payload.actions.reschedule.pageUrl) {
+        setActionLinks({
+          cancelPageUrl: payload.actions.cancel.pageUrl,
+          reschedulePageUrl: payload.actions.reschedule.pageUrl,
+        });
+      }
       setInviteeName('');
       setInviteeEmail('');
       setSelectedSlot('');
@@ -430,6 +459,17 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
 
           {pageError ? <p className={styles.error}>{pageError}</p> : null}
           {confirmation ? <p className={styles.confirmation}>{confirmation}</p> : null}
+          {deliveryStatus ? <p className={styles.notice}>{deliveryStatus}</p> : null}
+          {actionLinks ? (
+            <div className={styles.actionLinks}>
+              <a className={styles.secondaryButton} href={actionLinks.cancelPageUrl}>
+                Open cancel link
+              </a>
+              <a className={styles.secondaryButton} href={actionLinks.reschedulePageUrl}>
+                Open reschedule link
+              </a>
+            </div>
+          ) : null}
         </div>
       </section>
     </main>
