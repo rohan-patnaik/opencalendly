@@ -14,7 +14,7 @@ describe('buildEmailDeliveryMessage', () => {
     ).toBe('Confirmation email sent to invitee@example.com.');
   });
 
-  it('returns provider error when email delivery fails with an error', () => {
+  it('returns generic failure message when email delivery fails with an error', () => {
     expect(
       buildEmailDeliveryMessage(
         {
@@ -24,6 +24,17 @@ describe('buildEmailDeliveryMessage', () => {
         'invitee@example.com',
       ),
     ).toBe('Booking confirmed, but we could not deliver the confirmation email.');
+  });
+
+  it('returns fallback failure message when delivery fails without error text', () => {
+    expect(
+      buildEmailDeliveryMessage(
+        {
+          sent: false,
+        },
+        'invitee@example.com',
+      ),
+    ).toBe('Booking confirmed, but email delivery failed.');
   });
 
   it('returns unknown status message when payload is missing', () => {
