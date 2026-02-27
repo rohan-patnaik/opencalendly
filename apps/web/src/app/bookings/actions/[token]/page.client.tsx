@@ -369,9 +369,11 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
       if (!response.ok || !payload || !('ok' in payload) || payload.ok !== true) {
         const message = getErrorMessage(payload, 'Unable to reschedule booking.');
         if (response.status === 409) {
-          const conflictMessage = message.toLowerCase().includes('slot')
-            ? message
-            : `Selected slot is no longer available. ${message}`;
+          const normalizedMessage = message.toLowerCase();
+          const conflictMessage =
+            normalizedMessage.includes('idempotency') || normalizedMessage.includes('slot')
+              ? message
+              : `Selected slot is no longer available. ${message}`;
           setError(conflictMessage);
           void loadAvailability();
           return;
