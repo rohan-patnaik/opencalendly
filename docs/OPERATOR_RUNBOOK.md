@@ -20,6 +20,12 @@ Last updated: 27 Feb 2026 (IST)
 
 ## 2) Failed webhook delivery replay
 
+Authentication requirements for webhook operations:
+
+- Use `Authorization: Bearer <session-token>` (authenticated organizer session token).
+- Obtain the token through the normal login flow for an operator/organizer account in the target environment.
+- `GET /v0/webhooks` and `POST /v0/webhooks/deliveries/run` require that authenticated organizer context.
+
 1. Inspect current delivery status (authenticated):
    - `GET /v0/webhooks`
 2. Run replay worker (authenticated):
