@@ -367,12 +367,21 @@ Conflict response (`409`):
 }
 ```
 
-Idempotency mismatch/in-progress response (`409`):
+Idempotency mismatch response (`409`):
 
 ```json
 {
   "ok": false,
   "error": "Idempotency key reuse with different request payload is not allowed."
+}
+```
+
+Idempotency in-progress response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "A request with this idempotency key is already in progress."
 }
 ```
 
@@ -1065,6 +1074,33 @@ Notes:
 - Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.
 - Route is rate-limited per IP + team event key.
 - Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
+
+Idempotency mismatch response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "Idempotency key reuse with different request payload is not allowed."
+}
+```
+
+Idempotency in-progress response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "A request with this idempotency key is already in progress."
+}
+```
+
+Rate-limit response (`429`):
+
+```json
+{
+  "ok": false,
+  "error": "Rate limit exceeded. Try again in a minute."
+}
+```
 
 ## Feature 6 Endpoints (Calendar Sync Hardening v1)
 

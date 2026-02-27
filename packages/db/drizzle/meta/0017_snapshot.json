@@ -1643,7 +1643,7 @@
       "checkConstraints": {
         "idempotency_requests_status_state_check": {
           "name": "idempotency_requests_status_state_check",
-          "value": "(\n        \"idempotency_requests\".\"status\" = 'in_progress'\n        AND \"idempotency_requests\".\"completed_at\" IS NULL\n        AND \"idempotency_requests\".\"response_status_code\" IS NULL\n      ) OR (\n        \"idempotency_requests\".\"status\" = 'completed'\n        AND \"idempotency_requests\".\"completed_at\" IS NOT NULL\n        AND \"idempotency_requests\".\"response_status_code\" IS NOT NULL\n      )"
+          "value": "(\n        \"idempotency_requests\".\"status\" = 'in_progress'\n        AND \"idempotency_requests\".\"completed_at\" IS NULL\n        AND \"idempotency_requests\".\"response_status_code\" IS NULL\n        AND \"idempotency_requests\".\"response_body\" IS NULL\n      ) OR (\n        \"idempotency_requests\".\"status\" = 'completed'\n        AND \"idempotency_requests\".\"completed_at\" IS NOT NULL\n        AND \"idempotency_requests\".\"response_status_code\" IS NOT NULL\n        AND \"idempotency_requests\".\"response_body\" IS NOT NULL\n      )"
         }
       },
       "isRLSEnabled": false

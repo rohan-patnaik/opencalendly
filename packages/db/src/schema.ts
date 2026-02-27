@@ -373,10 +373,12 @@ export const idempotencyRequests = pgTable(
         ${table.status} = 'in_progress'
         AND ${table.completedAt} IS NULL
         AND ${table.responseStatusCode} IS NULL
+        AND ${table.responseBody} IS NULL
       ) OR (
         ${table.status} = 'completed'
         AND ${table.completedAt} IS NOT NULL
         AND ${table.responseStatusCode} IS NOT NULL
+        AND ${table.responseBody} IS NOT NULL
       )`,
     ),
     scopeCreatedAtIndex: index('idempotency_requests_scope_created_at_idx').on(

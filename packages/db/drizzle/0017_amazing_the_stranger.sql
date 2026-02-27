@@ -2,8 +2,10 @@ ALTER TABLE "idempotency_requests" ADD CONSTRAINT "idempotency_requests_status_s
         "idempotency_requests"."status" = 'in_progress'
         AND "idempotency_requests"."completed_at" IS NULL
         AND "idempotency_requests"."response_status_code" IS NULL
+        AND "idempotency_requests"."response_body" IS NULL
       ) OR (
         "idempotency_requests"."status" = 'completed'
         AND "idempotency_requests"."completed_at" IS NOT NULL
         AND "idempotency_requests"."response_status_code" IS NOT NULL
+        AND "idempotency_requests"."response_body" IS NOT NULL
       ));

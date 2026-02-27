@@ -1643,8 +1643,26 @@ const withDatabase = async (
   }
 };
 
+const toCanonicalJson = (value: unknown): string => {
+  const normalize = (node: unknown): unknown => {
+    if (Array.isArray(node)) {
+      return node.map(normalize);
+    }
+    if (node && typeof node === 'object') {
+      return Object.fromEntries(
+        Object.entries(node as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, child]) => [key, normalize(child)]),
+      );
+    }
+    return node;
+  };
+
+  return JSON.stringify(normalize(value));
+};
+
 const hashIdempotencyRequestPayload = (input: Record<string, unknown>): string => {
-  return hashToken(JSON.stringify(input));
+  return hashToken(toCanonicalJson(input));
 };
 
 const claimIdempotencyRequest = async (
