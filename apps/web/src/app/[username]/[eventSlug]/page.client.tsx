@@ -106,8 +106,8 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState<string | null>(null);
   const [actionLinks, setActionLinks] = useState<{
-    cancelPageUrl: string;
-    reschedulePageUrl: string;
+    cancelPageUrl?: string;
+    reschedulePageUrl?: string;
   } | null>(null);
 
   const timezoneOptions = useMemo(() => {
@@ -280,11 +280,20 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       const inviteeEmailForNotice = inviteeEmail;
       setConfirmation(`Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} (${timezone}).`);
       setDeliveryStatus(buildEmailDeliveryMessage(payload.email, inviteeEmailForNotice));
-      if (payload.actions?.cancel.pageUrl && payload.actions.reschedule.pageUrl) {
-        setActionLinks({
-          cancelPageUrl: payload.actions.cancel.pageUrl,
-          reschedulePageUrl: payload.actions.reschedule.pageUrl,
-        });
+      const cancelPageUrl = payload.actions?.cancel?.pageUrl;
+      const reschedulePageUrl = payload.actions?.reschedule?.pageUrl;
+      if (cancelPageUrl || reschedulePageUrl) {
+        const nextActionLinks: {
+          cancelPageUrl?: string;
+          reschedulePageUrl?: string;
+        } = {};
+        if (cancelPageUrl) {
+          nextActionLinks.cancelPageUrl = cancelPageUrl;
+        }
+        if (reschedulePageUrl) {
+          nextActionLinks.reschedulePageUrl = reschedulePageUrl;
+        }
+        setActionLinks(nextActionLinks);
       }
       setInviteeName('');
       setInviteeEmail('');
@@ -462,12 +471,16 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
           {deliveryStatus ? <p className={styles.notice}>{deliveryStatus}</p> : null}
           {actionLinks ? (
             <div className={styles.actionLinks}>
-              <a className={styles.secondaryButton} href={actionLinks.cancelPageUrl}>
-                Open cancel link
-              </a>
-              <a className={styles.secondaryButton} href={actionLinks.reschedulePageUrl}>
-                Open reschedule link
-              </a>
+              {actionLinks.cancelPageUrl ? (
+                <a className={styles.secondaryButton} href={actionLinks.cancelPageUrl}>
+                  Open cancel link
+                </a>
+              ) : null}
+              {actionLinks.reschedulePageUrl ? (
+                <a className={styles.secondaryButton} href={actionLinks.reschedulePageUrl}>
+                  Open reschedule link
+                </a>
+              ) : null}
             </div>
           ) : null}
         </div>
