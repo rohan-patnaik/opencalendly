@@ -62,6 +62,11 @@ flowchart LR
   - `/settings/calendar/google/callback`
   - `/settings/calendar/microsoft/callback`
   - each callback completes provider OAuth by calling `/v0/calendar/{provider}/connect/complete` with the returned code/state
+- Public booking/action shells:
+  - `/:username/:eventSlug` one-on-one booking UX (slot grouping, timezone picker, booking form)
+  - `/team/:teamSlug/:eventSlug` team booking UX over team availability/booking APIs
+  - `/bookings/actions/:token` cancel/reschedule UX with token state handling (`404`, `410`, `409` conflict)
+  - `/embed/playground` script generator + live widget preview for `/v0/embed/widget.js`
 - Typed API client utilities:
   - centralized authenticated `GET`/`POST`/`PATCH`/`PUT` wrappers
   - organizer-focused typed client module used by console panels

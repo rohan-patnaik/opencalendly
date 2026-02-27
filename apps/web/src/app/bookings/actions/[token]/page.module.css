@@ -17,14 +17,14 @@
 .heroCard {
   padding: 1.35rem 1.4rem;
   background:
-    linear-gradient(130deg, color-mix(in oklab, var(--accent-1) 16%, transparent), transparent 55%),
+    linear-gradient(130deg, color-mix(in oklab, var(--accent-3) 16%, transparent), transparent 55%),
     linear-gradient(225deg, color-mix(in oklab, var(--accent-2) 18%, transparent), transparent 64%),
     color-mix(in oklab, var(--surface-1) 96%, transparent);
 }
 
 .heroCard h1 {
   margin: 0.65rem 0 0.65rem;
-  font-size: clamp(1.8rem, 3.1vw, 2.5rem);
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
   letter-spacing: -0.02em;
 }
 
@@ -48,7 +48,7 @@
 
 .layout {
   display: grid;
-  grid-template-columns: 1.25fr 0.95fr;
+  grid-template-columns: 1.2fr 1fr;
   gap: 0.9rem;
 }
 
@@ -56,13 +56,9 @@
   padding: 1.15rem;
 }
 
-.sectionHead h2 {
+.card h2 {
   margin: 0;
   font-size: 1.18rem;
-}
-
-.sectionHead p {
-  margin: 0.38rem 0 0;
 }
 
 .label {
@@ -75,7 +71,7 @@
 }
 
 .select,
-.input {
+.textarea {
   width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: 12px;
@@ -83,6 +79,10 @@
   color: var(--text);
   padding: 0.66rem 0.74rem;
   font: inherit;
+}
+
+.textarea {
+  resize: vertical;
 }
 
 .slotDayStack {
@@ -134,13 +134,35 @@
   box-shadow: 0 8px 20px color-mix(in oklab, var(--accent-1) 22%, transparent);
 }
 
+.selection {
+  margin: 0.85rem 0 0;
+  border-radius: 12px;
+  border: 1px dashed var(--border-strong);
+  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  padding: 0.6rem 0.65rem;
+}
+
 .form {
-  margin-top: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.primaryButton,
+.dangerButton,
+.secondaryButton {
+  margin-top: 0.9rem;
+  border-radius: 999px;
+  width: 100%;
+  padding: 0.72rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .primaryButton {
-  margin-top: 1rem;
-  border-radius: 999px;
   border: 1px solid color-mix(in oklab, var(--accent-1) 70%, transparent);
   background: linear-gradient(
     110deg,
@@ -148,23 +170,30 @@
     color-mix(in oklab, var(--accent-2) 76%, white)
   );
   color: #081126;
-  width: 100%;
-  padding: 0.73rem 1rem;
-  font-weight: 700;
-  cursor: pointer;
 }
 
-.primaryButton:disabled {
+.dangerButton {
+  border: 1px solid color-mix(in oklab, #dc2626 72%, transparent);
+  background: linear-gradient(110deg, #ef4444, #f97316);
+  color: #fff;
+}
+
+.secondaryButton {
+  border: 1px solid var(--border-strong);
+  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
+  color: var(--text);
+}
+
+.primaryButton:disabled,
+.dangerButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.selection {
-  margin: 0.9rem 0 0;
-  border-radius: 12px;
-  border: 1px dashed var(--border-strong);
-  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
-  padding: 0.6rem 0.65rem;
+.inlineLink {
+  margin-top: 0.75rem;
+  display: inline-block;
+  color: var(--accent-1);
 }
 
 .muted {
@@ -173,12 +202,12 @@
 }
 
 .error {
-  margin-top: 0.75rem;
+  margin: 0.2rem 0 0;
   color: var(--error-text);
 }
 
-.confirmation {
-  margin-top: 0.75rem;
+.success {
+  margin: 0.2rem 0 0;
   color: var(--success-text);
   font-weight: 600;
 }

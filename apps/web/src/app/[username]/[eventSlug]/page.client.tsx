@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import {
+  COMMON_TIMEZONES,
+  createIdempotencyKey,
+  formatSlot,
+  getBrowserTimezone,
+  groupSlotsByDay,
+} from '../../../lib/public-booking';
 import styles from './page.module.css';
 
 type PublicEventResponse = {
@@ -53,40 +60,21 @@ type BookingPageClientProps = {
   apiBaseUrl: string;
 };
 
-const COMMON_TIMEZONES = [
-  'UTC',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'Europe/London',
-  'Asia/Kolkata',
-  'Asia/Tokyo',
-  'Australia/Sydney',
-];
-
-const getBrowserTimezone = (): string => {
-  if (typeof window === 'undefined') {
-    return 'UTC';
+const readableLocation = (locationType: string, locationValue: string | null): string => {
+  if (locationValue && locationValue.trim().length > 0) {
+    return locationValue;
   }
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-};
-
-const formatSlot = (isoDate: string, timezone: string): string => {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: timezone,
-  }).format(new Date(isoDate));
+  return locationType.replace('_', ' ');
 };
 
 export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: BookingPageClientProps) {
   const [timezone, setTimezone] = useState('UTC');
   const [eventData, setEventData] = useState<PublicEventResponse | null>(null);
   const [slots, setSlots] = useState<Array<{ startsAt: string; endsAt: string }>>([]);
-  const [selectedSlot, setSelectedSlot] = useState<string>('');
+  const [selectedSlot, setSelectedSlot] = useState('');
   const [inviteeName, setInviteeName] = useState('');
   const [inviteeEmail, setInviteeEmail] = useState('');
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [pageError, setPageError] = useState<string | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -96,6 +84,17 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   const timezoneOptions = useMemo(() => {
     return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
   }, [timezone]);
+
+  const slotGroups = useMemo(() => {
+    return groupSlotsByDay(slots, timezone);
+  }, [slots, timezone]);
+
+  const selectedSlotLabel = useMemo(() => {
+    if (!selectedSlot) {
+      return null;
+    }
+    return formatSlot(selectedSlot, timezone);
+  }, [selectedSlot, timezone]);
 
   const trackFunnelEvent = useCallback(
     (stage: 'page_view' | 'slot_selection') => {
@@ -129,6 +128,12 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       }
 
       setEventData(payload);
+      setAnswers(
+        payload.eventType.questions.reduce<Record<string, string>>((accumulator, question) => {
+          accumulator[question.id] = '';
+          return accumulator;
+        }, {}),
+      );
       trackFunnelEvent('page_view');
     } catch {
       setPageError('Unable to load event details.');
@@ -136,19 +141,19 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     } finally {
       setLoadingEvent(false);
     }
-  }, [eventSlug, trackFunnelEvent, username, apiBaseUrl]);
+  }, [apiBaseUrl, eventSlug, trackFunnelEvent, username]);
 
   const loadAvailability = useCallback(async () => {
     setLoadingSlots(true);
     setPageError(null);
 
     try {
-      const start = new Date().toISOString();
       const params = new URLSearchParams({
         timezone,
-        start,
+        start: new Date().toISOString(),
         days: '7',
       });
+
       const response = await fetch(
         `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
         { cache: 'no-store' },
@@ -197,11 +202,22 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       return;
     }
 
+    const missingRequiredQuestion = eventData?.eventType.questions.find(
+      (question) => question.required && !(answers[question.id] ?? '').trim(),
+    );
+    if (missingRequiredQuestion) {
+      setPageError(`Answer required question: "${missingRequiredQuestion.label}".`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const response = await fetch(`${apiBaseUrl}/v0/bookings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': createIdempotencyKey(),
+        },
         body: JSON.stringify({
           username,
           eventSlug,
@@ -209,6 +225,9 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
           timezone,
           inviteeName,
           inviteeEmail,
+          answers: Object.fromEntries(
+            Object.entries(answers).filter((entry) => entry[1].trim().length > 0),
+          ),
         }),
       });
       const payload = (await response.json()) as BookingResponse;
@@ -217,12 +236,16 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
         return;
       }
 
-      setConfirmation(
-        `Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} (${timezone}).`,
-      );
+      setConfirmation(`Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} (${timezone}).`);
       setInviteeName('');
       setInviteeEmail('');
       setSelectedSlot('');
+      setAnswers(
+        eventData?.eventType.questions.reduce<Record<string, string>>((accumulator, question) => {
+          accumulator[question.id] = '';
+          return accumulator;
+        }, {}) ?? {},
+      );
       void loadAvailability();
     } catch {
       setPageError('Booking failed. Please try again.');
@@ -234,7 +257,10 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   if (loadingEvent) {
     return (
       <main className={styles.page}>
-        <section className={styles.card}>Loading event...</section>
+        <section className={styles.heroCard}>
+          <p className={styles.kicker}>Public booking</p>
+          <h1>Loading event...</h1>
+        </section>
       </main>
     );
   }
@@ -242,102 +268,154 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   if (!eventData) {
     return (
       <main className={styles.page}>
-        <section className={styles.card}>{pageError || 'Event not found.'}</section>
+        <section className={styles.heroCard}>
+          <p className={styles.kicker}>Public booking</p>
+          <h1>Event unavailable</h1>
+          <p className={styles.error}>{pageError || 'Event not found.'}</p>
+        </section>
       </main>
     );
   }
 
   return (
     <main className={styles.page}>
-      <section className={styles.card}>
-        <p className={styles.kicker}>Public booking link</p>
+      <section className={styles.heroCard}>
+        <p className={styles.kicker}>Open booking link</p>
         <h1>{eventData.eventType.name}</h1>
         <p>
-          {eventData.organizer.displayName} • {eventData.eventType.durationMinutes} minutes
+          Hosted by <strong>{eventData.organizer.displayName}</strong> ·{' '}
+          {eventData.eventType.durationMinutes} minutes
         </p>
-        <p>
-          Location:{' '}
-          {eventData.eventType.locationValue || eventData.eventType.locationType.replace('_', ' ')}
-        </p>
+        <p>Location: {readableLocation(eventData.eventType.locationType, eventData.eventType.locationValue)}</p>
       </section>
 
-      <section className={styles.card}>
-        <label className={styles.label} htmlFor="timezone">
-          Timezone
-        </label>
-        <select
-          id="timezone"
-          className={styles.select}
-          value={timezone}
-          onChange={(event) => setTimezone(event.target.value)}
-        >
-          {timezoneOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+      <section className={styles.layout}>
+        <div className={styles.card}>
+          <div className={styles.sectionHead}>
+            <h2>Pick your time</h2>
+            <p>Slots are shown in your selected timezone.</p>
+          </div>
 
-        <p className={styles.muted}>
-          Organizer timezone: <strong>{eventData.organizer.timezone}</strong>
-        </p>
+          <label className={styles.label} htmlFor="timezone">
+            Timezone
+          </label>
+          <select
+            id="timezone"
+            className={styles.select}
+            value={timezone}
+            onChange={(event) => setTimezone(event.target.value)}
+          >
+            {timezoneOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
 
-        {loadingSlots ? <p>Loading slots...</p> : null}
-        {!loadingSlots && slots.length === 0 ? <p>No slots available in the next 7 days.</p> : null}
+          <p className={styles.muted}>
+            Organizer timezone: <strong>{eventData.organizer.timezone}</strong>
+          </p>
 
-        <div className={styles.slotGrid}>
-          {slots.slice(0, 28).map((slot) => (
-            <button
-              key={slot.startsAt}
-              type="button"
-              className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
-              onClick={() => {
-                if (selectedSlot === slot.startsAt) {
-                  return;
-                }
-                setSelectedSlot(slot.startsAt);
-                trackFunnelEvent('slot_selection');
-              }}
-            >
-              {formatSlot(slot.startsAt, timezone)}
-            </button>
-          ))}
+          {loadingSlots ? <p className={styles.muted}>Loading slots...</p> : null}
+          {!loadingSlots && slots.length === 0 ? (
+            <p className={styles.muted}>No slots available in the next 7 days.</p>
+          ) : null}
+
+          <div className={styles.slotDayStack}>
+            {slotGroups.map((group) => (
+              <section key={group.dateKey} className={styles.slotDay}>
+                <h3>{group.label}</h3>
+                <div className={styles.slotGrid}>
+                  {group.slots.map((slot) => (
+                    <button
+                      key={slot.startsAt}
+                      type="button"
+                      className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
+                      onClick={() => {
+                        if (selectedSlot === slot.startsAt) {
+                          return;
+                        }
+                        setSelectedSlot(slot.startsAt);
+                        trackFunnelEvent('slot_selection');
+                      }}
+                    >
+                      {new Intl.DateTimeFormat(undefined, {
+                        timeStyle: 'short',
+                        timeZone: timezone,
+                      }).format(new Date(slot.startsAt))}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
         </div>
-      </section>
 
-      <section className={styles.card}>
-        <h2>Book this time</h2>
-        <form className={styles.form} onSubmit={submitBooking}>
-          <label className={styles.label} htmlFor="invitee-name">
-            Your name
-          </label>
-          <input
-            id="invitee-name"
-            className={styles.input}
-            value={inviteeName}
-            onChange={(event) => setInviteeName(event.target.value)}
-            required
-          />
+        <div className={styles.card}>
+          <div className={styles.sectionHead}>
+            <h2>Your details</h2>
+            <p>We will email your booking confirmation and action links.</p>
+          </div>
 
-          <label className={styles.label} htmlFor="invitee-email">
-            Your email
-          </label>
-          <input
-            id="invitee-email"
-            type="email"
-            className={styles.input}
-            value={inviteeEmail}
-            onChange={(event) => setInviteeEmail(event.target.value)}
-            required
-          />
+          {selectedSlotLabel ? (
+            <p className={styles.selection}>
+              Selected slot: <strong>{selectedSlotLabel}</strong>
+            </p>
+          ) : (
+            <p className={styles.selection}>Select a slot to continue.</p>
+          )}
 
-          <button className={styles.primaryButton} type="submit" disabled={submitting}>
-            {submitting ? 'Booking...' : 'Confirm booking'}
-          </button>
-        </form>
+          <form className={styles.form} onSubmit={submitBooking}>
+            <label className={styles.label} htmlFor="invitee-name">
+              Your name
+            </label>
+            <input
+              id="invitee-name"
+              className={styles.input}
+              value={inviteeName}
+              onChange={(event) => setInviteeName(event.target.value)}
+              required
+            />
 
-        {pageError ? <p className={styles.error}>{pageError}</p> : null}
-        {confirmation ? <p className={styles.confirmation}>{confirmation}</p> : null}
+            <label className={styles.label} htmlFor="invitee-email">
+              Your email
+            </label>
+            <input
+              id="invitee-email"
+              type="email"
+              className={styles.input}
+              value={inviteeEmail}
+              onChange={(event) => setInviteeEmail(event.target.value)}
+              required
+            />
+
+            {eventData.eventType.questions.map((question) => (
+              <label key={question.id} className={styles.label} htmlFor={`question-${question.id}`}>
+                {question.label}
+                <input
+                  id={`question-${question.id}`}
+                  className={styles.input}
+                  value={answers[question.id] ?? ''}
+                  onChange={(entry) =>
+                    setAnswers((previous) => ({
+                      ...previous,
+                      [question.id]: entry.target.value,
+                    }))
+                  }
+                  placeholder={question.placeholder ?? ''}
+                  required={question.required}
+                />
+              </label>
+            ))}
+
+            <button className={styles.primaryButton} type="submit" disabled={submitting}>
+              {submitting ? 'Booking...' : 'Confirm booking'}
+            </button>
+          </form>
+
+          {pageError ? <p className={styles.error}>{pageError}</p> : null}
+          {confirmation ? <p className={styles.confirmation}>{confirmation}</p> : null}
+        </div>
       </section>
     </main>
   );
