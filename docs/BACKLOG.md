@@ -152,12 +152,34 @@ Acceptance criteria:
 
 - GitHub branch protection is fully configured to enforce required checks and no direct `main` pushes.
 - API adds request-level rate limiting for public booking/availability routes.
-- Idempotency keys are enforced for booking-create and booking-reschedule mutation endpoints.
+- Idempotency keys are enforced for booking-create, team booking-create, and booking-reschedule mutation endpoints.
 - Platform warning debt is resolved or documented with a tracked migration plan:
   - evaluate and decide migration path from `@cloudflare/next-on-pages` to OpenNext
   - document lockfile warning strategy for local dev
 - Smoke + regression test suite runs in CI for critical booking flows.
 - `docs/STACK.md`/`docs/ARCHITECTURE.md` are updated for operational guardrails.
+
+Execution plan (Feature 9 PR flow):
+
+1. Platform enforcement
+   - configure GitHub `main` branch protection required checks + PR-only merge policy
+   - verify direct push rejection path at platform level
+2. Public API abuse controls
+   - add request-level rate limiting for public availability and booking mutation routes
+   - return deterministic `429` payloads for throttled requests
+3. Mutation idempotency
+   - add DB-backed idempotency table keyed by `(scope, idempotencyKeyHash)`
+   - require `Idempotency-Key` on booking create + team booking create + reschedule mutation
+   - replay stored response for key retries with same payload; reject payload mismatch with `409`
+4. Warning debt decisions
+   - document OpenNext migration decision/timeline
+   - document multi-lockfile warning strategy for local dev
+5. CI hardening
+   - add smoke/regression test suite for critical booking flows to CI
+6. Review gate + merge
+   - CodeRabbit + Greptile + CI green
+   - resolve all review threads
+   - merge without deleting feature branch
 
 ## Feature 10 (PR#14): Launch Readiness + v1.0 Release
 
