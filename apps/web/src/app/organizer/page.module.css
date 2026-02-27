@@ -48,6 +48,93 @@
   gap: 0.7rem;
 }
 
+.consoleLayout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.consoleMain {
+  display: grid;
+  gap: 1rem;
+}
+
+.sideRail {
+  position: sticky;
+  top: calc(var(--app-header-height) + 1rem);
+  display: grid;
+  gap: 0.9rem;
+}
+
+.sectionNav {
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--surface-1) 92%, transparent);
+  box-shadow: var(--shadow-soft);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sectionNavTitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.sectionNavLink {
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-2) 84%, transparent);
+  border-radius: 0.7rem;
+  padding: 0.5rem 0.65rem;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.9rem;
+  transition:
+    background 120ms ease,
+    transform 120ms ease,
+    border-color 120ms ease;
+}
+
+.sectionNavLink:hover {
+  background: color-mix(in oklab, var(--accent-1) 14%, transparent);
+  border-color: color-mix(in oklab, var(--accent-1) 40%, var(--border-subtle));
+  transform: translateY(-1px);
+}
+
+.summaryGrid {
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--surface-1) 92%, transparent);
+  box-shadow: var(--shadow-soft);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.summaryCard {
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  padding: 0.55rem 0.65rem;
+}
+
+.summaryCard p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.summaryCard strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+}
+
 .sectionHeader {
   margin-bottom: 0.85rem;
 }
@@ -330,6 +417,24 @@
 }
 
 @media (max-width: 920px) {
+  .consoleLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .sideRail {
+    position: static;
+  }
+
+  .sectionNav {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(140px, 1fr);
+    overflow-x: auto;
+  }
+
+  .sectionNavTitle {
+    grid-column: 1 / -1;
+  }
+
   .splitGrid {
     grid-template-columns: 1fr;
   }

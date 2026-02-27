@@ -119,6 +119,14 @@ npm run dev:web
 3. Resize to mobile width and verify drawer navigation opens/closes and route links work.
 4. Sign in via `/auth/sign-in` (or keep an active session), then open `/auth/verify`, `/dashboard`, and `/organizer` to confirm shared shell/card/form styling is consistent.
 
+### 7.2) Feature 17 organizer IA parity smoke test
+
+1. Open `http://localhost:3000/organizer` with an active authenticated session.
+2. Use the left-rail section links and confirm each anchor section opens correctly:
+   - `#event-types`, `#availability`, `#teams`, `#webhooks`, `#calendars`, `#writeback`
+3. Verify summary cards render non-empty counts from live organizer data.
+4. Open `http://localhost:3000/dashboard` and use Quick actions to jump into organizer sections.
+
 ### 8) Feature 12 organizer console smoke test
 
 1. Open `http://localhost:3000/organizer` (authenticated session required).
@@ -144,6 +152,7 @@ npm run dev:web
 - `/bookings/actions/[token]` public cancel/reschedule action page
 - `/embed/playground` embed script generator + live preview
 - `/organizer` authenticated organizer operations console (event types, availability, teams, webhooks, calendar, writeback)
+- `/organizer#event-types|availability|teams|webhooks|calendars|writeback` direct organizer section anchors
 - `/dashboard` authenticated organizer analytics dashboard
 - `/settings/calendar/google/callback` OAuth callback completion for Google Calendar connect
 - `/settings/calendar/microsoft/callback` OAuth callback completion for Microsoft Calendar connect
