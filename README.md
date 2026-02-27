@@ -112,13 +112,24 @@ npm run dev:web
 3. Complete verification on `http://localhost:3000/auth/verify` (auto-filled token flow).
 4. Confirm redirect to `http://localhost:3000/dashboard` and analytics load without manual token paste.
 
+### 8) Feature 12 organizer console smoke test
+
+1. Open `http://localhost:3000/organizer` (authenticated session required).
+2. Confirm event types list/create/edit works from UI.
+3. Confirm availability rules/overrides can be loaded and saved.
+4. Confirm teams/members/team event types can be listed and created.
+5. Confirm webhooks and calendar/writeback controls load and actions execute.
+
 ### Key web routes
 
 - `/` modern product homepage
 - `/auth/sign-in` magic-link session start
 - `/auth/verify` magic-link token verification
 - `/demo/intro-call` public one-on-one booking demo
+- `/organizer` authenticated organizer operations console (event types, availability, teams, webhooks, calendar, writeback)
 - `/dashboard` authenticated organizer analytics dashboard
+- `/settings/calendar/google/callback` OAuth callback completion for Google Calendar connect
+- `/settings/calendar/microsoft/callback` OAuth callback completion for Microsoft Calendar connect
 
 Theme toggle is available in the top-right app chrome and persists `light` / `dark` / `system`.
 

@@ -51,8 +51,20 @@ flowchart LR
 - Auth route shells:
   - `/auth/sign-in` requests one-time token via `POST /v0/auth/magic-link`
   - `/auth/verify` exchanges token via `POST /v0/auth/verify`, stores session, then redirects
+- Organizer console shell:
+  - `/organizer` is the authenticated operational UI over organizer APIs:
+    - event type management (`GET/POST/PATCH /v0/event-types`)
+    - availability management (`GET /v0/me/availability`, `PUT /v0/me/availability/*`)
+    - team/membership/team-event management (`GET /v0/teams*`, `POST /v0/teams*`, `POST /v0/team-event-types`)
+    - webhook operations (`GET/POST/PATCH /v0/webhooks`, `POST /v0/webhooks/deliveries/run`)
+    - calendar sync + writeback operations (`/v0/calendar/*`)
+- Calendar OAuth callback shells:
+  - `/settings/calendar/google/callback`
+  - `/settings/calendar/microsoft/callback`
+  - each callback completes provider OAuth by calling `/v0/calendar/{provider}/connect/complete` with the returned code/state
 - Typed API client utilities:
   - centralized authenticated `GET`/`POST` wrappers
+  - organizer-focused typed client module used by console panels
   - normalized error extraction from API payloads for consistent UI state handling
 
 ## Critical flows
