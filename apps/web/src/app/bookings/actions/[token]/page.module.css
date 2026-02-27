@@ -32,6 +32,19 @@
   margin: 0.35rem 0 0;
 }
 
+.statusPill {
+  margin-top: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--border-strong) 72%, transparent);
+  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  padding: 0.26rem 0.58rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .kicker {
   margin: 0;
   display: inline-block;
