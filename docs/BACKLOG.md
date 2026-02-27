@@ -196,6 +196,24 @@ Acceptance criteria:
 - Versioned release notes and migration notes are published for `v1.0.0`.
 - Production deployment checklist is executable end-to-end with zero manual ambiguity.
 
+Execution plan (Feature 10 PR flow):
+
+1. Release-readiness test suite
+   - add a dedicated test suite covering one-on-one, team round-robin, team collective, webhook retry behavior, and calendar-sync conflict blocking
+   - include the suite in smoke coverage used by CI
+2. Security readiness
+   - publish `docs/SECURITY_CHECKLIST.md` and mark v1.0 gate items complete
+3. Operator readiness
+   - publish `docs/OPERATOR_RUNBOOK.md` with incident/replay/recovery/restore drill procedures
+4. Deploy readiness
+   - publish `docs/PROD_DEPLOY_CHECKLIST.md` with pre-deploy, deploy, validation, and rollback gates
+5. Release packaging
+   - publish `docs/releases/v1.0.0.md` with highlights + migration notes
+6. Merge gate
+   - CodeRabbit + Greptile + CI green
+   - resolve all review threads
+   - merge without deleting feature branch
+
 ## Post-Feature-5 Delivery Plan (Until Done)
 
 1. Lock baseline after Feature 5 merge:
