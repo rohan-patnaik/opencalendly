@@ -593,6 +593,33 @@ Conflict response (`409`):
 }
 ```
 
+Idempotency mismatch response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "Idempotency key reuse with different request payload is not allowed."
+}
+```
+
+Idempotency in-progress response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "A request with this idempotency key is already in progress."
+}
+```
+
+Rate-limit response (`429`):
+
+```json
+{
+  "ok": false,
+  "error": "Rate limit exceeded. Try again in a minute."
+}
+```
+
 Behavior:
 
 - Transaction-safe organizer-level conflict checks are required before confirming the new slot.

@@ -1680,7 +1680,7 @@ const claimIdempotencyRequest = async (
     }
   | {
       state: 'replay';
-      statusCode: 200 | 400 | 404 | 409 | 410;
+      statusCode: 200 | 400 | 404 | 409 | 410 | 500;
       responseBody: Record<string, unknown>;
     }
   | {
@@ -1774,7 +1774,8 @@ const claimIdempotencyRequest = async (
     responseStatusCode === 400 ||
     responseStatusCode === 404 ||
     responseStatusCode === 409 ||
-    responseStatusCode === 410;
+    responseStatusCode === 410 ||
+    responseStatusCode === 500;
   if (
     existing.status === 'completed' &&
     isReplayStatusCode &&
@@ -1797,7 +1798,7 @@ const completeIdempotencyRequest = async (
   input: {
     scope: IdempotencyScope;
     keyHash: string;
-    statusCode: 200 | 400 | 404 | 409 | 410;
+    statusCode: 200 | 400 | 404 | 409 | 410 | 500;
     responseBody: Record<string, unknown>;
     now?: Date;
   },
@@ -5639,11 +5640,17 @@ app.post('/v0/team-bookings', async (context) => {
         });
         return context.json(responseBody, 409);
       }
-      await releaseIdempotencyRequest(db, {
+      const responseBody: Record<string, unknown> = {
+        ok: false,
+        error: 'Internal server error.',
+      };
+      await completeIdempotencyRequest(db, {
         scope: 'team_booking_create',
         keyHash: idempotencyState.keyHash,
+        statusCode: 500,
+        responseBody,
       });
-      throw error;
+      return context.json(responseBody, 500);
     }
   });
 });
@@ -5998,11 +6005,17 @@ app.post('/v0/bookings', async (context) => {
         });
         return context.json(responseBody, 409);
       }
-      await releaseIdempotencyRequest(db, {
+      const responseBody: Record<string, unknown> = {
+        ok: false,
+        error: 'Internal server error.',
+      };
+      await completeIdempotencyRequest(db, {
         scope: 'booking_create',
         keyHash: idempotencyState.keyHash,
+        statusCode: 500,
+        responseBody,
       });
-      throw error;
+      return context.json(responseBody, 500);
     }
   });
 });
@@ -7096,11 +7109,17 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         });
         return context.json(responseBody, 409);
       }
-      await releaseIdempotencyRequest(db, {
+      const responseBody: Record<string, unknown> = {
+        ok: false,
+        error: 'Internal server error.',
+      };
+      await completeIdempotencyRequest(db, {
         scope: 'booking_reschedule',
         keyHash: idempotencyState.keyHash,
+        statusCode: 500,
+        responseBody,
       });
-      throw error;
+      return context.json(responseBody, 500);
     }
   });
 });
