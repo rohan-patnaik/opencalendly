@@ -2356,8 +2356,8 @@ const actionTokenMap = (
 };
 
 const buildActionUrls = (
-  env: Bindings,
   request: Request,
+  appBaseUrl: string,
   tokenMap: {
     cancelToken: string;
     rescheduleToken: string;
@@ -2371,7 +2371,6 @@ const buildActionUrls = (
   reschedulePageUrl: string;
 } => {
   const apiOrigin = new URL(request.url).origin;
-  const appBaseUrl = resolveAppBaseUrl(env, request);
 
   return {
     lookupCancelUrl: `${apiOrigin}/v0/bookings/actions/${tokenMap.cancelToken}`,
@@ -5597,6 +5596,16 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (contex
 app.get('/v0/teams/:teamSlug/event-types/:eventSlug', async (context) => {
   const teamSlug = context.req.param('teamSlug');
   const eventSlug = context.req.param('eventSlug');
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicBookingRateLimited({
+      ip: requestIp,
+      scope: `team-event|${teamSlug}|${eventSlug}`,
+      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
 
   return withDatabase(context, async (db) => {
     const teamEventContext = await findTeamEventTypeContext(db, teamSlug, eventSlug);
@@ -5691,6 +5700,17 @@ app.post('/v0/team-bookings', async (context) => {
     inviteeEmail: payload.inviteeEmail,
     answers: payload.answers ?? {},
   });
+
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolveAppBaseUrl(context.env, context.req.raw);
+  } catch (error) {
+    return jsonError(
+      context,
+      500,
+      error instanceof Error ? error.message : 'APP_BASE_URL must be a valid URL.',
+    );
+  }
 
   return withDatabase(context, async (db) => {
     const idempotencyState = await claimIdempotencyRequest(db, {
@@ -5948,7 +5968,7 @@ app.post('/v0/team-bookings', async (context) => {
       });
 
       const tokens = actionTokenMap(result.actionTokens);
-      const actionUrls = buildActionUrls(context.env, context.req.raw, {
+      const actionUrls = buildActionUrls(context.req.raw, appBaseUrl, {
         cancelToken: tokens.cancelToken,
         rescheduleToken: tokens.rescheduleToken,
       });
@@ -6154,6 +6174,17 @@ app.post('/v0/bookings', async (context) => {
     answers: payload.answers ?? {},
   });
 
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolveAppBaseUrl(context.env, context.req.raw);
+  } catch (error) {
+    return jsonError(
+      context,
+      500,
+      error instanceof Error ? error.message : 'APP_BASE_URL must be a valid URL.',
+    );
+  }
+
   return withDatabase(context, async (db) => {
     const idempotencyState = await claimIdempotencyRequest(db, {
       scope: 'booking_create',
@@ -6324,7 +6355,7 @@ app.post('/v0/bookings', async (context) => {
       );
 
       const tokens = actionTokenMap(result.actionTokens);
-      const actionUrls = buildActionUrls(context.env, context.req.raw, {
+      const actionUrls = buildActionUrls(context.req.raw, appBaseUrl, {
         cancelToken: tokens.cancelToken,
         rescheduleToken: tokens.rescheduleToken,
       });
@@ -6939,6 +6970,17 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
     timezone,
   });
 
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolveAppBaseUrl(context.env, context.req.raw);
+  } catch (error) {
+    return jsonError(
+      context,
+      500,
+      error instanceof Error ? error.message : 'APP_BASE_URL must be a valid URL.',
+    );
+  }
+
   return withDatabase(context, async (db) => {
     const idempotencyState = await claimIdempotencyRequest(db, {
       scope: 'booking_reschedule',
@@ -7493,7 +7535,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
       const actions = result.actionTokens
         ? (() => {
             const tokens = actionTokenMap(result.actionTokens);
-            const urls = buildActionUrls(context.env, context.req.raw, {
+            const urls = buildActionUrls(context.req.raw, appBaseUrl, {
               cancelToken: tokens.cancelToken,
               rescheduleToken: tokens.rescheduleToken,
             });

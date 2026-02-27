@@ -253,10 +253,11 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
   }, [actionData?.actions.canReschedule, loadAvailability]);
 
   useEffect(() => {
-    if (selectedSlot) {
+    if (!selectedSlot) {
+      setRescheduleRequestKey('');
       return;
     }
-    setRescheduleRequestKey('');
+    setRescheduleRequestKey(createIdempotencyKey());
   }, [selectedSlot]);
 
   const submitCancel = async (event: FormEvent<HTMLFormElement>) => {
@@ -499,10 +500,7 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
                         key={slot.startsAt}
                         type="button"
                         className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
-                        onClick={() => {
-                          setSelectedSlot(slot.startsAt);
-                          setRescheduleRequestKey(createIdempotencyKey());
-                        }}
+                        onClick={() => setSelectedSlot(slot.startsAt)}
                       >
                         {new Intl.DateTimeFormat(undefined, {
                           timeStyle: 'short',

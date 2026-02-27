@@ -403,16 +403,15 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
             />
 
             {eventData.eventType.questions.map((question) => (
-              <label key={question.id} className={styles.label} htmlFor={`question-${question.id}`}>
+              <label key={question.id} className={styles.label}>
                 {question.label}
                 <input
-                  id={`question-${question.id}`}
                   className={styles.input}
                   value={answers[question.id] ?? ''}
-                  onChange={(entry) =>
+                  onChange={(event) =>
                     setAnswers((previous) => ({
                       ...previous,
-                      [question.id]: entry.target.value,
+                      [question.id]: event.target.value,
                     }))
                   }
                   placeholder={question.placeholder ?? ''}
