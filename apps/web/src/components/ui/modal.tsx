@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { ReactNode } from 'react';
 
 import { Button } from './button';
@@ -14,6 +14,7 @@ type ModalProps = {
 };
 
 export function Modal({ open, title, onClose, children }: ModalProps) {
+  const titleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
 
@@ -103,12 +104,14 @@ export function Modal({ open, title, onClose, children }: ModalProps) {
         className={styles.modal}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>{title}</h3>
+          <h3 id={titleId} className={styles.modalTitle}>
+            {title}
+          </h3>
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
             Close
           </Button>

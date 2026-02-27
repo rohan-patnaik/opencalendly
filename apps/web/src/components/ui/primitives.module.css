@@ -227,6 +227,7 @@
   display: grid;
   place-items: center;
   padding: 1rem;
+  overflow-y: auto;
 }
 
 .modal {
@@ -238,6 +239,8 @@
   padding: 1rem;
   display: grid;
   gap: 0.9rem;
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
 }
 
 .modalHeader {

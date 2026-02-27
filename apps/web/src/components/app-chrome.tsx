@@ -116,6 +116,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       <div
         className={`${styles.mobileOverlay} ${mobileNavOpen ? styles.mobileOverlayOpen : ''}`.trim()}
         onClick={closeMobileNav}
+        aria-hidden="true"
       />
       <aside
         id="mobile-navigation"
