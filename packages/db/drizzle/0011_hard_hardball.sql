@@ -6,6 +6,7 @@ BEGIN
     SELECT 1
     FROM pg_constraint
     WHERE conname = 'calendar_connections_id_provider_unique'
+      AND conrelid = 'calendar_connections'::regclass
   ) THEN
     ALTER TABLE "calendar_connections"
       ADD CONSTRAINT "calendar_connections_id_provider_unique" UNIQUE("id","provider");
@@ -18,6 +19,7 @@ BEGIN
     SELECT 1
     FROM pg_constraint
     WHERE conname = 'booking_external_events_connection_provider_fk'
+      AND conrelid = 'booking_external_events'::regclass
   ) THEN
     ALTER TABLE "booking_external_events"
       ADD CONSTRAINT "booking_external_events_connection_provider_fk"
