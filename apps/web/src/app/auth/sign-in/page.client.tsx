@@ -1,10 +1,18 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
-import styles from '../auth.module.css';
+import {
+  Button,
+  Card,
+  FormField,
+  LinkButton,
+  PageShell,
+  Toast,
+} from '../../../components/ui';
+import uiStyles from '../../../components/ui/primitives.module.css';
+import styles from '../shared.module.css';
 
 type SignInPageClientProps = {
   apiBaseUrl: string;
@@ -87,15 +95,12 @@ export default function SignInPageClient({ apiBaseUrl }: SignInPageClientProps) 
   };
 
   return (
-    <main className={styles.page}>
-      <section className={styles.card}>
-        <p className={styles.kicker}>Authentication</p>
-        <h1>Sign in with magic link</h1>
-        <p>
-          Enter your email to start a session. If this is your first sign-in with this email, also
-          provide username and display name.
-        </p>
-
+    <PageShell
+      eyebrow="Authentication"
+      title="Sign in with magic link"
+      description="Enter your email to start a session. For first sign-in with a new email, include username and display name."
+    >
+      <Card>
         <form
           className={styles.form}
           onSubmit={(event) => {
@@ -103,10 +108,9 @@ export default function SignInPageClient({ apiBaseUrl }: SignInPageClientProps) 
             void requestMagicLink();
           }}
         >
-          <label className={styles.label}>
-            Email
+          <FormField label="Email">
             <input
-              className={styles.input}
+              className={uiStyles.input}
               type="email"
               required
               value={email}
@@ -114,13 +118,12 @@ export default function SignInPageClient({ apiBaseUrl }: SignInPageClientProps) 
               autoComplete="email"
               placeholder="you@example.com"
             />
-          </label>
+          </FormField>
 
           <div className={styles.grid}>
-            <label className={styles.label}>
-              Username (first sign-in only)
+            <FormField label="Username (first sign-in only)">
               <input
-                className={styles.input}
+                className={uiStyles.input}
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 placeholder="e.g. rohan-patnaik"
@@ -128,58 +131,52 @@ export default function SignInPageClient({ apiBaseUrl }: SignInPageClientProps) 
                 autoCorrect="off"
                 spellCheck={false}
               />
-            </label>
+            </FormField>
 
-            <label className={styles.label}>
-              Display name (first sign-in only)
+            <FormField label="Display name (first sign-in only)">
               <input
-                className={styles.input}
+                className={uiStyles.input}
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
                 placeholder="e.g. Rohan Patnaik"
               />
-            </label>
+            </FormField>
           </div>
 
-          <label className={styles.label}>
-            Timezone
+          <FormField
+            label="Timezone"
+            hint="Existing users can submit with email only. New users should include username and display name."
+          >
             <input
-              className={styles.input}
+              className={uiStyles.input}
               value={timezone}
               onChange={(event) => setTimezone(event.target.value)}
               placeholder="Asia/Kolkata"
             />
-          </label>
+          </FormField>
 
-          <p className={styles.hint}>
-            Existing users can submit with email only. New users must include username and display
-            name.
-          </p>
-
-          <div className={styles.actions}>
-            <button className={styles.primaryButton} type="submit" disabled={loading}>
+          <div className={uiStyles.actions}>
+            <Button type="submit" disabled={loading}>
               {loading ? 'Requesting...' : 'Continue'}
-            </button>
-            <Link className={styles.secondaryButton} href="/demo/intro-call">
+            </Button>
+            <LinkButton href="/demo/intro-call" variant="secondary">
               Back to booking demo
-            </Link>
+            </LinkButton>
           </div>
         </form>
 
-        {error ? <p className={styles.error}>{error}</p> : null}
+        {error ? <Toast variant="error">{error}</Toast> : null}
 
         {magicToken ? (
           <>
-            <p className={styles.success}>
-              Magic link generated. Redirecting to token verification…
-            </p>
-            <div className={styles.tokenBox}>{tokenPreview}</div>
+            <Toast variant="success">Magic link generated. Redirecting to token verification…</Toast>
+            <p className={styles.tokenPreview}>{tokenPreview}</p>
             <div className={styles.meta}>
               <span>Expires: {new Date(expiresAt || '').toLocaleString()}</span>
             </div>
           </>
         ) : null}
-      </section>
-    </main>
+      </Card>
+    </PageShell>
   );
 }

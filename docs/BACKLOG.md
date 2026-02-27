@@ -285,3 +285,52 @@ Acceptance criteria:
 - Embed playground route exists for script generation and preview.
 - Existing analytics funnel tracking remains wired from public page interactions.
 - Regression coverage includes `/demo/intro-call` and `/dashboard` behavior post-redesign.
+
+### Feature 15: App shell parity foundation
+
+Acceptance criteria:
+
+- Global app shell is rebuilt with sticky top nav, auth-aware actions, and responsive mobile drawer navigation.
+- Design system primitives are standardized and reusable:
+  - tokens (spacing/radius/elevation/type/motion)
+  - theme-aware components for button/card/form/toast/modal/tabs/table/page shell
+- Theme toggle supports persisted `light`, `dark`, and `system` preferences.
+- Ad-hoc wrappers on `/auth/sign-in`, `/auth/verify`, `/dashboard`, and `/organizer` are replaced with shared shell primitives.
+- No major accessibility regressions are introduced by shell changes.
+
+### Feature 16: Booking flow parity
+
+Acceptance criteria:
+
+- One-on-one booking UX parity is improved for `/demo/intro-call` (slot browser, timezone UX, attendee details, confirmation state).
+- Team booking UX parity is improved for `/team/:teamSlug/:eventSlug` (mode clarity, member context, capacity handling).
+- Booking action UX parity is improved for `/bookings/actions/:token` with explicit success/error state handling (`404`, `410`, `409`).
+- Embed playground UX parity is improved for `/embed/playground` with script generation + live preview behavior.
+- One-on-one and team booking continue to work end-to-end in UI against existing APIs.
+
+### Feature 17: Organizer console parity
+
+Acceptance criteria:
+
+- Organizer console information architecture is improved with clearer route/panel ownership and operational navigation.
+- Organizer pages support production-quality loading/empty/error states for event types, availability, teams, webhooks, calendar sync, and writeback controls.
+- Dashboard + organizer UX no longer depends on manual session token paste in normal flows.
+- If required for parity, missing read/list APIs are added and documented:
+  - `GET /v0/event-types`
+  - `GET /v0/me/availability`
+  - `GET /v0/teams`
+  - `GET /v0/teams/:teamId/members`
+  - `GET /v0/teams/:teamId/event-types`
+
+### Feature 18: Marketing surface parity
+
+Acceptance criteria:
+
+- Marketing homepage (`/`) ships enterprise-grade information architecture: hero, social proof, workflow blocks, integrations, pricing preview, CTA, and deep footer.
+- Additional marketing routes exist and are production-ready:
+  - `/pricing`
+  - `/features`
+  - `/solutions`
+  - `/resources`
+- Marketing CTA actions route to live implemented product flows.
+- Marketing pages are responsive and coherent with app shell design system.

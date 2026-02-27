@@ -38,15 +38,15 @@ Build a practical open-source scheduling platform for solo creators, consultants
 - Launch readiness docs + `v1.0.0` release artifacts.
 - Migration bootstrap hotfix for fresh Neon environments.
 
-### Post-v1 UI parity track
+### Post-v1 app-first parity track
 
-- Chore PR: dependency sync for Wrangler/runtime alignment.
-- Feature 11: UI foundation + homepage parity + theme toggle + magic-link auth UX.
-- Feature 12: organizer console parity for already-implemented authenticated APIs.
-- Feature 13: public booking/action UX parity (one-on-one/team/cancel/reschedule/embed playground).
+- Feature 15: app shell parity foundation (sticky nav, mobile drawer, tokens, standardized UI primitives, theme persistence).
+- Feature 16: booking flow parity (one-on-one, team booking, booking actions, embed playground UX hardening).
+- Feature 17: organizer console parity (operational IA, actionable panel states, dashboard/organizer polish).
+- Feature 18: marketing surface parity (`/`, `/pricing`, `/features`, `/solutions`, `/resources`).
 
-### Done definition for UI parity track
+### Done definition for app-first parity track
 
-- Feature 11 through Feature 13 are merged to `main` with CI green.
+- Feature 15 through Feature 18 are merged to `main` with CI green.
 - CodeRabbit and Greptile review gates are satisfied for each feature PR.
 - Frontend architecture and route documentation stay in sync with shipped UX.

@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { Button, Card, FormField, LinkButton, PageShell, Toast } from '../../../components/ui';
+import uiStyles from '../../../components/ui/primitives.module.css';
 import { useAuthSession } from '../../../lib/use-auth-session';
-import styles from '../auth.module.css';
+import styles from '../shared.module.css';
 
 type VerifyPageClientProps = {
   apiBaseUrl: string;
@@ -94,15 +95,12 @@ export default function VerifyPageClient({ apiBaseUrl }: VerifyPageClientProps) 
   }, [initialToken, verifyToken]);
 
   return (
-    <main className={styles.page}>
-      <section className={styles.card}>
-        <p className={styles.kicker}>Authentication</p>
-        <h1>Verify magic-link token</h1>
-        <p>
-          This step converts your one-time magic-link token into a bearer session and loads
-          organizer dashboard access.
-        </p>
-
+    <PageShell
+      eyebrow="Authentication"
+      title="Verify magic-link token"
+      description="This step exchanges your one-time token for a session and grants organizer dashboard access."
+    >
+      <Card>
         <form
           className={styles.form}
           onSubmit={(event) => {
@@ -110,10 +108,9 @@ export default function VerifyPageClient({ apiBaseUrl }: VerifyPageClientProps) 
             void verifyToken(token);
           }}
         >
-          <label className={styles.label}>
-            Magic-link token
+          <FormField label="Magic-link token">
             <input
-              className={styles.input}
+              className={uiStyles.input}
               type="password"
               value={token}
               onChange={(event) => setToken(event.target.value)}
@@ -124,21 +121,21 @@ export default function VerifyPageClient({ apiBaseUrl }: VerifyPageClientProps) 
               spellCheck={false}
               required
             />
-          </label>
+          </FormField>
 
-          <div className={styles.actions}>
-            <button className={styles.primaryButton} type="submit" disabled={loading}>
+          <div className={uiStyles.actions}>
+            <Button type="submit" disabled={loading}>
               {loading ? 'Verifying...' : 'Verify and continue'}
-            </button>
-            <Link className={styles.secondaryButton} href="/auth/sign-in">
+            </Button>
+            <LinkButton href="/auth/sign-in" variant="secondary">
               Back to sign in
-            </Link>
+            </LinkButton>
           </div>
         </form>
 
-        {error ? <p className={styles.error}>{error}</p> : null}
-        {success ? <p className={styles.success}>{success}</p> : null}
-      </section>
-    </main>
+        {error ? <Toast variant="error">{error}</Toast> : null}
+        {success ? <Toast variant="success">{success}</Toast> : null}
+      </Card>
+    </PageShell>
   );
 }

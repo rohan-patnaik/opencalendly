@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 import { useAuthSession } from '../lib/use-auth-session';
 import ThemeToggle from './theme-toggle';
@@ -26,15 +27,50 @@ const isActive = (pathname: string, href: string): boolean => {
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, ready, clear } = useAuthSession();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileNavOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileNavOpen]);
 
   return (
     <div className={styles.root}>
       <header className={styles.header}>
-        <Link className={styles.brand} href="/">
-          OpenCalendly
-        </Link>
+        <div className={styles.brandGroup}>
+          <button
+            type="button"
+            className={styles.mobileMenuButton}
+            onClick={() => setMobileNavOpen((previous) => !previous)}
+            aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={mobileNavOpen}
+            aria-controls="mobile-navigation"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
 
-        <nav className={styles.nav} aria-label="Main">
+          <Link className={styles.brand} href="/">
+            OpenCalendly
+          </Link>
+        </div>
+
+        <nav className={styles.nav} aria-label="Main navigation">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -51,17 +87,49 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           {ready && session ? (
             <>
               <span className={styles.sessionChip}>{session.user.email}</span>
-              <button type="button" className={styles.actionLink} onClick={clear}>
+              <button type="button" className={styles.actionButton} onClick={clear}>
                 Sign out
               </button>
             </>
           ) : (
-            <Link href="/auth/sign-in" className={styles.actionLink}>
+            <Link href="/auth/sign-in" className={styles.actionButton}>
               Sign in
             </Link>
           )}
         </div>
       </header>
+
+      <div
+        className={`${styles.mobileOverlay} ${mobileNavOpen ? styles.mobileOverlayOpen : ''}`.trim()}
+        onClick={() => setMobileNavOpen(false)}
+      />
+      <aside
+        id="mobile-navigation"
+        className={`${styles.mobileDrawer} ${mobileNavOpen ? styles.mobileDrawerOpen : ''}`.trim()}
+        aria-label="Mobile navigation"
+      >
+        <div className={styles.mobileDrawerHeader}>
+          <p>Navigate</p>
+          <button
+            type="button"
+            className={styles.mobileCloseButton}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            Close
+          </button>
+        </div>
+        <nav className={styles.mobileNav} aria-label="Mobile main navigation">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`${styles.mobileNavLink} ${isActive(pathname, link.href) ? styles.mobileNavLinkActive : ''}`.trim()}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+      </aside>
 
       <div className={styles.content}>{children}</div>
     </div>
