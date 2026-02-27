@@ -112,6 +112,13 @@ npm run dev:web
 3. Complete verification on `http://localhost:3000/auth/verify` (auto-filled token flow).
 4. Confirm redirect to `http://localhost:3000/dashboard` and analytics load without manual token paste.
 
+### 7.1) Feature 15 app shell smoke test
+
+1. Confirm top navigation remains sticky while scrolling.
+2. Toggle theme (sun/moon/system cycle) and refresh to verify persistence.
+3. Resize to mobile width and verify drawer navigation opens/closes and route links work.
+4. Sign in via `/auth/sign-in` (or keep an active session), then open `/auth/verify`, `/dashboard`, and `/organizer` to confirm shared shell/card/form styling is consistent.
+
 ### 8) Feature 12 organizer console smoke test
 
 1. Open `http://localhost:3000/organizer` (authenticated session required).

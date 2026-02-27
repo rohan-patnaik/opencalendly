@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../lib/use-auth-session';
 import ThemeToggle from './theme-toggle';
@@ -26,15 +27,82 @@ const isActive = (pathname: string, href: string): boolean => {
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, ready, clear } = useAuthSession();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
+
+  useEffect(() => {
+    closeMobileNav();
+  }, [closeMobileNav, pathname]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileNavOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileNavOpen]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileNavOpen]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 921px)');
+    const onMediaChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setMobileNavOpen(false);
+      }
+    };
+
+    mediaQuery.addEventListener('change', onMediaChange);
+    if (mediaQuery.matches) {
+      setMobileNavOpen(false);
+    }
+
+    return () => {
+      mediaQuery.removeEventListener('change', onMediaChange);
+    };
+  }, []);
 
   return (
     <div className={styles.root}>
       <header className={styles.header}>
-        <Link className={styles.brand} href="/">
-          OpenCalendly
-        </Link>
+        <div className={styles.brandGroup}>
+          <button
+            type="button"
+            className={styles.mobileMenuButton}
+            onClick={() => setMobileNavOpen((previous) => !previous)}
+            aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={mobileNavOpen}
+            aria-controls="mobile-navigation"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
 
-        <nav className={styles.nav} aria-label="Main">
+          <Link className={styles.brand} href="/">
+            OpenCalendly
+          </Link>
+        </div>
+
+        <nav className={styles.nav} aria-label="Main navigation">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -51,17 +119,53 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           {ready && session ? (
             <>
               <span className={styles.sessionChip}>{session.user.email}</span>
-              <button type="button" className={styles.actionLink} onClick={clear}>
+              <button type="button" className={styles.actionButton} onClick={clear}>
                 Sign out
               </button>
             </>
           ) : (
-            <Link href="/auth/sign-in" className={styles.actionLink}>
+            <Link href="/auth/sign-in" className={styles.actionButton}>
               Sign in
             </Link>
           )}
         </div>
       </header>
+
+      <div
+        className={`${styles.mobileOverlay} ${mobileNavOpen ? styles.mobileOverlayOpen : ''}`.trim()}
+        onClick={closeMobileNav}
+        aria-hidden="true"
+      />
+      <aside
+        id="mobile-navigation"
+        className={`${styles.mobileDrawer} ${mobileNavOpen ? styles.mobileDrawerOpen : ''}`.trim()}
+        aria-label="Mobile navigation"
+        aria-hidden={!mobileNavOpen}
+        inert={!mobileNavOpen}
+      >
+        <div className={styles.mobileDrawerHeader}>
+          <p>Navigate</p>
+          <button
+            type="button"
+            className={styles.mobileCloseButton}
+            onClick={closeMobileNav}
+          >
+            Close
+          </button>
+        </div>
+        <nav className={styles.mobileNav} aria-label="Mobile main navigation">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={closeMobileNav}
+              className={`${styles.mobileNavLink} ${isActive(pathname, link.href) ? styles.mobileNavLinkActive : ''}`.trim()}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+      </aside>
 
       <div className={styles.content}>{children}</div>
     </div>

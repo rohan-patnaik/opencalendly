@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { Button, Card, LinkButton, PageShell, Toast } from '../../components/ui';
 import { authedGetJson } from '../../lib/api-client';
 import {
   organizerApi,
@@ -960,73 +961,74 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
 
   if (!ready || authChecking) {
     return (
-      <main className={styles.page}>
-        <section className={styles.heroCard}>
-          <p className={styles.kicker}>Feature 12</p>
-          <h1>Organizer Console</h1>
+      <PageShell
+        eyebrow="Feature 12"
+        title="Organizer Console"
+        description="Manage event types, availability, teams, webhooks, and calendar status."
+      >
+        <Card>
           <p>Restoring your session…</p>
-        </section>
-      </main>
+        </Card>
+      </PageShell>
     );
   }
 
   if (!session || !authedUser) {
     return (
-      <main className={styles.page}>
-        <section className={styles.heroCard}>
-          <p className={styles.kicker}>Authentication required</p>
-          <h1>Organizer Console</h1>
-          <p>Sign in with magic-link auth to manage event types, teams, webhooks, and calendars.</p>
-          {authError ? <p className={styles.error}>{authError}</p> : null}
+      <PageShell
+        eyebrow="Authentication required"
+        title="Organizer Console"
+        description="Sign in with magic-link auth to manage event types, teams, webhooks, and calendars."
+      >
+        <Card>
+          {authError ? <Toast variant="error">{authError}</Toast> : null}
           <div className={styles.rowActions}>
-            <Link className={styles.primaryButton} href="/auth/sign-in">
+            <LinkButton href="/auth/sign-in" variant="primary">
               Sign in
-            </Link>
-            <Link className={styles.secondaryButton} href="/demo/intro-call">
+            </LinkButton>
+            <LinkButton href="/demo/intro-call" variant="secondary">
               Booking demo
-            </Link>
+            </LinkButton>
           </div>
-        </section>
-      </main>
+        </Card>
+      </PageShell>
     );
   }
 
   return (
-    <main className={styles.page}>
+    <PageShell
+      eyebrow="Feature 12"
+      title="Organizer Console"
+      description="Manage all shipped organizer APIs from UI: event types, availability, teams, webhooks, calendar sync, and writeback queue controls."
+    >
       <section className={styles.heroCard}>
-        <p className={styles.kicker}>Feature 12</p>
-        <h1>Organizer Console (v1)</h1>
-        <p>
-          Manage all shipped organizer APIs from UI: event types, availability, teams, webhooks, calendar
-          sync, and writeback queue controls.
-        </p>
         <div className={styles.metaStrip}>
           <span>
             Signed in as <strong>{authedUser.email}</strong>
           </span>
           <span>Timezone: {authedUser.timezone}</span>
-          <button type="button" className={styles.linkButton} onClick={clear}>
+          <Button type="button" variant="ghost" size="sm" onClick={clear}>
             Sign out
-          </button>
+          </Button>
         </div>
 
         <div className={styles.rowActions}>
-          <button
+          <Button
             type="button"
-            className={styles.secondaryButton}
+            variant="secondary"
             onClick={() => void refreshOrganizerState()}
             disabled={isRefreshing || busyActions.size > 0}
           >
             {isRefreshing ? 'Refreshing…' : 'Refresh console data'}
-          </button>
+          </Button>
           <Link className={styles.secondaryButton} href="/dashboard">
             Open analytics dashboard
           </Link>
         </div>
 
-        {globalError ? <p className={styles.error}>{globalError}</p> : null}
-        {panelError ? <p className={styles.error}>{panelError}</p> : null}
-        {panelMessage ? <p className={styles.success}>{panelMessage}</p> : null}
+        {globalError ? <Toast variant="error">{globalError}</Toast> : null}
+        {panelError ? <Toast variant="error">{panelError}</Toast> : null}
+        {panelMessage ? <Toast variant="success">{panelMessage}</Toast> : null}
       </section>
 
       <section className={styles.card}>
@@ -1838,6 +1840,6 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           <p className={styles.empty}>No failed writeback rows.</p>
         )}
       </section>
-    </main>
+    </PageShell>
   );
 }

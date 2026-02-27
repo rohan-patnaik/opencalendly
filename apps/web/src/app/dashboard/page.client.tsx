@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { Button, Card, LinkButton, PageShell, Toast } from '../../components/ui';
 import { authedGetJson } from '../../lib/api-client';
 import { useAuthSession } from '../../lib/use-auth-session';
 import styles from './page.module.css';
@@ -229,54 +229,55 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
 
   if (!ready || authChecking) {
     return (
-      <main className={styles.page}>
-        <section className={styles.card}>
-          <p className={styles.kicker}>Feature 8</p>
-          <h1>Analytics Dashboard (v1)</h1>
+      <PageShell
+        eyebrow="Feature 8"
+        title="Analytics Dashboard"
+        description="Read-only organizer analytics for funnel, team distribution, and operator health."
+      >
+        <Card>
           <p>Restoring your session…</p>
-        </section>
-      </main>
+        </Card>
+      </PageShell>
     );
   }
 
   if (!session || !authedUser) {
     return (
-      <main className={styles.page}>
-        <section className={styles.card}>
-          <p className={styles.kicker}>Authentication required</p>
-          <h1>Analytics Dashboard (v1)</h1>
-          <p>Sign in with magic-link auth to access organizer analytics dashboards.</p>
-          {authError ? <p className={styles.error}>{authError}</p> : null}
+      <PageShell
+        eyebrow="Authentication required"
+        title="Analytics Dashboard"
+        description="Sign in with magic-link auth to access organizer analytics dashboards."
+      >
+        <Card>
+          {authError ? <Toast variant="error">{authError}</Toast> : null}
           <div className={styles.actions}>
-            <Link className={styles.primaryButton} href="/auth/sign-in">
+            <LinkButton href="/auth/sign-in" variant="primary">
               Sign in
-            </Link>
-            <Link className={styles.secondaryButton} href="/demo/intro-call">
+            </LinkButton>
+            <LinkButton href="/demo/intro-call" variant="secondary">
               View booking demo
-            </Link>
+            </LinkButton>
           </div>
-        </section>
-      </main>
+        </Card>
+      </PageShell>
     );
   }
 
   return (
-    <main className={styles.page}>
+    <PageShell
+      eyebrow="Feature 8"
+      title="Analytics Dashboard"
+      description="Read-only organizer analytics for funnel, team scheduling distribution, and operator health."
+    >
       <section className={styles.card}>
-        <p className={styles.kicker}>Feature 8</p>
-        <h1>Analytics Dashboard (v1)</h1>
-        <p>
-          Read-only organizer analytics for funnel, team scheduling distribution, and operator
-          health.
-        </p>
         <div className={styles.metaRow}>
           <span>
             Signed in as <strong>{authedUser.email}</strong>
           </span>
           <span>Timezone: {authedUser.timezone}</span>
-          <button type="button" className={styles.linkButton} onClick={clear}>
+          <Button type="button" variant="ghost" size="sm" onClick={clear}>
             Sign out
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -320,15 +321,10 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
             />
           </label>
         </div>
-        <button
-          className={styles.primaryButton}
-          type="button"
-          onClick={() => void loadDashboard()}
-          disabled={loading}
-        >
+        <Button type="button" onClick={() => void loadDashboard()} disabled={loading}>
           {loading ? 'Loading...' : 'Load analytics'}
-        </button>
-        {error ? <p className={styles.error}>{error}</p> : null}
+        </Button>
+        {error ? <Toast variant="error">{error}</Toast> : null}
       </section>
 
       {funnel ? (
@@ -491,6 +487,6 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
           </div>
         </section>
       ) : null}
-    </main>
+    </PageShell>
   );
 }
