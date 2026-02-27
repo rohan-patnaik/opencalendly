@@ -1,0 +1,1 @@
+CREATE INDEX "analytics_funnel_events_team_event_type_occurred_at_idx" ON "analytics_funnel_events" USING btree ("team_event_type_id","occurred_at");

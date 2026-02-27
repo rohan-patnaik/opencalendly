@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { Hono } from 'hono';
 
 import {
+  analyticsFunnelEvents,
   availabilityOverrides,
   availabilityRules,
   bookingExternalEvents,
@@ -12,6 +13,7 @@ import {
   calendarConnections,
   createDb,
   demoCreditsDaily,
+  emailDeliveries,
   eventTypes,
   sessions,
   teamBookingAssignments,
@@ -25,6 +27,8 @@ import {
   webhookSubscriptions,
 } from '@opencalendly/db';
 import {
+  analyticsRangeQuerySchema,
+  analyticsTrackFunnelEventSchema,
   availabilityQuerySchema,
   bookingActionTokenSchema,
   bookingCancelSchema,
@@ -62,6 +66,7 @@ import {
   SESSION_TTL_DAYS,
   createRawToken,
   getBearerToken,
+  hmacToken,
   hashToken,
 } from './lib/auth';
 import { computeAvailabilitySlots } from './lib/availability';
@@ -132,6 +137,13 @@ import {
   computeTeamAvailabilitySlots,
   computeTeamSlotMatrix,
 } from './lib/team-scheduling';
+import {
+  resolveAnalyticsRange,
+  summarizeFunnelAnalytics,
+  summarizeOperatorHealth,
+  summarizeTeamAnalytics,
+  type AnalyticsFunnelStage,
+} from './lib/analytics';
 
 type HyperdriveBinding = {
   connectionString: string;
@@ -142,6 +154,7 @@ type Bindings = {
   DATABASE_URL?: string;
   APP_BASE_URL?: string;
   SESSION_SECRET?: string;
+  TELEMETRY_HMAC_KEY?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   DEMO_DAILY_PASS_LIMIT?: string;
@@ -309,6 +322,7 @@ type CalendarConnectionStatus = {
 };
 
 type CalendarWritebackOperation = 'create' | 'cancel' | 'reschedule';
+type EmailDeliveryType = 'booking_confirmation' | 'booking_cancellation' | 'booking_rescheduled';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -369,6 +383,14 @@ const resolveCalendarEncryptionSecret = (env: Bindings): string | null => {
   return secret;
 };
 
+const resolveTelemetryHmacKey = (env: Bindings): string | null => {
+  const telemetryHmacKey = env.TELEMETRY_HMAC_KEY?.trim();
+  if (!telemetryHmacKey || telemetryHmacKey.length < MIN_CALENDAR_SECRET_LENGTH) {
+    return null;
+  }
+  return telemetryHmacKey;
+};
+
 const resolveGoogleOAuthConfig = (
   env: Bindings,
 ): { clientId: string; clientSecret: string } | null => {
@@ -418,6 +440,13 @@ const CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS = 5;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT = 25;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_MAX = 100;
 const CALENDAR_WRITEBACK_LEASE_MINUTES = 3;
+const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
+const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE = 120;
+const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP = 300;
+const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS = 5_000;
+const PUBLIC_ANALYTICS_RATE_LIMIT_CLEANUP_INTERVAL = 50;
+const publicAnalyticsRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
+let publicAnalyticsRateLimitRequestCounter = 0;
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -446,6 +475,183 @@ const clampCalendarWritebackBatchLimit = (rawLimit: number | string | undefined)
     return CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT;
   }
   return Math.max(1, Math.min(CALENDAR_WRITEBACK_BATCH_LIMIT_MAX, parsed));
+};
+
+const resolveClientIp = (request: Request): string => {
+  const cloudflareIp = request.headers.get('cf-connecting-ip')?.trim();
+  if (cloudflareIp) {
+    return cloudflareIp;
+  }
+
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const [firstIp] = forwardedFor.split(',');
+    if (firstIp?.trim()) {
+      return firstIp.trim();
+    }
+  }
+
+  return 'unknown';
+};
+
+const isPublicAnalyticsRateLimited = (input: {
+  ip: string;
+  username: string;
+  eventSlug: string;
+  nowMs?: number;
+}): boolean => {
+  const nowMs = input.nowMs ?? Date.now();
+  const cutoffMs = nowMs - PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS;
+
+  const pruneRateLimitState = () => {
+    const shouldCleanup =
+      publicAnalyticsRateLimitState.size > PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS ||
+      publicAnalyticsRateLimitRequestCounter % PUBLIC_ANALYTICS_RATE_LIMIT_CLEANUP_INTERVAL === 0;
+    if (!shouldCleanup) {
+      return;
+    }
+
+    for (const [key, state] of publicAnalyticsRateLimitState) {
+      if (state.windowStartMs < cutoffMs) {
+        publicAnalyticsRateLimitState.delete(key);
+      }
+    }
+
+    if (publicAnalyticsRateLimitState.size > PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS) {
+      const overflow = publicAnalyticsRateLimitState.size - PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS;
+      let removed = 0;
+      for (const key of publicAnalyticsRateLimitState.keys()) {
+        publicAnalyticsRateLimitState.delete(key);
+        removed += 1;
+        if (removed >= overflow) {
+          break;
+        }
+      }
+    }
+  };
+
+  const consumeRateLimitKey = (key: string, maxRequests: number): boolean => {
+    const existing = publicAnalyticsRateLimitState.get(key);
+    if (!existing || existing.windowStartMs < cutoffMs) {
+      publicAnalyticsRateLimitState.set(key, {
+        windowStartMs: nowMs,
+        count: 1,
+      });
+      return false;
+    }
+
+    if (existing.count >= maxRequests) {
+      return true;
+    }
+
+    existing.count += 1;
+    return false;
+  };
+
+  publicAnalyticsRateLimitRequestCounter += 1;
+  pruneRateLimitState();
+
+  const ipKey = `ip:${input.ip}`;
+  if (consumeRateLimitKey(ipKey, PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP)) {
+    return true;
+  }
+
+  const scopedKey = `scope:${input.ip}|${input.username}|${input.eventSlug}`;
+  return consumeRateLimitKey(scopedKey, PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE);
+};
+
+const recordAnalyticsFunnelEvent = async (
+  db: Database,
+  input: {
+    organizerId: string;
+    eventTypeId: string;
+    stage: AnalyticsFunnelStage;
+    teamEventTypeId?: string | null;
+    metadata?: Record<string, unknown>;
+    occurredAt?: Date;
+  },
+): Promise<void> => {
+  await db.insert(analyticsFunnelEvents).values({
+    organizerId: input.organizerId,
+    eventTypeId: input.eventTypeId,
+    ...(input.teamEventTypeId ? { teamEventTypeId: input.teamEventTypeId } : {}),
+    stage: input.stage,
+    ...(input.metadata ? { metadata: input.metadata } : {}),
+    ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
+  });
+};
+
+const tryRecordAnalyticsFunnelEvent = async (
+  db: Database,
+  input: Parameters<typeof recordAnalyticsFunnelEvent>[1],
+): Promise<void> => {
+  await recordAnalyticsFunnelEvent(db, input).catch((error) => {
+    // Analytics writes are best-effort and must not fail booking flows.
+    console.warn('analytics_funnel_event_write_failed', {
+      eventTypeId: input.eventTypeId,
+      stage: input.stage,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+  });
+};
+
+const hashEmailForTelemetry = (email: string, telemetryHmacKey: string): string => {
+  return hmacToken(email.trim().toLowerCase(), telemetryHmacKey);
+};
+
+const recordEmailDelivery = async (
+  db: Database,
+  telemetryHmacKey: string,
+  input: {
+    organizerId: string;
+    bookingId: string;
+    eventTypeId: string;
+    recipientEmail: string;
+    emailType: EmailDeliveryType;
+    provider: string;
+    status: 'succeeded' | 'failed';
+    providerMessageId?: string;
+    error?: string;
+  },
+): Promise<void> => {
+  await db.insert(emailDeliveries).values({
+    organizerId: input.organizerId,
+    bookingId: input.bookingId,
+    eventTypeId: input.eventTypeId,
+    recipientEmailHash: hashEmailForTelemetry(input.recipientEmail, telemetryHmacKey),
+    emailType: input.emailType,
+    provider: input.provider,
+    status: input.status,
+    ...(input.providerMessageId ? { providerMessageId: input.providerMessageId } : {}),
+    ...(input.error ? { error: input.error.slice(0, 1000) } : {}),
+  });
+};
+
+const tryRecordEmailDelivery = async (
+  env: Bindings,
+  db: Database,
+  input: Parameters<typeof recordEmailDelivery>[2],
+): Promise<void> => {
+  const telemetryHmacKey = resolveTelemetryHmacKey(env);
+  if (!telemetryHmacKey) {
+    console.warn('email_delivery_write_failed', {
+      bookingId: input.bookingId,
+      emailType: input.emailType,
+      status: input.status,
+      error: 'missing_telemetry_hmac_key',
+    });
+    return;
+  }
+
+  await recordEmailDelivery(db, telemetryHmacKey, input).catch((error) => {
+    // Delivery telemetry is best-effort and should not fail request paths.
+    console.warn('email_delivery_write_failed', {
+      bookingId: input.bookingId,
+      emailType: input.emailType,
+      status: input.status,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+  });
 };
 
 const stripTrailingSlash = (value: string): string => {
@@ -2067,6 +2273,434 @@ app.get('/v0/auth/me', async (context) => {
     }
 
     return context.json({ ok: true, user: authedUser });
+  });
+});
+
+app.get('/v0/analytics/funnel', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const query = Object.fromEntries(new URL(context.req.url).searchParams.entries());
+    const parsed = analyticsRangeQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid query params.');
+    }
+
+    let range: { start: Date; endExclusive: Date; startDate: string; endDate: string };
+    try {
+      range = resolveAnalyticsRange({
+        startDate: parsed.data.startDate,
+        endDate: parsed.data.endDate,
+      });
+    } catch (error) {
+      return jsonError(context, 400, error instanceof Error ? error.message : 'Invalid range.');
+    }
+
+    const funnelWhere = [
+      eq(analyticsFunnelEvents.organizerId, authedUser.id),
+      gte(analyticsFunnelEvents.occurredAt, range.start),
+      lt(analyticsFunnelEvents.occurredAt, range.endExclusive),
+    ];
+    if (parsed.data.eventTypeId) {
+      funnelWhere.push(eq(analyticsFunnelEvents.eventTypeId, parsed.data.eventTypeId));
+    }
+
+    const bookingWhere = [
+      eq(bookings.organizerId, authedUser.id),
+      gte(bookings.createdAt, range.start),
+      lt(bookings.createdAt, range.endExclusive),
+      inArray(bookings.status, ['confirmed', 'canceled']),
+    ];
+    if (parsed.data.eventTypeId) {
+      bookingWhere.push(eq(bookings.eventTypeId, parsed.data.eventTypeId));
+    }
+
+    const funnelDateBucket = sql<string>`to_char(timezone('utc', ${analyticsFunnelEvents.occurredAt}), 'YYYY-MM-DD')`;
+    const bookingDateBucket = sql<string>`to_char(timezone('utc', ${bookings.createdAt}), 'YYYY-MM-DD')`;
+    const bookingStatusBucket = sql<string>`case
+      when ${bookings.rescheduledFromBookingId} is not null then 'rescheduled'
+      else ${bookings.status}
+    end`;
+
+    const [funnelRows, bookingRows] = await Promise.all([
+      db
+        .select({
+          stage: analyticsFunnelEvents.stage,
+          eventTypeId: analyticsFunnelEvents.eventTypeId,
+          date: funnelDateBucket.as('date'),
+          count: sql<number>`count(*)::int`.as('count'),
+        })
+        .from(analyticsFunnelEvents)
+        .where(and(...funnelWhere))
+        .groupBy(analyticsFunnelEvents.stage, analyticsFunnelEvents.eventTypeId, funnelDateBucket),
+      db
+        .select({
+          eventTypeId: bookings.eventTypeId,
+          status: bookingStatusBucket.as('status'),
+          date: bookingDateBucket.as('date'),
+          count: sql<number>`count(*)::int`.as('count'),
+        })
+        .from(bookings)
+        .where(and(...bookingWhere))
+        .groupBy(bookings.eventTypeId, bookingStatusBucket, bookingDateBucket),
+    ]);
+
+    const eventTypeIds = Array.from(
+      new Set([
+        ...funnelRows.map((row) => row.eventTypeId),
+        ...bookingRows.map((row) => row.eventTypeId),
+      ]),
+    );
+
+    const eventTypeNameById = new Map<string, string>();
+    if (eventTypeIds.length > 0) {
+      const eventRows = await db
+        .select({
+          id: eventTypes.id,
+          name: eventTypes.name,
+        })
+        .from(eventTypes)
+        .where(inArray(eventTypes.id, eventTypeIds));
+      for (const row of eventRows) {
+        eventTypeNameById.set(row.id, row.name);
+      }
+    }
+
+    const metrics = summarizeFunnelAnalytics({
+      funnelRows,
+      bookingRows,
+      eventTypeNameById,
+    });
+
+    return context.json({
+      ok: true,
+      range: {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      },
+      summary: metrics.summary,
+      byEventType: metrics.byEventType,
+      daily: metrics.daily,
+    });
+  });
+});
+
+app.get('/v0/analytics/team', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const query = Object.fromEntries(new URL(context.req.url).searchParams.entries());
+    const parsed = analyticsRangeQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid query params.');
+    }
+
+    let range: { start: Date; endExclusive: Date; startDate: string; endDate: string };
+    try {
+      range = resolveAnalyticsRange({
+        startDate: parsed.data.startDate,
+        endDate: parsed.data.endDate,
+      });
+    } catch (error) {
+      return jsonError(context, 400, error instanceof Error ? error.message : 'Invalid range.');
+    }
+
+    const teamEventTypeWhere = [eq(teams.ownerUserId, authedUser.id)];
+    if (parsed.data.teamId) {
+      teamEventTypeWhere.push(eq(teamEventTypes.teamId, parsed.data.teamId));
+    }
+    if (parsed.data.eventTypeId) {
+      teamEventTypeWhere.push(eq(teamEventTypes.eventTypeId, parsed.data.eventTypeId));
+    }
+
+    const teamEventTypeRows = await db
+      .select({
+        teamEventTypeId: teamEventTypes.id,
+        teamId: teams.id,
+        teamName: teams.name,
+        mode: teamEventTypes.mode,
+        eventTypeId: eventTypes.id,
+        eventTypeName: eventTypes.name,
+      })
+      .from(teamEventTypes)
+      .innerJoin(teams, eq(teams.id, teamEventTypes.teamId))
+      .innerJoin(eventTypes, eq(eventTypes.id, teamEventTypes.eventTypeId))
+      .where(and(...teamEventTypeWhere));
+
+    if (teamEventTypeRows.length === 0) {
+      return context.json({
+        ok: true,
+        range: {
+          startDate: range.startDate,
+          endDate: range.endDate,
+        },
+        roundRobinAssignments: [],
+        collectiveBookings: [],
+      });
+    }
+
+    const teamEventTypeById = new Map(
+      teamEventTypeRows.map((row) => [row.teamEventTypeId, row] as const),
+    );
+    const teamEventTypeIdsByEventTypeId = new Map<string, string[]>();
+    for (const row of teamEventTypeRows) {
+      const existing = teamEventTypeIdsByEventTypeId.get(row.eventTypeId);
+      if (existing) {
+        existing.push(row.teamEventTypeId);
+      } else {
+        teamEventTypeIdsByEventTypeId.set(row.eventTypeId, [row.teamEventTypeId]);
+      }
+    }
+
+    const bookingEventTypeIds = Array.from(teamEventTypeIdsByEventTypeId.keys());
+    const teamBookingRows =
+      bookingEventTypeIds.length === 0
+        ? []
+        : await db
+            .select({
+              bookingId: bookings.id,
+              eventTypeId: bookings.eventTypeId,
+              metadata: bookings.metadata,
+            })
+            .from(bookings)
+            .where(
+              and(
+                inArray(bookings.eventTypeId, bookingEventTypeIds),
+                gte(bookings.createdAt, range.start),
+                lt(bookings.createdAt, range.endExclusive),
+              ),
+            );
+
+    const bookingIds = teamBookingRows.map((row) => row.bookingId);
+    const assignmentRows =
+      bookingIds.length === 0
+        ? []
+        : await db
+            .select({
+              bookingId: teamBookingAssignments.bookingId,
+              teamEventTypeId: teamBookingAssignments.teamEventTypeId,
+              memberUserId: teamBookingAssignments.userId,
+              memberDisplayName: users.displayName,
+            })
+            .from(teamBookingAssignments)
+            .innerJoin(users, eq(users.id, teamBookingAssignments.userId))
+            .where(inArray(teamBookingAssignments.bookingId, bookingIds));
+
+    const assignmentRowsByBookingId = new Map<
+      string,
+      Array<{
+        teamEventTypeId: string;
+        memberUserId: string;
+        memberDisplayName: string;
+      }>
+    >();
+    for (const row of assignmentRows) {
+      const existing = assignmentRowsByBookingId.get(row.bookingId);
+      if (existing) {
+        existing.push(row);
+      } else {
+        assignmentRowsByBookingId.set(row.bookingId, [row]);
+      }
+    }
+
+    const metadataByBookingId = new Map<
+      string,
+      ReturnType<typeof parseBookingMetadata>['team'] | undefined
+    >();
+    const metadataMemberUserIds = new Set<string>();
+    for (const row of teamBookingRows) {
+      const parsedTeamMetadata = parseBookingMetadata(row.metadata, normalizeTimezone).team;
+      metadataByBookingId.set(row.bookingId, parsedTeamMetadata);
+      for (const memberUserId of parsedTeamMetadata?.assignmentUserIds ?? []) {
+        metadataMemberUserIds.add(memberUserId);
+      }
+    }
+
+    const memberDisplayNameByUserId = new Map<string, string>();
+    for (const row of assignmentRows) {
+      memberDisplayNameByUserId.set(row.memberUserId, row.memberDisplayName);
+    }
+
+    const missingMemberUserIds = Array.from(metadataMemberUserIds).filter(
+      (memberUserId) => !memberDisplayNameByUserId.has(memberUserId),
+    );
+    if (missingMemberUserIds.length > 0) {
+      const missingMemberRows = await db
+        .select({
+          id: users.id,
+          displayName: users.displayName,
+        })
+        .from(users)
+        .where(inArray(users.id, missingMemberUserIds));
+      for (const row of missingMemberRows) {
+        memberDisplayNameByUserId.set(row.id, row.displayName);
+      }
+    }
+
+    const roundRobinRows: Array<{
+      teamEventTypeId: string;
+      memberUserId: string;
+      memberDisplayName: string;
+    }> = [];
+    const collectiveRows: Array<{
+      bookingId: string;
+      teamEventTypeId: string;
+    }> = [];
+
+    for (const row of teamBookingRows) {
+      const bookingAssignmentRows = assignmentRowsByBookingId.get(row.bookingId) ?? [];
+      const parsedTeamMetadata = metadataByBookingId.get(row.bookingId);
+
+      let teamEventTypeId: string | null = null;
+      if (
+        parsedTeamMetadata?.teamEventTypeId &&
+        teamEventTypeById.has(parsedTeamMetadata.teamEventTypeId)
+      ) {
+        teamEventTypeId = parsedTeamMetadata.teamEventTypeId;
+      } else if (bookingAssignmentRows.length > 0) {
+        teamEventTypeId = bookingAssignmentRows[0]?.teamEventTypeId ?? null;
+      } else {
+        const fallbackTeamEventTypeIds = teamEventTypeIdsByEventTypeId.get(row.eventTypeId) ?? [];
+        if (fallbackTeamEventTypeIds.length === 1) {
+          teamEventTypeId = fallbackTeamEventTypeIds[0] ?? null;
+        }
+      }
+
+      if (!teamEventTypeId) {
+        continue;
+      }
+
+      const teamEventTypeMeta = teamEventTypeById.get(teamEventTypeId);
+      if (!teamEventTypeMeta) {
+        continue;
+      }
+
+      const mode = parsedTeamMetadata?.mode ?? teamEventTypeMeta.mode;
+      if (mode === 'collective') {
+        collectiveRows.push({
+          bookingId: row.bookingId,
+          teamEventTypeId,
+        });
+        continue;
+      }
+
+      const assignmentSource =
+        bookingAssignmentRows.length > 0
+          ? bookingAssignmentRows
+              .filter((assignment) => assignment.teamEventTypeId === teamEventTypeId)
+              .map((assignment) => ({
+                memberUserId: assignment.memberUserId,
+                memberDisplayName: assignment.memberDisplayName,
+              }))
+          : (parsedTeamMetadata?.assignmentUserIds ?? []).map((memberUserId) => ({
+              memberUserId,
+              memberDisplayName:
+                memberDisplayNameByUserId.get(memberUserId) ?? 'Unknown Member',
+            }));
+
+      for (const assignment of assignmentSource) {
+        roundRobinRows.push({
+          teamEventTypeId,
+          memberUserId: assignment.memberUserId,
+          memberDisplayName: assignment.memberDisplayName,
+        });
+      }
+    }
+
+    const metrics = summarizeTeamAnalytics({
+      teamEventTypeRows,
+      roundRobinRows,
+      collectiveRows,
+    });
+
+    return context.json({
+      ok: true,
+      range: {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      },
+      roundRobinAssignments: metrics.roundRobinAssignments,
+      collectiveBookings: metrics.collectiveBookings,
+    });
+  });
+});
+
+app.get('/v0/analytics/operator/health', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const query = Object.fromEntries(new URL(context.req.url).searchParams.entries());
+    const parsed = analyticsRangeQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid query params.');
+    }
+
+    let range: { start: Date; endExclusive: Date; startDate: string; endDate: string };
+    try {
+      range = resolveAnalyticsRange({
+        startDate: parsed.data.startDate,
+        endDate: parsed.data.endDate,
+      });
+    } catch (error) {
+      return jsonError(context, 400, error instanceof Error ? error.message : 'Invalid range.');
+    }
+
+    const [webhookRows, emailRows] = await Promise.all([
+      db
+        .select({
+          status: webhookDeliveries.status,
+          count: sql<number>`count(*)::int`.as('count'),
+        })
+        .from(webhookDeliveries)
+        .innerJoin(webhookSubscriptions, eq(webhookSubscriptions.id, webhookDeliveries.subscriptionId))
+        .where(
+          and(
+            eq(webhookSubscriptions.userId, authedUser.id),
+            gte(webhookDeliveries.createdAt, range.start),
+            lt(webhookDeliveries.createdAt, range.endExclusive),
+          ),
+        )
+        .groupBy(webhookDeliveries.status),
+      db
+        .select({
+          status: emailDeliveries.status,
+          emailType: emailDeliveries.emailType,
+          count: sql<number>`count(*)::int`.as('count'),
+        })
+        .from(emailDeliveries)
+        .where(
+          and(
+            eq(emailDeliveries.organizerId, authedUser.id),
+            gte(emailDeliveries.createdAt, range.start),
+            lt(emailDeliveries.createdAt, range.endExclusive),
+          ),
+        )
+        .groupBy(emailDeliveries.status, emailDeliveries.emailType),
+    ]);
+
+    const metrics = summarizeOperatorHealth({
+      webhookRows,
+      emailRows,
+    });
+
+    return context.json({
+      ok: true,
+      range: {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      },
+      webhookDeliveries: metrics.webhookDeliveries,
+      emailDeliveries: metrics.emailDeliveries,
+    });
   });
 });
 
@@ -4016,6 +4650,49 @@ app.put('/v0/me/availability/overrides', async (context) => {
   });
 });
 
+app.post('/v0/analytics/funnel/events', async (context) => {
+  const body = await context.req.json().catch(() => null);
+  const parsed = analyticsTrackFunnelEventSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+  }
+
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicAnalyticsRateLimited({
+      ip: requestIp,
+      username: parsed.data.username,
+      eventSlug: parsed.data.eventSlug,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
+
+  return withDatabase(context, async (db) => {
+    const eventType = await findPublicEventType(db, parsed.data.username, parsed.data.eventSlug);
+    if (!eventType) {
+      return jsonError(context, 404, 'Event type not found.');
+    }
+
+    await recordAnalyticsFunnelEvent(db, {
+      organizerId: eventType.userId,
+      eventTypeId: eventType.id,
+      stage: parsed.data.stage,
+      metadata: {
+        source: 'public_booking_page',
+      },
+    }).catch((error) => {
+      console.warn('analytics_funnel_event_write_failed', {
+        eventTypeId: eventType.id,
+        stage: parsed.data.stage,
+        error: error instanceof Error ? error.message : 'unknown',
+      });
+    });
+
+    return context.json({ ok: true });
+  });
+});
+
 app.get('/v0/users/:username/event-types/:slug', async (context) => {
   return withDatabase(context, async (db) => {
     const username = context.req.param('username');
@@ -4451,6 +5128,14 @@ app.post('/v0/team-bookings', async (context) => {
         rescheduleToken: tokens.rescheduleToken,
       });
 
+      await tryRecordAnalyticsFunnelEvent(db, {
+        organizerId: result.booking.organizerId,
+        eventTypeId: result.booking.eventTypeId,
+        teamEventTypeId: result.team.teamEventTypeId,
+        stage: 'booking_confirmed',
+        occurredAt: new Date(),
+      });
+
       const email = await sendBookingConfirmationEmail(context.env, {
         inviteeEmail: payload.inviteeEmail,
         inviteeName: payload.inviteeName,
@@ -4464,6 +5149,18 @@ app.post('/v0/team-bookings', async (context) => {
         cancelLink: actionUrls.lookupCancelUrl,
         rescheduleLink: actionUrls.lookupRescheduleUrl,
         idempotencyKey: `booking-confirmation:${result.booking.id}`,
+      });
+
+      await tryRecordEmailDelivery(context.env, db, {
+        organizerId: result.booking.organizerId,
+        bookingId: result.booking.id,
+        eventTypeId: result.booking.eventTypeId,
+        recipientEmail: result.booking.inviteeEmail,
+        emailType: 'booking_confirmation',
+        provider: email.provider,
+        status: email.sent ? 'succeeded' : 'failed',
+        ...(email.messageId ? { providerMessageId: email.messageId } : {}),
+        ...(email.error ? { error: email.error } : {}),
       });
 
       const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
@@ -4713,6 +5410,13 @@ app.post('/v0/bookings', async (context) => {
         rescheduleToken: tokens.rescheduleToken,
       });
 
+      await tryRecordAnalyticsFunnelEvent(db, {
+        organizerId: result.booking.organizerId,
+        eventTypeId: result.booking.eventTypeId,
+        stage: 'booking_confirmed',
+        occurredAt: new Date(),
+      });
+
       const email = await sendBookingConfirmationEmail(context.env, {
         inviteeEmail: payload.inviteeEmail,
         inviteeName: payload.inviteeName,
@@ -4725,6 +5429,18 @@ app.post('/v0/bookings', async (context) => {
         cancelLink: actionUrls.lookupCancelUrl,
         rescheduleLink: actionUrls.lookupRescheduleUrl,
         idempotencyKey: `booking-confirmation:${result.booking.id}`,
+      });
+
+      await tryRecordEmailDelivery(context.env, db, {
+        organizerId: result.booking.organizerId,
+        bookingId: result.booking.id,
+        eventTypeId: result.booking.eventTypeId,
+        recipientEmail: result.booking.inviteeEmail,
+        emailType: 'booking_confirmation',
+        provider: email.provider,
+        status: email.sent ? 'succeeded' : 'failed',
+        ...(email.messageId ? { providerMessageId: email.messageId } : {}),
+        ...(email.error ? { error: email.error } : {}),
       });
 
       const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
@@ -5110,6 +5826,40 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
               idempotencyKey: `booking-cancel:${result.booking.id}:organizer`,
             }),
           ]);
+
+      if (!result.alreadyProcessed && Array.isArray(email)) {
+        const [inviteeEmailResult, organizerEmailResult] = email;
+        if (inviteeEmailResult) {
+          await tryRecordEmailDelivery(context.env, db, {
+            organizerId: result.booking.organizerId,
+            bookingId: result.booking.id,
+            eventTypeId: result.booking.eventTypeId,
+            recipientEmail: result.booking.inviteeEmail,
+            emailType: 'booking_cancellation',
+            provider: inviteeEmailResult.provider,
+            status: inviteeEmailResult.sent ? 'succeeded' : 'failed',
+            ...(inviteeEmailResult.messageId
+              ? { providerMessageId: inviteeEmailResult.messageId }
+              : {}),
+            ...(inviteeEmailResult.error ? { error: inviteeEmailResult.error } : {}),
+          });
+        }
+        if (organizerEmailResult) {
+          await tryRecordEmailDelivery(context.env, db, {
+            organizerId: result.booking.organizerId,
+            bookingId: result.booking.id,
+            eventTypeId: result.booking.eventTypeId,
+            recipientEmail: result.organizer.email,
+            emailType: 'booking_cancellation',
+            provider: organizerEmailResult.provider,
+            status: organizerEmailResult.sent ? 'succeeded' : 'failed',
+            ...(organizerEmailResult.messageId
+              ? { providerMessageId: organizerEmailResult.messageId }
+              : {}),
+            ...(organizerEmailResult.error ? { error: organizerEmailResult.error } : {}),
+          });
+        }
+      }
 
       const queuedWebhookDeliveries = result.alreadyProcessed
         ? 0
@@ -5638,6 +6388,40 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
               idempotencyKey: `booking-rescheduled:${result.oldBooking.id}:${result.newBooking.id}:organizer`,
             }),
           ]);
+
+      if (!result.alreadyProcessed && Array.isArray(email)) {
+        const [inviteeEmailResult, organizerEmailResult] = email;
+        if (inviteeEmailResult) {
+          await tryRecordEmailDelivery(context.env, db, {
+            organizerId: result.newBooking.organizerId,
+            bookingId: result.newBooking.id,
+            eventTypeId: result.newBooking.eventTypeId,
+            recipientEmail: result.newBooking.inviteeEmail,
+            emailType: 'booking_rescheduled',
+            provider: inviteeEmailResult.provider,
+            status: inviteeEmailResult.sent ? 'succeeded' : 'failed',
+            ...(inviteeEmailResult.messageId
+              ? { providerMessageId: inviteeEmailResult.messageId }
+              : {}),
+            ...(inviteeEmailResult.error ? { error: inviteeEmailResult.error } : {}),
+          });
+        }
+        if (organizerEmailResult) {
+          await tryRecordEmailDelivery(context.env, db, {
+            organizerId: result.newBooking.organizerId,
+            bookingId: result.newBooking.id,
+            eventTypeId: result.newBooking.eventTypeId,
+            recipientEmail: result.organizer.email,
+            emailType: 'booking_rescheduled',
+            provider: organizerEmailResult.provider,
+            status: organizerEmailResult.sent ? 'succeeded' : 'failed',
+            ...(organizerEmailResult.messageId
+              ? { providerMessageId: organizerEmailResult.messageId }
+              : {}),
+            ...(organizerEmailResult.error ? { error: organizerEmailResult.error } : {}),
+          });
+        }
+      }
 
       const queuedWebhookDeliveries = result.alreadyProcessed
         ? 0

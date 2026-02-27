@@ -36,6 +36,14 @@ export default function HomePage() {
           <Link href="/demo/intro-call">/demo/intro-call</Link>
         </p>
       </section>
+
+      <section className="card">
+        <h2>Feature 8 preview</h2>
+        <p>
+          Organizer analytics dashboard (requires session token):{' '}
+          <Link href="/dashboard">/dashboard</Link>
+        </p>
+      </section>
     </main>
   );
 }
