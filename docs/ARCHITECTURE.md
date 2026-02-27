@@ -57,11 +57,15 @@ flowchart LR
   - `/auth/verify` exchanges token via `POST /v0/auth/verify`, stores session, then redirects
 - Organizer console shell:
   - `/organizer` is the authenticated operational UI over organizer APIs:
+    - left-rail section navigation (`#event-types`, `#availability`, `#teams`, `#webhooks`, `#calendars`, `#writeback`)
+    - operational summary cards for key resource counts (event types, teams, members, webhooks, connected calendars, writeback failures)
     - event type management (`GET/POST/PATCH /v0/event-types`)
     - availability management (`GET /v0/me/availability`, `PUT /v0/me/availability/*`)
     - team/membership/team-event management (`GET /v0/teams*`, `POST /v0/teams*`, `POST /v0/team-event-types`)
     - webhook operations (`GET/POST/PATCH /v0/webhooks`, `POST /v0/webhooks/deliveries/run`)
     - calendar sync + writeback operations (`/v0/calendar/*`)
+- Dashboard shell:
+  - `/dashboard` includes authenticated analytics filters plus quick-action links to organizer sections for operational follow-through.
 - Calendar OAuth callback shells:
   - `/settings/calendar/google/callback`
   - `/settings/calendar/microsoft/callback`

@@ -36,6 +36,14 @@ type AuthMeResponse = {
 };
 
 const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const organizerSections = [
+  { id: 'event-types', label: 'Event types' },
+  { id: 'availability', label: 'Availability' },
+  { id: 'teams', label: 'Teams' },
+  { id: 'webhooks', label: 'Webhooks' },
+  { id: 'calendars', label: 'Calendars' },
+  { id: 'writeback', label: 'Writeback queue' },
+] as const;
 
 const toClockTime = (minuteOfDay: number): string => {
   const clamped = Math.max(0, Math.min(1439, minuteOfDay));
@@ -252,6 +260,19 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     () => teams.find((team) => team.id === selectedTeamId) ?? null,
     [selectedTeamId, teams],
   );
+  const organizerSummary = useMemo(() => {
+    const connectedCalendars = calendarStatuses.filter((status) => status.connected).length;
+    const totalTeamMembers = teams.reduce((count, team) => count + team.memberCount, 0);
+
+    return [
+      { label: 'Event types', value: String(eventTypes.length) },
+      { label: 'Teams', value: String(teams.length) },
+      { label: 'Team members', value: String(totalTeamMembers) },
+      { label: 'Webhooks', value: String(webhooks.length) },
+      { label: 'Calendars connected', value: String(connectedCalendars) },
+      { label: 'Writeback failures', value: String(writebackStatus?.summary.failed ?? 0) },
+    ];
+  }, [calendarStatuses, eventTypes.length, teams, webhooks.length, writebackStatus?.summary.failed]);
 
   const refreshOrganizerState = useCallback(async () => {
     if (!session) {
@@ -1031,7 +1052,29 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         {panelMessage ? <Toast variant="success">{panelMessage}</Toast> : null}
       </section>
 
-      <section className={styles.card}>
+      <div className={styles.consoleLayout}>
+        <aside className={styles.sideRail} aria-label="Organizer section navigation">
+          <div className={styles.sectionNav}>
+            <p className={styles.sectionNavTitle}>Console sections</p>
+            {organizerSections.map((section) => (
+              <a key={section.id} className={styles.sectionNavLink} href={`#${section.id}`}>
+                {section.label}
+              </a>
+            ))}
+          </div>
+
+          <div className={styles.summaryGrid}>
+            {organizerSummary.map((item) => (
+              <article key={item.label} className={styles.summaryCard}>
+                <p>{item.label}</p>
+                <strong>{item.value}</strong>
+              </article>
+            ))}
+          </div>
+        </aside>
+
+        <div className={styles.consoleMain}>
+          <section id="event-types" className={styles.card}>
         <div className={styles.sectionHeader}>
           <h2>Event types</h2>
           <p>Create, list, and edit one-on-one event types.</p>
@@ -1245,9 +1288,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             </button>
           </form>
         </div>
-      </section>
+          </section>
 
-      <section className={styles.card}>
+          <section id="availability" className={styles.card}>
         <div className={styles.sectionHeader}>
           <h2>Availability rules + overrides</h2>
           <p>Read and replace organizer availability definitions used by slot computation.</p>
@@ -1324,9 +1367,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             </button>
           </div>
         </div>
-      </section>
+          </section>
 
-      <section className={styles.card}>
+          <section id="teams" className={styles.card}>
         <div className={styles.sectionHeader}>
           <h2>Teams + members + team event types</h2>
           <p>Create teams, add members, and configure round-robin / collective event types.</p>
@@ -1579,9 +1622,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             </div>
           </div>
         ) : null}
-      </section>
+          </section>
 
-      <section className={styles.card}>
+          <section id="webhooks" className={styles.card}>
         <div className={styles.sectionHeader}>
           <h2>Webhooks + delivery runner</h2>
           <p>Create/list/update subscriptions and trigger delivery processing.</p>
@@ -1703,9 +1746,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             )}
           </div>
         </div>
-      </section>
+          </section>
 
-      <section className={styles.card}>
+          <section id="calendars" className={styles.card}>
         <div className={styles.sectionHeader}>
           <h2>Calendar integrations (Google + Microsoft)</h2>
           <p>Connect, sync, and disconnect provider calendars using the existing API contracts.</p>
@@ -1762,9 +1805,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             ))}
           </div>
         )}
-      </section>
+          </section>
 
-      <section className={styles.card}>
+          <section id="writeback" className={styles.card}>
         <div className={styles.sectionHeader}>
           <h2>Calendar writeback queue</h2>
           <p>Inspect pending/failed writebacks and trigger retry processing.</p>
@@ -1839,7 +1882,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         ) : (
           <p className={styles.empty}>No failed writeback rows.</p>
         )}
-      </section>
+          </section>
+        </div>
+      </div>
     </PageShell>
   );
 }

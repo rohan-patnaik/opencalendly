@@ -282,6 +282,25 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
       </section>
 
       <section className={styles.card}>
+        <p className={styles.kicker}>Operations</p>
+        <h2>Quick actions</h2>
+        <div className={styles.quickLinks}>
+          <LinkButton href="/organizer#event-types" variant="secondary">
+            Manage event types
+          </LinkButton>
+          <LinkButton href="/organizer#teams" variant="secondary">
+            Manage teams
+          </LinkButton>
+          <LinkButton href="/organizer#webhooks" variant="secondary">
+            Run webhooks
+          </LinkButton>
+          <LinkButton href="/organizer#writeback" variant="secondary">
+            Run writeback queue
+          </LinkButton>
+        </div>
+      </section>
+
+      <section className={styles.card}>
         <h2>Filters</h2>
         <div className={styles.grid}>
           <label className={styles.label}>
@@ -321,9 +340,24 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
             />
           </label>
         </div>
-        <Button type="button" onClick={() => void loadDashboard()} disabled={loading}>
-          {loading ? 'Loading...' : 'Load analytics'}
-        </Button>
+        <div className={styles.actions}>
+          <Button type="button" onClick={() => void loadDashboard()} disabled={loading}>
+            {loading ? 'Loading...' : 'Load analytics'}
+          </Button>
+          <button
+            type="button"
+            className={styles.linkButton}
+            onClick={() => {
+              setStartDate(defaultRange.startDate);
+              setEndDate(defaultRange.endDate);
+              setEventTypeId('');
+              setTeamId('');
+            }}
+            disabled={loading}
+          >
+            Reset filters
+          </button>
+        </div>
         {error ? <Toast variant="error">{error}</Toast> : null}
       </section>
 
