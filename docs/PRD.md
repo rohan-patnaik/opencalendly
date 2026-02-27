@@ -24,7 +24,7 @@ Build a practical open-source scheduling platform for solo creators, consultants
 
 ## Roadmap
 
-### Completed foundation (PR#2-PR#7)
+### Completed foundation and v1 buildout (PR#2-PR#15)
 
 - Monorepo + infra bootstrap.
 - One-on-one event types + public booking links + timezone/buffer handling.
@@ -32,18 +32,21 @@ Build a practical open-source scheduling platform for solo creators, consultants
 - Demo Credits Pool + waitlist + reset controls.
 - Embeds + outbound webhooks with retry/signature.
 - Team scheduling modes (`round_robin`, `collective`) with correctness-safe commit.
+- Calendar sync hardening (Google + Microsoft) with external busy conflict blocking and writeback retry.
+- Analytics/operator dashboard API + baseline web dashboard.
+- Reliability hardening (rate limiting, idempotency keys, CI smoke coverage, platform policy enforcement).
+- Launch readiness docs + `v1.0.0` release artifacts.
+- Migration bootstrap hotfix for fresh Neon environments.
 
-### Remaining to reach v1.0
+### Post-v1 UI parity track
 
-- PR#10 Feature 6: Calendar Sync Hardening v1 (Google busy sync + conflict blocking).
-- PR#11 Feature 7: Calendar Sync Hardening v2 (Outlook + booking writeback).
-- PR#12 Feature 8: Analytics + operator dashboard v1.
-- PR#13 Feature 9: Reliability + platform hardening (rate limits, idempotency, CI/smoke, branch protection enforcement).
-- PR#14 Feature 10: Launch readiness + `v1.0.0` release hardening.
+- Chore PR: dependency sync for Wrangler/runtime alignment.
+- Feature 11: UI foundation + homepage parity + theme toggle + magic-link auth UX.
+- Feature 12: organizer console parity for already-implemented authenticated APIs.
+- Feature 13: public booking/action UX parity (one-on-one/team/cancel/reschedule/embed playground).
 
-### Done definition for this roadmap
+### Done definition for UI parity track
 
-- Feature 6 through Feature 10 are merged to `main` with CI green.
+- Feature 11 through Feature 13 are merged to `main` with CI green.
 - CodeRabbit and Greptile review gates are satisfied for each feature PR.
-- API/architecture/stack docs are updated in the same PR as each feature.
-- `v1.0.0` release notes and operator runbook are published.
+- Frontend architecture and route documentation stay in sync with shipped UX.

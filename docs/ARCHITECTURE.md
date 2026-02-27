@@ -34,6 +34,27 @@ flowchart LR
 - `email_deliveries`: best-effort delivery telemetry for confirmation/cancellation/reschedule emails.
 - `idempotency_requests`: request dedupe records for booking mutations (`scope + key hash + request hash + replay payload`).
 
+## Frontend architecture (post-v1 parity track)
+
+- Global app chrome wraps all routes and provides:
+  - primary navigation
+  - session state affordances (signed-in identity + sign-out)
+  - theme toggle control
+- Theme system:
+  - CSS variable tokens in global stylesheet (`light` + `dark`)
+  - persisted theme preference (`light` | `dark` | `system`) in browser storage
+  - early `data-theme` hydration script to reduce theme flash during SSR/CSR handoff
+- Auth session model:
+  - client-side `AuthSession` store in localStorage
+  - shared hook to observe/update session across tabs via storage + custom events
+  - bootstrap validation through `GET /v0/auth/me` before loading authenticated dashboard data
+- Auth route shells:
+  - `/auth/sign-in` requests one-time token via `POST /v0/auth/magic-link`
+  - `/auth/verify` exchanges token via `POST /v0/auth/verify`, stores session, then redirects
+- Typed API client utilities:
+  - centralized authenticated `GET`/`POST` wrappers
+  - normalized error extraction from API payloads for consistent UI state handling
+
 ## Critical flows
 
 ### Compute availability

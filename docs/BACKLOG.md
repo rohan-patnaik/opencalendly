@@ -235,3 +235,53 @@ Execution plan (Feature 10 PR flow):
    - Feature 6, 7, 8, 9, and 10 merged to `main`
    - docs/API.md, docs/ARCHITECTURE.md, docs/STACK.md, and docs/PRD.md updated per feature
    - release `v1.0.0` tagged with final handoff summary
+
+## Post-v1 UI Parity Track
+
+### Chore A (PR#16): Wrangler dependency sync
+
+Acceptance criteria:
+
+- `apps/api/package.json` updates Wrangler dependency (`^4.3.0` -> `^4.69.0`).
+- `package-lock.json` is in sync with dependency update.
+- No feature/API behavior changes are introduced.
+- `npm run lint`, `npm run test`, and `npm run typecheck` remain green.
+- `npm run dev:api` starts successfully.
+
+### Feature 11: UI foundation + homepage parity + theme + auth UX
+
+Acceptance criteria:
+
+- Homepage (`/`) ships a modern product surface with links to implemented product routes.
+- Shared UI foundation exists for app chrome/navigation and reusable card/CTA patterns.
+- Global theme toggle supports persisted `light`, `dark`, and `system` preferences.
+- `/auth/sign-in` requests magic-link tokens via `POST /v0/auth/magic-link`.
+- `/auth/verify` verifies tokens via `POST /v0/auth/verify` and stores session client-side.
+- Dashboard session bootstrap uses managed auth state + `GET /v0/auth/me` (no manual token paste flow).
+- Tests cover new session/theme utility logic.
+- `README.md`, `docs/PRD.md`, and `docs/ARCHITECTURE.md` reflect the UI/auth foundation.
+
+### Feature 12: Organizer console parity (UI over implemented APIs)
+
+Acceptance criteria:
+
+- Organizer-authenticated UI supports event types create/edit/list.
+- Organizer-authenticated UI supports availability rules + overrides management.
+- Organizer-authenticated UI supports teams, members, and team event type management.
+- Organizer-authenticated UI supports webhook subscriptions and delivery runner trigger.
+- Organizer-authenticated UI supports Google/Microsoft calendar connect/sync/disconnect/status.
+- Organizer-authenticated UI supports writeback queue status and runner trigger.
+- Missing read/list API endpoints required by the console are added and documented in `docs/API.md`.
+- Loading, empty, error, and authorization states are handled across all organizer panels.
+
+### Feature 13: Public booking/action UX parity
+
+Acceptance criteria:
+
+- One-on-one public booking UI is redesigned for production-quality interaction and clarity.
+- Team booking public route UX is added on top of existing team availability/booking APIs.
+- Booking action pages (`/bookings/actions/[token]`) support cancel and reschedule flows.
+- Action pages correctly handle invalid/expired/conflict/idempotent replay states.
+- Embed playground route exists for script generation and preview.
+- Existing analytics funnel tracking remains wired from public page interactions.
+- Regression coverage includes `/demo/intro-call` and `/dashboard` behavior post-redesign.

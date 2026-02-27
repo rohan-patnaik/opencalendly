@@ -1,0 +1,136 @@
+.root {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(120deg, color-mix(in oklab, var(--accent-2) 16%, transparent), transparent 55%),
+    color-mix(in oklab, var(--surface-2) 90%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.brand {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.navLink {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.4rem 0.62rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.navLink:hover {
+  background: color-mix(in oklab, var(--accent-1) 16%, transparent);
+  color: var(--text);
+}
+
+.navLinkActive {
+  color: var(--text);
+  background: color-mix(in oklab, var(--accent-1) 26%, transparent);
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.themeButton {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  color: var(--text);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.themeButton:hover {
+  background: color-mix(in oklab, var(--surface-1) 76%, var(--accent-2));
+}
+
+.sessionChip {
+  padding: 0.36rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--accent-2) 10%, transparent);
+  font-size: 0.82rem;
+  color: var(--muted);
+  max-width: 15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actionLink {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 0.38rem 0.72rem;
+  background: color-mix(in oklab, var(--surface-1) 88%, transparent);
+}
+
+.actionLink:hover {
+  background: color-mix(in oklab, var(--accent-1) 16%, transparent);
+}
+
+.content {
+  padding-bottom: 2rem;
+}
+
+@media (max-width: 920px) {
+  .header {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'brand right'
+      'nav nav';
+    row-gap: 0.75rem;
+  }
+
+  .brand {
+    grid-area: brand;
+  }
+
+  .nav {
+    grid-area: nav;
+  }
+
+  .right {
+    grid-area: right;
+  }
+
+  .sessionChip {
+    display: none;
+  }
+}

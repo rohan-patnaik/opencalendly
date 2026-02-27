@@ -41,23 +41,23 @@ cp .env.example .env
 
 Populate required values in `.env` once, up front:
 
-| Variable | How to get it |
-| --- | --- |
-| `DATABASE_URL` | Neon dashboard -> project -> connection details -> direct Postgres URL (`*.neon.tech`) |
-| `SESSION_SECRET` | Run `openssl rand -hex 32` |
-| `APP_BASE_URL` | Local web URL (`http://localhost:3000`) |
-| `API_BASE_URL` | Local API URL (`http://127.0.0.1:8787`) |
-| `NEXT_PUBLIC_API_BASE_URL` | Same as `API_BASE_URL` for local web calls |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard -> right sidebar account ID |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard -> My Profile -> API Tokens (token with Workers/Pages/Hyperdrive permissions) |
-| `HYPERDRIVE_ID` | Cloudflare dashboard -> Hyperdrive -> created config ID |
-| `RESEND_API_KEY` | Resend dashboard -> API Keys |
-| `RESEND_FROM_EMAIL` | Resend dashboard -> verified sender identity |
-| `GOOGLE_CLIENT_ID` | Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID (Web application) |
-| `GOOGLE_CLIENT_SECRET` | Same Google OAuth credential as above |
-| `MICROSOFT_CLIENT_ID` | Microsoft Entra -> App registrations -> Application (client) ID |
-| `MICROSOFT_CLIENT_SECRET` | Microsoft Entra -> App registrations -> client secret |
-| `DEMO_DAILY_PASS_LIMIT` | Optional integer daily cap for Feature 3 demo credits (default `25`) |
+| Variable                   | How to get it                                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`             | Neon dashboard -> project -> connection details -> direct Postgres URL (`*.neon.tech`)             |
+| `SESSION_SECRET`           | Run `openssl rand -hex 32`                                                                         |
+| `APP_BASE_URL`             | Local web URL (`http://localhost:3000`)                                                            |
+| `API_BASE_URL`             | Local API URL (`http://127.0.0.1:8787`)                                                            |
+| `NEXT_PUBLIC_API_BASE_URL` | Same as `API_BASE_URL` for local web calls                                                         |
+| `CLOUDFLARE_ACCOUNT_ID`    | Cloudflare dashboard -> right sidebar account ID                                                   |
+| `CLOUDFLARE_API_TOKEN`     | Cloudflare dashboard -> My Profile -> API Tokens (token with Workers/Pages/Hyperdrive permissions) |
+| `HYPERDRIVE_ID`            | Cloudflare dashboard -> Hyperdrive -> created config ID                                            |
+| `RESEND_API_KEY`           | Resend dashboard -> API Keys                                                                       |
+| `RESEND_FROM_EMAIL`        | Resend dashboard -> verified sender identity                                                       |
+| `GOOGLE_CLIENT_ID`         | Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID (Web application)    |
+| `GOOGLE_CLIENT_SECRET`     | Same Google OAuth credential as above                                                              |
+| `MICROSOFT_CLIENT_ID`      | Microsoft Entra -> App registrations -> Application (client) ID                                    |
+| `MICROSOFT_CLIENT_SECRET`  | Microsoft Entra -> App registrations -> client secret                                              |
+| `DEMO_DAILY_PASS_LIMIT`    | Optional integer daily cap for Feature 3 demo credits (default `25`)                               |
 
 Optional (not required for current feature set):
 
@@ -104,6 +104,23 @@ npm run dev:web
 
 - Open `http://localhost:3000/demo/intro-call`
 - Use the timezone picker, select an available slot, and submit a booking.
+
+### 7) Feature 11 auth + dashboard smoke test
+
+1. Open `http://localhost:3000/auth/sign-in`
+2. Request a magic-link token (email required; username/displayName required only for first-time account creation).
+3. Complete verification on `http://localhost:3000/auth/verify` (auto-filled token flow).
+4. Confirm redirect to `http://localhost:3000/dashboard` and analytics load without manual token paste.
+
+### Key web routes
+
+- `/` modern product homepage
+- `/auth/sign-in` magic-link session start
+- `/auth/verify` magic-link token verification
+- `/demo/intro-call` public one-on-one booking demo
+- `/dashboard` authenticated organizer analytics dashboard
+
+Theme toggle is available in the top-right app chrome and persists `light` / `dark` / `system`.
 
 ## Deploy Overview (Cloudflare Pages + Workers)
 
