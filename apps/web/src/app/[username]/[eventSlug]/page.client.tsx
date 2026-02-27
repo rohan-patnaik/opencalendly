@@ -51,6 +51,12 @@ type BookingResponse = {
     startsAt: string;
     endsAt: string;
   };
+  email?: {
+    sent: boolean;
+    provider: 'resend' | 'none';
+    messageId?: string;
+    error?: string;
+  };
   error?: string;
 };
 
@@ -90,6 +96,8 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const [emailStatusError, setEmailStatusError] = useState(false);
 
   const timezoneOptions = useMemo(() => {
     return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
@@ -208,6 +216,8 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   const submitBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setConfirmation(null);
+    setEmailStatus(null);
+    setEmailStatusError(false);
     setPageError(null);
 
     if (!selectedSlot) {
@@ -256,7 +266,22 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
         return;
       }
 
+      const recipientEmail = inviteeEmail.trim().toLowerCase();
       setConfirmation(`Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} (${timezone}).`);
+      if (payload.email?.sent) {
+        setEmailStatus(`Confirmation email sent to ${recipientEmail}.`);
+        setEmailStatusError(false);
+      } else if (payload.email) {
+        setEmailStatus(
+          payload.email.error
+            ? `Booking confirmed, but confirmation email was not sent (${payload.email.error}).`
+            : 'Booking confirmed, but confirmation email was not sent.',
+        );
+        setEmailStatusError(true);
+      } else {
+        setEmailStatus('Booking confirmed. Email delivery status is unavailable.');
+        setEmailStatusError(true);
+      }
       setInviteeName('');
       setInviteeEmail('');
       setSelectedSlot('');
@@ -430,6 +455,9 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
 
           {pageError ? <p className={styles.error}>{pageError}</p> : null}
           {confirmation ? <p className={styles.confirmation}>{confirmation}</p> : null}
+          {emailStatus ? (
+            <p className={emailStatusError ? styles.error : styles.confirmation}>{emailStatus}</p>
+          ) : null}
         </div>
       </section>
     </main>

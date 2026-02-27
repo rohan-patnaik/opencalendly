@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
 import {
   analyticsFunnelEvents,
@@ -329,6 +330,49 @@ type CalendarWritebackOperation = 'create' | 'cancel' | 'reschedule';
 type EmailDeliveryType = 'booking_confirmation' | 'booking_cancellation' | 'booking_rescheduled';
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+const LOCAL_WEB_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000'] as const;
+
+const toOrigin = (raw: string | undefined): string | null => {
+  if (!raw) {
+    return null;
+  }
+  const value = raw.trim();
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+};
+
+const resolveAllowedOrigins = (env: Bindings): Set<string> => {
+  const allowedOrigins = new Set<string>(LOCAL_WEB_ORIGINS);
+  const appBaseOrigin = toOrigin(env.APP_BASE_URL);
+  if (appBaseOrigin) {
+    allowedOrigins.add(appBaseOrigin);
+  }
+  return allowedOrigins;
+};
+
+app.use('*', async (context, next) => {
+  const allowedOrigins = resolveAllowedOrigins(context.env);
+
+  return cors({
+    origin: (origin) => {
+      if (!origin) {
+        return undefined;
+      }
+      return allowedOrigins.has(origin) ? origin : undefined;
+    },
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Idempotency-Key'],
+    maxAge: 86_400,
+  })(context, next);
+});
 
 class BookingActionNotFoundError extends Error {}
 class BookingActionGoneError extends Error {}
