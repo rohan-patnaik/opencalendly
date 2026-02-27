@@ -49,6 +49,19 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [mobileNavOpen]);
 
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileNavOpen]);
+
   return (
     <div className={styles.root}>
       <header className={styles.header}>
