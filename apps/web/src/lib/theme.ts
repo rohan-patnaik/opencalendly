@@ -27,8 +27,12 @@ export const readThemePreference = (): ThemePreference => {
   if (!isBrowser()) {
     return 'system';
   }
-  const value = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return isThemePreference(value) ? value : 'system';
+  try {
+    const value = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return isThemePreference(value) ? value : 'system';
+  } catch {
+    return 'system';
+  }
 };
 
 export const resolveTheme = (preference: ThemePreference): 'light' | 'dark' => {
@@ -47,7 +51,11 @@ export const writeThemePreference = (preference: ThemePreference): void => {
   if (!isBrowser()) {
     return;
   }
-  window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+  } catch {
+    // Swallow storage write failures (private mode or blocked storage) and still apply runtime theme.
+  }
   applyTheme(preference);
   emitThemeChange();
 };

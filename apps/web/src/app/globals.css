@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  font-family: 'Sora', 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
+  font-family: Sora, 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
   --bg: #f5f7ff;
   --bg-accent-a: #fef3c7;
   --bg-accent-b: #c4b5fd;
@@ -14,6 +14,8 @@
   --accent-1: #2563eb;
   --accent-2: #14b8a6;
   --accent-3: #f97316;
+  --error-text: #7f1d1d;
+  --success-text: #155e75;
   --shadow-soft: 0 12px 36px rgba(15, 23, 42, 0.09);
 }
 
@@ -32,6 +34,8 @@ html[data-theme='dark'] {
   --accent-1: #60a5fa;
   --accent-2: #2dd4bf;
   --accent-3: #fb923c;
+  --error-text: #fecaca;
+  --success-text: #99f6e4;
   --shadow-soft: 0 16px 42px rgba(3, 7, 18, 0.65);
 }
 

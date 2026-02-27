@@ -16,6 +16,16 @@ export const AUTH_SESSION_STORAGE_KEY = 'opencalendly.auth.session';
 export const AUTH_SESSION_EVENT = 'opencalendly:auth-session-changed';
 
 const isBrowser = (): boolean => typeof window !== 'undefined';
+const removeSessionFromStorage = (): void => {
+  if (!isBrowser()) {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures in restricted browser contexts.
+  }
+};
 
 export const isSessionExpired = (session: AuthSession): boolean => {
   return Date.now() >= new Date(session.expiresAt).getTime();
@@ -26,7 +36,12 @@ export const readAuthSession = (): AuthSession | null => {
     return null;
   }
 
-  const raw = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+  let raw: string | null = null;
+  try {
+    raw = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
   if (!raw) {
     return null;
   }
@@ -37,21 +52,26 @@ export const readAuthSession = (): AuthSession | null => {
       !parsed ||
       typeof parsed.sessionToken !== 'string' ||
       typeof parsed.expiresAt !== 'string' ||
-      !parsed.user
+      !parsed.user ||
+      typeof parsed.user.id !== 'string' ||
+      typeof parsed.user.email !== 'string' ||
+      typeof parsed.user.username !== 'string' ||
+      typeof parsed.user.displayName !== 'string' ||
+      typeof parsed.user.timezone !== 'string'
     ) {
-      window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+      removeSessionFromStorage();
       return null;
     }
 
     const session = parsed as AuthSession;
     if (isSessionExpired(session)) {
-      window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+      removeSessionFromStorage();
       return null;
     }
 
     return session;
   } catch {
-    window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+    removeSessionFromStorage();
     return null;
   }
 };
@@ -67,7 +87,11 @@ export const writeAuthSession = (session: AuthSession): void => {
   if (!isBrowser()) {
     return;
   }
-  window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+  try {
+    window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // Ignore storage failures but still notify listeners with in-memory session state.
+  }
   emitSessionChange();
 };
 
@@ -75,7 +99,7 @@ export const clearAuthSession = (): void => {
   if (!isBrowser()) {
     return;
   }
-  window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
+  removeSessionFromStorage();
   emitSessionChange();
 };
 

@@ -131,13 +131,13 @@
 }
 
 .error {
-  color: #7f1d1d;
+  color: var(--error-text);
   background: color-mix(in oklab, #ef4444 18%, var(--surface-1));
   border-color: color-mix(in oklab, #ef4444 42%, var(--border-strong));
 }
 
 .success {
-  color: #155e75;
+  color: var(--success-text);
   background: color-mix(in oklab, #14b8a6 18%, var(--surface-1));
   border-color: color-mix(in oklab, #14b8a6 42%, var(--border-strong));
 }

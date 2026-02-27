@@ -38,7 +38,7 @@
   opacity: 0.45;
   filter: blur(2px);
   pointer-events: none;
-  animation: pulseOrbit 7.4s ease-in-out infinite;
+  animation: pulse-orbit 7.4s ease-in-out infinite;
 }
 
 .heroContent {
@@ -241,7 +241,7 @@
   letter-spacing: -0.02em;
 }
 
-@keyframes pulseOrbit {
+@keyframes pulse-orbit {
   0%,
   100% {
     transform: translateY(0) scale(1);

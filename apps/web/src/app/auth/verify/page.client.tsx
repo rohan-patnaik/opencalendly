@@ -25,18 +25,6 @@ type VerifyResponse = {
   error?: string;
 };
 
-type AuthMeResponse = {
-  ok: boolean;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    displayName: string;
-    timezone: string;
-  };
-  error?: string;
-};
-
 export default function VerifyPageClient({ apiBaseUrl }: VerifyPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,23 +68,10 @@ export default function VerifyPageClient({ apiBaseUrl }: VerifyPageClientProps) 
           throw new Error(verifyPayload?.error || 'Token verification failed.');
         }
 
-        const meResponse = await fetch(`${apiBaseUrl}/v0/auth/me`, {
-          method: 'GET',
-          cache: 'no-store',
-          headers: {
-            Authorization: `Bearer ${verifyPayload.sessionToken}`,
-          },
-        });
-
-        const mePayload = (await meResponse.json().catch(() => null)) as AuthMeResponse | null;
-        if (!meResponse.ok || !mePayload || !mePayload.ok) {
-          throw new Error(mePayload?.error || 'Session bootstrap failed after verification.');
-        }
-
         save({
           sessionToken: verifyPayload.sessionToken,
           expiresAt: verifyPayload.expiresAt,
-          user: mePayload.user,
+          user: verifyPayload.user,
         });
 
         setSuccess('Session verified. Redirecting to dashboard…');
