@@ -18,6 +18,7 @@ const valueCards = [
 
 const experienceLinks = [
   { label: 'One-on-one booking demo', href: '/demo/intro-call', badge: 'Public' },
+  { label: 'Organizer console', href: '/organizer', badge: 'Auth' },
   { label: 'Organizer analytics dashboard', href: '/dashboard', badge: 'Auth' },
   { label: 'Sign in / start session', href: '/auth/sign-in', badge: 'Auth' },
 ];

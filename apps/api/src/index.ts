@@ -368,6 +368,12 @@ const jsonError = (context: ContextLike, status: number, error: string): Respons
   return context.json({ ok: false, error }, status);
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value: string): boolean => {
+  return UUID_PATTERN.test(value);
+};
+
 const normalizeTimezone = (timezone: string | undefined): string => {
   if (!timezone) {
     return 'UTC';
@@ -4441,6 +4447,380 @@ app.post('/v0/dev/demo-credits/reset', async (context) => {
   });
 });
 
+app.get('/v0/event-types', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const rows = await db
+      .select({
+        id: eventTypes.id,
+        slug: eventTypes.slug,
+        name: eventTypes.name,
+        durationMinutes: eventTypes.durationMinutes,
+        locationType: eventTypes.locationType,
+        locationValue: eventTypes.locationValue,
+        questions: eventTypes.questions,
+        isActive: eventTypes.isActive,
+        createdAt: eventTypes.createdAt,
+      })
+      .from(eventTypes)
+      .where(eq(eventTypes.userId, authedUser.id))
+      .orderBy(desc(eventTypes.createdAt));
+
+    return context.json({
+      ok: true,
+      eventTypes: rows.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        durationMinutes: row.durationMinutes,
+        locationType: row.locationType,
+        locationValue: row.locationValue,
+        questions: toEventQuestions(row.questions),
+        isActive: row.isActive,
+        createdAt: row.createdAt.toISOString(),
+      })),
+    });
+  });
+});
+
+app.get('/v0/me/availability', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const [rules, overrides] = await Promise.all([
+      db
+        .select({
+          id: availabilityRules.id,
+          dayOfWeek: availabilityRules.dayOfWeek,
+          startMinute: availabilityRules.startMinute,
+          endMinute: availabilityRules.endMinute,
+          bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
+          bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
+          createdAt: availabilityRules.createdAt,
+        })
+        .from(availabilityRules)
+        .where(eq(availabilityRules.userId, authedUser.id))
+        .orderBy(asc(availabilityRules.dayOfWeek), asc(availabilityRules.startMinute)),
+      db
+        .select({
+          id: availabilityOverrides.id,
+          startAt: availabilityOverrides.startAt,
+          endAt: availabilityOverrides.endAt,
+          isAvailable: availabilityOverrides.isAvailable,
+          reason: availabilityOverrides.reason,
+          createdAt: availabilityOverrides.createdAt,
+        })
+        .from(availabilityOverrides)
+        .where(eq(availabilityOverrides.userId, authedUser.id))
+        .orderBy(asc(availabilityOverrides.startAt)),
+    ]);
+
+    return context.json({
+      ok: true,
+      rules: rules.map((rule) => ({
+        id: rule.id,
+        dayOfWeek: rule.dayOfWeek,
+        startMinute: rule.startMinute,
+        endMinute: rule.endMinute,
+        bufferBeforeMinutes: rule.bufferBeforeMinutes,
+        bufferAfterMinutes: rule.bufferAfterMinutes,
+        createdAt: rule.createdAt.toISOString(),
+      })),
+      overrides: overrides.map((override) => ({
+        id: override.id,
+        startAt: override.startAt.toISOString(),
+        endAt: override.endAt.toISOString(),
+        isAvailable: override.isAvailable,
+        reason: override.reason,
+        createdAt: override.createdAt.toISOString(),
+      })),
+    });
+  });
+});
+
+app.get('/v0/teams', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const teamRows = await db
+      .select({
+        id: teams.id,
+        ownerUserId: teams.ownerUserId,
+        slug: teams.slug,
+        name: teams.name,
+        createdAt: teams.createdAt,
+      })
+      .from(teams)
+      .where(eq(teams.ownerUserId, authedUser.id))
+      .orderBy(desc(teams.createdAt));
+
+    if (teamRows.length === 0) {
+      return context.json({
+        ok: true,
+        teams: [],
+      });
+    }
+
+    const teamIds = teamRows.map((team) => team.id);
+    const [memberCounts, teamEventTypeCounts] = await Promise.all([
+      db
+        .select({
+          teamId: teamMembers.teamId,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(teamMembers)
+        .where(inArray(teamMembers.teamId, teamIds))
+        .groupBy(teamMembers.teamId),
+      db
+        .select({
+          teamId: teamEventTypes.teamId,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(teamEventTypes)
+        .where(inArray(teamEventTypes.teamId, teamIds))
+        .groupBy(teamEventTypes.teamId),
+    ]);
+
+    const memberCountByTeamId = new Map(memberCounts.map((row) => [row.teamId, row.count]));
+    const teamEventTypeCountByTeamId = new Map(
+      teamEventTypeCounts.map((row) => [row.teamId, row.count]),
+    );
+
+    return context.json({
+      ok: true,
+      teams: teamRows.map((team) => ({
+        id: team.id,
+        ownerUserId: team.ownerUserId,
+        slug: team.slug,
+        name: team.name,
+        memberCount: memberCountByTeamId.get(team.id) ?? 0,
+        teamEventTypeCount: teamEventTypeCountByTeamId.get(team.id) ?? 0,
+        createdAt: team.createdAt.toISOString(),
+      })),
+    });
+  });
+});
+
+app.get('/v0/teams/:teamId/members', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const teamId = context.req.param('teamId');
+    if (!isUuid(teamId)) {
+      return jsonError(context, 400, 'Invalid teamId.');
+    }
+
+    const [team] = await db
+      .select({
+        id: teams.id,
+        ownerUserId: teams.ownerUserId,
+      })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    if (!team) {
+      return jsonError(context, 404, 'Team not found.');
+    }
+    if (team.ownerUserId !== authedUser.id) {
+      return jsonError(context, 403, 'Only the team owner can view members.');
+    }
+
+    const rows = await db
+      .select({
+        id: teamMembers.id,
+        teamId: teamMembers.teamId,
+        userId: teamMembers.userId,
+        role: teamMembers.role,
+        createdAt: teamMembers.createdAt,
+        email: users.email,
+        username: users.username,
+        displayName: users.displayName,
+        timezone: users.timezone,
+      })
+      .from(teamMembers)
+      .innerJoin(users, eq(users.id, teamMembers.userId))
+      .where(eq(teamMembers.teamId, teamId))
+      .orderBy(asc(teamMembers.createdAt), asc(users.username));
+
+    return context.json({
+      ok: true,
+      members: rows.map((row) => ({
+        id: row.id,
+        teamId: row.teamId,
+        userId: row.userId,
+        role: row.role,
+        createdAt: row.createdAt.toISOString(),
+        user: {
+          id: row.userId,
+          email: row.email,
+          username: row.username,
+          displayName: row.displayName,
+          timezone: normalizeTimezone(row.timezone),
+        },
+      })),
+    });
+  });
+});
+
+app.get('/v0/teams/:teamId/event-types', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const teamId = context.req.param('teamId');
+    if (!isUuid(teamId)) {
+      return jsonError(context, 400, 'Invalid teamId.');
+    }
+
+    const [team] = await db
+      .select({
+        id: teams.id,
+        ownerUserId: teams.ownerUserId,
+        slug: teams.slug,
+        name: teams.name,
+      })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .limit(1);
+
+    if (!team) {
+      return jsonError(context, 404, 'Team not found.');
+    }
+    if (team.ownerUserId !== authedUser.id) {
+      return jsonError(context, 403, 'Only the team owner can view team event types.');
+    }
+
+    const rows = await db
+      .select({
+        teamEventTypeId: teamEventTypes.id,
+        mode: teamEventTypes.mode,
+        roundRobinCursor: teamEventTypes.roundRobinCursor,
+        createdAt: teamEventTypes.createdAt,
+        eventTypeId: eventTypes.id,
+        slug: eventTypes.slug,
+        name: eventTypes.name,
+        durationMinutes: eventTypes.durationMinutes,
+        locationType: eventTypes.locationType,
+        locationValue: eventTypes.locationValue,
+        questions: eventTypes.questions,
+        isActive: eventTypes.isActive,
+      })
+      .from(teamEventTypes)
+      .innerJoin(eventTypes, eq(eventTypes.id, teamEventTypes.eventTypeId))
+      .where(eq(teamEventTypes.teamId, team.id))
+      .orderBy(desc(teamEventTypes.createdAt));
+
+    if (rows.length === 0) {
+      return context.json({
+        ok: true,
+        team,
+        eventTypes: [],
+      });
+    }
+
+    const teamEventTypeIds = rows.map((row) => row.teamEventTypeId);
+    const memberRows = await db
+      .select({
+        teamEventTypeId: teamEventTypeMembers.teamEventTypeId,
+        userId: teamEventTypeMembers.userId,
+        isRequired: teamEventTypeMembers.isRequired,
+        role: teamMembers.role,
+        email: users.email,
+        username: users.username,
+        displayName: users.displayName,
+        timezone: users.timezone,
+      })
+      .from(teamEventTypeMembers)
+      .innerJoin(
+        teamMembers,
+        and(
+          eq(teamMembers.userId, teamEventTypeMembers.userId),
+          eq(teamMembers.teamId, team.id),
+        ),
+      )
+      .innerJoin(users, eq(users.id, teamEventTypeMembers.userId))
+      .where(inArray(teamEventTypeMembers.teamEventTypeId, teamEventTypeIds))
+      .orderBy(asc(teamEventTypeMembers.createdAt), asc(users.username));
+
+    const membersByTeamEventTypeId = new Map<
+      string,
+      Array<{
+        userId: string;
+        isRequired: boolean;
+        role: 'owner' | 'member';
+        user: {
+          id: string;
+          email: string;
+          username: string;
+          displayName: string;
+          timezone: string;
+        };
+      }>
+    >();
+
+    for (const member of memberRows) {
+      const existing = membersByTeamEventTypeId.get(member.teamEventTypeId) ?? [];
+      existing.push({
+        userId: member.userId,
+        isRequired: member.isRequired,
+        role: member.role,
+        user: {
+          id: member.userId,
+          email: member.email,
+          username: member.username,
+          displayName: member.displayName,
+          timezone: normalizeTimezone(member.timezone),
+        },
+      });
+      membersByTeamEventTypeId.set(member.teamEventTypeId, existing);
+    }
+
+    return context.json({
+      ok: true,
+      team,
+      eventTypes: rows.map((row) => {
+        const members = membersByTeamEventTypeId.get(row.teamEventTypeId) ?? [];
+        return {
+          id: row.teamEventTypeId,
+          mode: row.mode,
+          roundRobinCursor: row.roundRobinCursor,
+          createdAt: row.createdAt.toISOString(),
+          requiredMemberUserIds: members
+            .filter((member) => member.isRequired)
+            .map((member) => member.userId),
+          members,
+          eventType: {
+            id: row.eventTypeId,
+            slug: row.slug,
+            name: row.name,
+            durationMinutes: row.durationMinutes,
+            locationType: row.locationType,
+            locationValue: row.locationValue,
+            questions: toEventQuestions(row.questions),
+            isActive: row.isActive,
+          },
+        };
+      }),
+    });
+  });
+});
+
 app.post('/v0/event-types', async (context) => {
   return withDatabase(context, async (db) => {
     const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
@@ -4658,6 +5038,10 @@ app.post('/v0/teams/:teamId/members', async (context) => {
     }
 
     const teamId = context.req.param('teamId');
+    if (!isUuid(teamId)) {
+      return jsonError(context, 400, 'Invalid teamId.');
+    }
+
     const body = await context.req.json().catch(() => null);
     const parsed = teamAddMemberSchema.safeParse(body);
     if (!parsed.success) {

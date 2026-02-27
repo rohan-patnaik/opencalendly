@@ -1,0 +1,344 @@
+.page {
+  width: min(1160px, 92vw);
+  margin: 1.4rem auto 2.4rem;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.heroCard,
+.card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.15rem;
+  padding: 1.15rem;
+  background: color-mix(in oklab, var(--surface-1) 92%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+.kicker {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--accent-1);
+}
+
+.heroCard h1,
+.card h2 {
+  margin: 0.35rem 0 0.5rem;
+}
+
+.heroCard p,
+.card p {
+  margin: 0;
+}
+
+.metaStrip {
+  margin-top: 0.85rem;
+  display: flex;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.rowActions {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.sectionHeader {
+  margin-bottom: 0.85rem;
+}
+
+.sectionHeader p {
+  margin-top: 0.3rem;
+}
+
+.splitGrid {
+  display: grid;
+  gap: 0.95rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.9rem;
+}
+
+.listGrid {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.itemCard {
+  border-radius: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  padding: 0.85rem;
+  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.itemCard p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.itemHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.badge {
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  padding: 0.15rem 0.55rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.form {
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.9rem;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.65rem;
+  align-content: start;
+  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+}
+
+.form h3,
+.form h4 {
+  margin: 0;
+}
+
+.label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.labelCompact {
+  display: grid;
+  gap: 0.28rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  color: var(--text);
+  border-radius: 0.62rem;
+  padding: 0.56rem 0.62rem;
+  font: inherit;
+}
+
+.textarea {
+  min-height: 170px;
+  resize: vertical;
+  font-family: 'JetBrains Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: 2px solid color-mix(in oklab, var(--accent-2) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.checkboxGroup {
+  border: 1px dashed var(--border-strong);
+  border-radius: 0.62rem;
+  margin: 0;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.checkboxGroup legend {
+  padding: 0 0.2rem;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.primaryButton,
+.secondaryButton,
+.ghostButton,
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 0.48rem 0.88rem;
+  transition:
+    transform 130ms ease,
+    background 130ms ease,
+    border-color 130ms ease;
+}
+
+.primaryButton {
+  background: linear-gradient(120deg, var(--accent-1), color-mix(in oklab, var(--accent-2) 70%, var(--accent-1)));
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.primaryButton:hover {
+  transform: translateY(-1px);
+}
+
+.secondaryButton {
+  border-color: var(--border-strong);
+  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
+  color: var(--text);
+}
+
+.secondaryButton:hover,
+.ghostButton:hover,
+.linkButton:hover {
+  background: color-mix(in oklab, var(--accent-1) 14%, transparent);
+}
+
+.ghostButton {
+  border-color: var(--border-subtle);
+  background: transparent;
+  color: var(--text);
+}
+
+.linkButton {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-1);
+  padding: 0;
+}
+
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.55rem;
+}
+
+.teamPanel {
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.95rem;
+  padding: 0.9rem;
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.54rem 0.6rem;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.88rem;
+}
+
+.table thead th {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.statGrid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 0.8rem;
+}
+
+.statGrid > div {
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.75rem;
+  padding: 0.7rem;
+  background: color-mix(in oklab, var(--surface-2) 92%, transparent);
+}
+
+.statGrid strong {
+  display: block;
+  font-size: 1.25rem;
+}
+
+.statGrid span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.helperText {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.error {
+  color: var(--error-text);
+  margin-top: 0.6rem;
+}
+
+.success {
+  color: var(--success-text);
+  margin-top: 0.6rem;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.ghostButton:disabled,
+.linkButton:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 920px) {
+  .splitGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .statGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    width: min(1160px, 94vw);
+  }
+}

@@ -115,6 +115,33 @@ Success response:
 }
 ```
 
+### `GET /v0/event-types`
+
+Auth required.
+
+Lists all event types for the authenticated organizer.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "eventTypes": [
+    {
+      "id": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+      "slug": "intro-call",
+      "name": "Intro Call",
+      "durationMinutes": 30,
+      "locationType": "video",
+      "locationValue": "https://meet.example.com/demo",
+      "questions": [],
+      "isActive": true,
+      "createdAt": "2026-02-27T10:12:00.000Z"
+    }
+  ]
+}
+```
+
 ### `POST /v0/event-types`
 
 Auth required.
@@ -167,6 +194,41 @@ Auth required. Supports partial updates for:
 - `locationValue`
 - `questions`
 - `isActive`
+
+### `GET /v0/me/availability`
+
+Auth required.
+
+Returns current organizer recurring rules + date overrides for editor hydration.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "rules": [
+    {
+      "id": "2f4af243-e1c6-416f-9a6a-77ec9bcf4a2f",
+      "dayOfWeek": 1,
+      "startMinute": 540,
+      "endMinute": 1020,
+      "bufferBeforeMinutes": 10,
+      "bufferAfterMinutes": 10,
+      "createdAt": "2026-02-27T10:12:00.000Z"
+    }
+  ],
+  "overrides": [
+    {
+      "id": "9f39a694-0c84-477b-8dc3-9e8e13d37266",
+      "startAt": "2026-03-03T15:00:00.000Z",
+      "endAt": "2026-03-03T18:00:00.000Z",
+      "isAvailable": false,
+      "reason": "Out of office",
+      "createdAt": "2026-02-27T10:20:00.000Z"
+    }
+  ]
+}
+```
 
 ### `PUT /v0/me/availability/rules`
 
@@ -879,6 +941,31 @@ Source of truth: `packages/shared/src/schemas.ts` (`webhookEventSchema`).
 
 ## Feature 5 Endpoints (Team Scheduling v1)
 
+### `GET /v0/teams`
+
+Auth required.
+
+Lists teams owned by the authenticated organizer.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "teams": [
+    {
+      "id": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+      "ownerUserId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+      "slug": "customer-success",
+      "name": "Customer Success Team",
+      "memberCount": 3,
+      "teamEventTypeCount": 2,
+      "createdAt": "2026-02-27T10:35:00.000Z"
+    }
+  ]
+}
+```
+
 ### `POST /v0/teams`
 
 Auth required. Creates a team owned by the current organizer.
@@ -903,6 +990,36 @@ Success response:
     "name": "Customer Success Team",
     "slug": "customer-success"
   }
+}
+```
+
+### `GET /v0/teams/:teamId/members`
+
+Auth required. Team owner only.
+
+Returns the full member roster (role + user metadata) for the team.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "members": [
+    {
+      "id": "bb193f6e-8a7c-43cb-8565-01858db2a58e",
+      "teamId": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+      "userId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+      "role": "owner",
+      "createdAt": "2026-02-27T10:35:10.000Z",
+      "user": {
+        "id": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+        "email": "owner@example.com",
+        "username": "owner",
+        "displayName": "Owner User",
+        "timezone": "UTC"
+      }
+    }
+  ]
 }
 ```
 
@@ -940,6 +1057,59 @@ Success response:
       "displayName": "Owner User"
     }
   }
+}
+```
+
+### `GET /v0/teams/:teamId/event-types`
+
+Auth required. Team owner only.
+
+Returns team event type mappings plus required member assignments.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "team": {
+    "id": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+    "ownerUserId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+    "slug": "customer-success",
+    "name": "Customer Success Team"
+  },
+  "eventTypes": [
+    {
+      "id": "4f06b5a0-a3d9-4e96-9d90-2f9ec5d4d2f7",
+      "mode": "round_robin",
+      "roundRobinCursor": 0,
+      "createdAt": "2026-02-27T10:42:00.000Z",
+      "requiredMemberUserIds": ["5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2"],
+      "members": [
+        {
+          "userId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+          "isRequired": true,
+          "role": "owner",
+          "user": {
+            "id": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+            "email": "owner@example.com",
+            "username": "owner",
+            "displayName": "Owner User",
+            "timezone": "UTC"
+          }
+        }
+      ],
+      "eventType": {
+        "id": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+        "slug": "team-intro",
+        "name": "Team Intro",
+        "durationMinutes": 30,
+        "locationType": "video",
+        "locationValue": "https://meet.example.com/team",
+        "questions": [],
+        "isActive": true
+      }
+    }
+  ]
 }
 ```
 

@@ -20,17 +20,26 @@ const readJsonSafely = async <T>(response: Response): Promise<T | null> => {
   }
 };
 
-export const authedGetJson = async <T>(input: {
+const authedJson = async <T>(input: {
   url: string;
   session: AuthSession | null;
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT';
+  body?: unknown;
   fallbackError: string;
 }): Promise<T> => {
+  const hasBody = input.method !== 'GET';
+  const headers: Record<string, string> = {
+    ...getAuthHeader(input.session),
+  };
+  if (hasBody) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const response = await fetch(input.url, {
-    method: 'GET',
+    method: input.method,
     cache: 'no-store',
-    headers: {
-      ...getAuthHeader(input.session),
-    },
+    headers,
+    ...(hasBody ? { body: JSON.stringify(input.body ?? {}) } : {}),
   });
 
   const payload = await readJsonSafely<T & ApiErrorPayload>(response);
@@ -40,25 +49,49 @@ export const authedGetJson = async <T>(input: {
   return payload;
 };
 
+export const authedGetJson = async <T>(input: {
+  url: string;
+  session: AuthSession | null;
+  fallbackError: string;
+}): Promise<T> => {
+  return authedJson<T>({
+    ...input,
+    method: 'GET',
+  });
+};
+
 export const authedPostJson = async <T>(input: {
   url: string;
   session: AuthSession | null;
   body?: unknown;
   fallbackError: string;
 }): Promise<T> => {
-  const response = await fetch(input.url, {
+  return authedJson<T>({
+    ...input,
     method: 'POST',
-    cache: 'no-store',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeader(input.session),
-    },
-    body: input.body ? JSON.stringify(input.body) : '{}',
   });
+};
 
-  const payload = await readJsonSafely<T & ApiErrorPayload>(response);
-  if (!response.ok || !payload || payload.ok === false) {
-    throw new Error(toErrorMessage(payload, input.fallbackError));
-  }
-  return payload;
+export const authedPatchJson = async <T>(input: {
+  url: string;
+  session: AuthSession | null;
+  body?: unknown;
+  fallbackError: string;
+}): Promise<T> => {
+  return authedJson<T>({
+    ...input,
+    method: 'PATCH',
+  });
+};
+
+export const authedPutJson = async <T>(input: {
+  url: string;
+  session: AuthSession | null;
+  body?: unknown;
+  fallbackError: string;
+}): Promise<T> => {
+  return authedJson<T>({
+    ...input,
+    method: 'PUT',
+  });
 };

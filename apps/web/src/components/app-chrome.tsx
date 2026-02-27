@@ -10,6 +10,7 @@ import styles from './app-chrome.module.css';
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/demo/intro-call', label: 'Book Demo' },
+  { href: '/organizer', label: 'Organizer' },
   { href: '/dashboard', label: 'Dashboard' },
 ];
 
