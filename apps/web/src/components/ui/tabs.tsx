@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 
 import styles from './primitives.module.css';
@@ -14,12 +15,10 @@ type TabsProps = {
 };
 
 export function Tabs({ items, activeId, onChange }: TabsProps) {
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
   const focusTabById = (tabId: string) => {
-    if (typeof document === 'undefined') {
-      return;
-    }
-    const nextElement = document.getElementById(`tab-${tabId}`) as HTMLButtonElement | null;
-    nextElement?.focus();
+    tabRefs.current[tabId]?.focus();
   };
 
   const getNextId = (index: number, offset: number): string => {
@@ -69,12 +68,14 @@ export function Tabs({ items, activeId, onChange }: TabsProps) {
       {items.map((item, index) => (
         <button
           key={item.id}
-          id={`tab-${item.id}`}
           type="button"
           role="tab"
           tabIndex={item.id === activeId ? 0 : -1}
           aria-selected={item.id === activeId}
           className={styles.tabButton}
+          ref={(element) => {
+            tabRefs.current[item.id] = element;
+          }}
           onKeyDown={(event) => onKeyDown(event, index)}
           onClick={() => onChange(item.id)}
         >

@@ -172,10 +172,12 @@
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 0.8rem;
+  pointer-events: none;
 }
 
 .mobileDrawerOpen {
   transform: translateX(0);
+  pointer-events: auto;
 }
 
 .mobileDrawerHeader {

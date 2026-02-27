@@ -122,6 +122,8 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         id="mobile-navigation"
         className={`${styles.mobileDrawer} ${mobileNavOpen ? styles.mobileDrawerOpen : ''}`.trim()}
         aria-label="Mobile navigation"
+        aria-hidden={!mobileNavOpen}
+        inert={!mobileNavOpen}
       >
         <div className={styles.mobileDrawerHeader}>
           <p>Navigate</p>
