@@ -753,7 +753,7 @@ const resolveAppBaseUrl = (env: Bindings, request: Request): string => {
     try {
       return stripTrailingSlash(new URL(configured).toString());
     } catch {
-      // Fall back to request-derived URL if APP_BASE_URL is malformed.
+      throw new Error('APP_BASE_URL must be a valid absolute URL.');
     }
   }
 
@@ -762,7 +762,7 @@ const resolveAppBaseUrl = (env: Bindings, request: Request): string => {
     return 'http://localhost:3000';
   }
 
-  return requestUrl.origin;
+  throw new Error('APP_BASE_URL is required for non-local environments.');
 };
 
 const resolveEmbedTheme = (rawTheme: string | undefined): 'light' | 'dark' => {
