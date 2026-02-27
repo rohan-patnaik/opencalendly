@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../lib/use-auth-session';
 import ThemeToggle from './theme-toggle';
@@ -28,10 +28,11 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, ready, clear } = useAuthSession();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
 
   useEffect(() => {
-    setMobileNavOpen(false);
-  }, [pathname]);
+    closeMobileNav();
+  }, [closeMobileNav, pathname]);
 
   useEffect(() => {
     if (!mobileNavOpen) {
@@ -101,7 +102,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
 
       <div
         className={`${styles.mobileOverlay} ${mobileNavOpen ? styles.mobileOverlayOpen : ''}`.trim()}
-        onClick={() => setMobileNavOpen(false)}
+        onClick={closeMobileNav}
       />
       <aside
         id="mobile-navigation"
@@ -113,7 +114,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             className={styles.mobileCloseButton}
-            onClick={() => setMobileNavOpen(false)}
+            onClick={closeMobileNav}
           >
             Close
           </button>
@@ -123,6 +124,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
             <Link
               key={link.href}
               href={link.href}
+              onClick={closeMobileNav}
               className={`${styles.mobileNavLink} ${isActive(pathname, link.href) ? styles.mobileNavLinkActive : ''}`.trim()}
             >
               {link.label}

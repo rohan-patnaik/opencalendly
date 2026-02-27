@@ -102,7 +102,7 @@
     color-mix(in oklab, var(--accent-strong) 84%, white),
     color-mix(in oklab, var(--accent-soft) 72%, white)
   );
-  color: #0e1633;
+  color: var(--accent-contrast);
 }
 
 .buttonSecondary {
@@ -116,9 +116,9 @@
 }
 
 .buttonDanger {
-  border-color: color-mix(in oklab, #dc2626 48%, var(--border-strong));
-  background: color-mix(in oklab, #ef4444 20%, var(--surface));
-  color: #7f1d1d;
+  border-color: color-mix(in oklab, var(--danger-strong) 48%, var(--border-strong));
+  background: var(--danger-soft);
+  color: var(--danger-contrast);
 }
 
 .buttonSm {
@@ -209,21 +209,21 @@
 
 .toastSuccess {
   color: var(--success-text);
-  background: color-mix(in oklab, #14b8a6 15%, var(--surface));
-  border-color: color-mix(in oklab, #14b8a6 44%, var(--border-subtle));
+  background: var(--success-soft);
+  border-color: color-mix(in oklab, var(--accent-soft) 44%, var(--border-subtle));
 }
 
 .toastError {
   color: var(--error-text);
-  background: color-mix(in oklab, #ef4444 16%, var(--surface));
-  border-color: color-mix(in oklab, #ef4444 44%, var(--border-subtle));
+  background: var(--danger-soft);
+  border-color: color-mix(in oklab, var(--danger) 44%, var(--border-subtle));
 }
 
 .modalOverlay {
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: color-mix(in oklab, #020617 58%, transparent);
+  background: var(--overlay-strong);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -278,7 +278,7 @@
   cursor: pointer;
 }
 
-.tabButton[data-active='true'] {
+.tabButton[aria-selected='true'] {
   background: color-mix(in oklab, var(--accent-strong) 16%, var(--surface));
   color: var(--text-strong);
   border-color: color-mix(in oklab, var(--accent-strong) 32%, var(--border-subtle));

@@ -20,6 +20,14 @@
   --accent-strong: #2563eb;
   --accent-soft: #14b8a6;
   --accent-warm: #f97316;
+  --accent-contrast: #0e1633;
+
+  --danger: #ef4444;
+  --danger-strong: #dc2626;
+  --danger-contrast: #7f1d1d;
+  --danger-soft: color-mix(in oklab, var(--danger) 16%, var(--surface));
+  --success-soft: color-mix(in oklab, #14b8a6 15%, var(--surface));
+  --overlay-strong: color-mix(in oklab, #020617 58%, transparent);
 
   --error-text: #7f1d1d;
   --success-text: #155e75;
@@ -68,6 +76,14 @@ html[data-theme='dark'] {
   --accent-strong: #60a5fa;
   --accent-soft: #2dd4bf;
   --accent-warm: #fb923c;
+  --accent-contrast: #0b1228;
+
+  --danger: #f87171;
+  --danger-strong: #ef4444;
+  --danger-contrast: #fecaca;
+  --danger-soft: color-mix(in oklab, var(--danger) 24%, var(--surface));
+  --success-soft: color-mix(in oklab, #14b8a6 20%, var(--surface));
+  --overlay-strong: color-mix(in oklab, #020617 72%, transparent);
 
   --error-text: #fecaca;
   --success-text: #99f6e4;

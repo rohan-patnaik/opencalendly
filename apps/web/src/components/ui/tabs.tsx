@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 
 import styles from './primitives.module.css';
 
@@ -14,16 +14,68 @@ type TabsProps = {
 };
 
 export function Tabs({ items, activeId, onChange }: TabsProps) {
+  const focusTabById = (tabId: string) => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    const nextElement = document.getElementById(`tab-${tabId}`) as HTMLButtonElement | null;
+    nextElement?.focus();
+  };
+
+  const getNextId = (index: number, offset: number): string => {
+    const nextIndex = (index + offset + items.length) % items.length;
+    return items[nextIndex]?.id ?? items[0]?.id ?? '';
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (items.length === 0) {
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      const nextId = getNextId(index, 1);
+      onChange(nextId);
+      focusTabById(nextId);
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const nextId = getNextId(index, -1);
+      onChange(nextId);
+      focusTabById(nextId);
+      return;
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault();
+      const firstId = items[0]?.id ?? '';
+      onChange(firstId);
+      focusTabById(firstId);
+      return;
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault();
+      const lastId = items[items.length - 1]?.id ?? '';
+      onChange(lastId);
+      focusTabById(lastId);
+    }
+  };
+
   return (
     <div className={styles.tabs} role="tablist" aria-label="Sections">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <button
           key={item.id}
+          id={`tab-${item.id}`}
           type="button"
           role="tab"
+          tabIndex={item.id === activeId ? 0 : -1}
           aria-selected={item.id === activeId}
-          data-active={item.id === activeId}
           className={styles.tabButton}
+          onKeyDown={(event) => onKeyDown(event, index)}
           onClick={() => onChange(item.id)}
         >
           {item.label}

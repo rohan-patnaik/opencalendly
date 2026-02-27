@@ -117,7 +117,7 @@ npm run dev:web
 1. Confirm top navigation remains sticky while scrolling.
 2. Toggle theme (sun/moon/system cycle) and refresh to verify persistence.
 3. Resize to mobile width and verify drawer navigation opens/closes and route links work.
-4. Open `/auth/sign-in`, `/auth/verify`, `/dashboard`, and `/organizer` to confirm shared shell/card/form styling is consistent.
+4. Sign in via `/auth/sign-in` (or keep an active session), then open `/auth/verify`, `/dashboard`, and `/organizer` to confirm shared shell/card/form styling is consistent.
 
 ### 8) Feature 12 organizer console smoke test
 

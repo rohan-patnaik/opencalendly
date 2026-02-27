@@ -288,6 +288,11 @@ Acceptance criteria:
 
 ### Feature 15: App shell parity foundation
 
+Scope:
+- Build shared app-level UX infrastructure (shell + tokens + reusable primitives).
+- Touch auth/dashboard/organizer route wrappers for consistent composition.
+- Exclude marketing-page parity and booking-flow redesign from this feature.
+
 Acceptance criteria:
 
 - Global app shell is rebuilt with sticky top nav, auth-aware actions, and responsive mobile drawer navigation.
@@ -300,6 +305,11 @@ Acceptance criteria:
 
 ### Feature 16: Booking flow parity
 
+Scope:
+- Upgrade public booking, team booking, booking-action, and embed UX surfaces.
+- Keep existing booking correctness and API contracts intact.
+- Exclude organizer console IA changes and marketing pages.
+
 Acceptance criteria:
 
 - One-on-one booking UX parity is improved for `/demo/intro-call` (slot browser, timezone UX, attendee details, confirmation state).
@@ -309,6 +319,11 @@ Acceptance criteria:
 - One-on-one and team booking continue to work end-to-end in UI against existing APIs.
 
 ### Feature 17: Organizer console parity
+
+Scope:
+- Improve organizer/dashboard operational IA and panel usability over existing APIs.
+- Add only missing read/list API contracts required for usable organizer UX.
+- Exclude public marketing surfaces.
 
 Acceptance criteria:
 
@@ -323,6 +338,11 @@ Acceptance criteria:
   - `GET /v0/teams/:teamId/event-types`
 
 ### Feature 18: Marketing surface parity
+
+Scope:
+- Rebuild marketing information architecture and add dedicated marketing routes.
+- Map CTA actions to already-implemented product flows.
+- Exclude backend feature development.
 
 Acceptance criteria:
 
