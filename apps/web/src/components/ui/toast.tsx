@@ -23,12 +23,12 @@ const variantClass = (variant: ToastVariant): string => {
 export function Toast({ variant = 'info', children, className }: ToastProps) {
   const isError = variant === 'error';
   return (
-    <p
+    <div
       role={isError ? 'alert' : 'status'}
       aria-live={isError ? 'assertive' : 'polite'}
       className={[styles.toast, variantClass(variant), className ?? ''].filter(Boolean).join(' ')}
     >
       {children}
-    </p>
+    </div>
   );
 }

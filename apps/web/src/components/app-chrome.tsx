@@ -62,6 +62,24 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     };
   }, [mobileNavOpen]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 921px)');
+    const onMediaChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setMobileNavOpen(false);
+      }
+    };
+
+    mediaQuery.addEventListener('change', onMediaChange);
+    if (mediaQuery.matches) {
+      setMobileNavOpen(false);
+    }
+
+    return () => {
+      mediaQuery.removeEventListener('change', onMediaChange);
+    };
+  }, []);
+
   return (
     <div className={styles.root}>
       <header className={styles.header}>

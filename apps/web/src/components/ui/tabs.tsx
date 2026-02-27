@@ -12,9 +12,10 @@ type TabsProps = {
   items: TabItem[];
   activeId: string;
   onChange: (nextId: string) => void;
+  ariaLabel?: string;
 };
 
-export function Tabs({ items, activeId, onChange }: TabsProps) {
+export function Tabs({ items, activeId, onChange, ariaLabel = 'Sections' }: TabsProps) {
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const focusTabById = (tabId: string) => {
@@ -64,7 +65,7 @@ export function Tabs({ items, activeId, onChange }: TabsProps) {
   };
 
   return (
-    <div className={styles.tabs} role="tablist" aria-label="Sections">
+    <div className={styles.tabs} role="tablist" aria-label={ariaLabel}>
       {items.map((item, index) => (
         <button
           key={item.id}
