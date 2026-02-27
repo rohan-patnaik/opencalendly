@@ -27,5 +27,8 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      - name: Smoke regression tests
+        run: npm run test:smoke
+
       - name: Typecheck
         run: npm run typecheck

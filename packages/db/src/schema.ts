@@ -31,6 +31,7 @@ type CalendarWritebackStatusRecord = 'pending' | 'succeeded' | 'failed';
 type AnalyticsFunnelStageRecord = 'page_view' | 'slot_selection' | 'booking_confirmed';
 type EmailDeliveryTypeRecord = 'booking_confirmation' | 'booking_cancellation' | 'booking_rescheduled';
 type EmailDeliveryStatusRecord = 'succeeded' | 'failed';
+type IdempotencyRequestStatusRecord = 'in_progress' | 'completed';
 type WebhookEventPayloadRecord = {
   id: string;
   type: WebhookEventTypeRecord;
@@ -71,6 +72,10 @@ export const emailDeliveryTypeEnum = pgEnum('email_delivery_type', [
   'booking_rescheduled',
 ]);
 export const emailDeliveryStatusEnum = pgEnum('email_delivery_status', ['succeeded', 'failed']);
+export const idempotencyRequestStatusEnum = pgEnum('idempotency_request_status', [
+  'in_progress',
+  'completed',
+]);
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -340,6 +345,33 @@ export const bookingActionTokens = pgTable(
       table.bookingId,
       table.actionType,
     ),
+  }),
+);
+
+export const idempotencyRequests = pgTable(
+  'idempotency_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    scope: varchar('scope', { length: 64 }).notNull(),
+    idempotencyKeyHash: varchar('idempotency_key_hash', { length: 64 }).notNull(),
+    requestHash: varchar('request_hash', { length: 64 }).notNull(),
+    status: idempotencyRequestStatusEnum('status').$type<IdempotencyRequestStatusRecord>().notNull(),
+    responseStatusCode: integer('response_status_code'),
+    responseBody: jsonb('response_body').$type<Record<string, unknown>>(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    scopeKeyUnique: unique('idempotency_requests_scope_key_hash_unique').on(
+      table.scope,
+      table.idempotencyKeyHash,
+    ),
+    scopeCreatedAtIndex: index('idempotency_requests_scope_created_at_idx').on(
+      table.scope,
+      table.createdAt,
+    ),
+    expiresAtIndex: index('idempotency_requests_expires_at_idx').on(table.expiresAt),
   }),
 );
 

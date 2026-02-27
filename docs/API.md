@@ -266,6 +266,16 @@ Behavior:
 - Computes slots from organizer rules + date overrides.
 - Removes conflicts from confirmed bookings.
 - Applies synced external busy windows (Feature 6) as non-available blocks.
+- Route is rate-limited per IP + booking link key.
+
+Rate-limit response (`429`):
+
+```json
+{
+  "ok": false,
+  "error": "Rate limit exceeded. Try again in a minute."
+}
+```
 
 ### `POST /v0/bookings`
 
@@ -287,6 +297,10 @@ Request:
 }
 ```
 
+Required header:
+
+- `Idempotency-Key: <16-200 char unique key>`
+
 Behavior:
 
 - Re-validates slot availability inside a DB transaction.
@@ -295,6 +309,8 @@ Behavior:
 - Creates secure cancel/reschedule action tokens (stored hashed server-side).
 - Sends booking confirmation email after successful write.
 - Enqueues and runs immediate calendar writeback for connected providers.
+- Route is rate-limited per IP + booking link key.
+- Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
 
 Success response:
 
@@ -348,6 +364,24 @@ Conflict response (`409`):
 {
   "ok": false,
   "error": "Selected slot is no longer available."
+}
+```
+
+Idempotency mismatch/in-progress response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "Idempotency key reuse with different request payload is not allowed."
+}
+```
+
+Rate-limit response (`429`):
+
+```json
+{
+  "ok": false,
+  "error": "Rate limit exceeded. Try again in a minute."
 }
 ```
 
@@ -410,6 +444,10 @@ Request:
   "reason": "Need to move this out by a week."
 }
 ```
+
+Required header:
+
+- `Idempotency-Key: <16-200 char unique key>`
 
 Success response:
 
@@ -552,6 +590,8 @@ Behavior:
 - Reschedule sends notification emails to invitee + organizer.
 - Repeated submissions of the same token are idempotent.
 - Reschedule enqueues calendar writeback update for connected providers.
+- Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
+- Route is rate-limited per IP + action token.
 
 ## Feature 3 Endpoints (Demo Credits + Waitlist)
 
@@ -583,6 +623,10 @@ Request:
   "email": "pat@example.com"
 }
 ```
+
+Required header:
+
+- `Idempotency-Key: <16-200 char unique key>`
 
 Success response:
 
@@ -944,6 +988,7 @@ Behavior:
 - Computes per-member schedules from rules + overrides.
 - Applies confirmed booking conflicts per member.
 - Applies each member's synced external busy windows (Feature 6) before slot assignment.
+- Route is rate-limited per IP + team event key.
 
 ### `POST /v0/team-bookings`
 
@@ -1018,6 +1063,8 @@ Notes:
 - Team assignment rows enforce per-member slot uniqueness.
 - Member selection and commit checks include synced external busy windows.
 - Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.
+- Route is rate-limited per IP + team event key.
+- Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
 
 ## Feature 6 Endpoints (Calendar Sync Hardening v1)
 

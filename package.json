@@ -21,6 +21,7 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "vitest run",
+    "test:smoke": "vitest run apps/api/src/lib/booking.test.ts apps/api/src/lib/booking-actions.test.ts apps/api/src/lib/team-scheduling.test.ts apps/api/src/lib/availability.test.ts apps/api/src/lib/analytics.test.ts",
     "test:watch": "vitest",
     "env:check": "node scripts/env-check.mjs",
     "db:generate": "node ./scripts/run-with-root-env.mjs npm run generate -w packages/db",

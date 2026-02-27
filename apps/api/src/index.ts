@@ -15,6 +15,7 @@ import {
   demoCreditsDaily,
   emailDeliveries,
   eventTypes,
+  idempotencyRequests,
   sessions,
   teamBookingAssignments,
   teamEventTypeMembers,
@@ -168,6 +169,8 @@ type ContextLike = {
   env: Bindings;
   json: (body: unknown, status?: number) => Response;
 };
+
+type IdempotencyScope = 'booking_create' | 'team_booking_create' | 'booking_reschedule';
 
 type Database = ReturnType<typeof createDb>['db'];
 type QueryableDb = Pick<Database, 'select'>;
@@ -440,13 +443,25 @@ const CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS = 5;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT = 25;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_MAX = 100;
 const CALENDAR_WRITEBACK_LEASE_MINUTES = 3;
+const IDEMPOTENCY_KEY_HEADER = 'Idempotency-Key';
+const IDEMPOTENCY_KEY_MIN_LENGTH = 16;
+const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
+const IDEMPOTENCY_REQUEST_TTL_HOURS = 24;
 const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE = 120;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP = 300;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS = 5_000;
 const PUBLIC_ANALYTICS_RATE_LIMIT_CLEANUP_INTERVAL = 50;
+const PUBLIC_BOOKING_RATE_LIMIT_WINDOW_MS = 60_000;
+const PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE = 120;
+const PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE = 30;
+const PUBLIC_BOOKING_RATE_LIMIT_MAX_REQUESTS_PER_IP = 180;
+const PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS = 8_000;
+const PUBLIC_BOOKING_RATE_LIMIT_CLEANUP_INTERVAL = 50;
 const publicAnalyticsRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
 let publicAnalyticsRateLimitRequestCounter = 0;
+const publicBookingRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
+let publicBookingRateLimitRequestCounter = 0;
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -558,6 +573,80 @@ const isPublicAnalyticsRateLimited = (input: {
 
   const scopedKey = `scope:${input.ip}|${input.username}|${input.eventSlug}`;
   return consumeRateLimitKey(scopedKey, PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE);
+};
+
+const isPublicBookingRateLimited = (input: {
+  ip: string;
+  scope: string;
+  perScopeLimit: number;
+  nowMs?: number;
+}): boolean => {
+  const nowMs = input.nowMs ?? Date.now();
+  const cutoffMs = nowMs - PUBLIC_BOOKING_RATE_LIMIT_WINDOW_MS;
+
+  const shouldCleanup =
+    publicBookingRateLimitState.size > PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS ||
+    publicBookingRateLimitRequestCounter % PUBLIC_BOOKING_RATE_LIMIT_CLEANUP_INTERVAL === 0;
+  if (shouldCleanup) {
+    for (const [key, state] of publicBookingRateLimitState) {
+      if (state.windowStartMs < cutoffMs) {
+        publicBookingRateLimitState.delete(key);
+      }
+    }
+
+    if (publicBookingRateLimitState.size > PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS) {
+      const overflow = publicBookingRateLimitState.size - PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS;
+      let removed = 0;
+      for (const key of publicBookingRateLimitState.keys()) {
+        publicBookingRateLimitState.delete(key);
+        removed += 1;
+        if (removed >= overflow) {
+          break;
+        }
+      }
+    }
+  }
+
+  const consumeRateLimitKey = (key: string, maxRequests: number): boolean => {
+    const existing = publicBookingRateLimitState.get(key);
+    if (!existing || existing.windowStartMs < cutoffMs) {
+      publicBookingRateLimitState.set(key, {
+        windowStartMs: nowMs,
+        count: 1,
+      });
+      return false;
+    }
+
+    if (existing.count >= maxRequests) {
+      return true;
+    }
+
+    existing.count += 1;
+    return false;
+  };
+
+  publicBookingRateLimitRequestCounter += 1;
+
+  const ipKey = `ip:${input.ip}`;
+  if (consumeRateLimitKey(ipKey, PUBLIC_BOOKING_RATE_LIMIT_MAX_REQUESTS_PER_IP)) {
+    return true;
+  }
+
+  const scopedKey = `scope:${input.ip}|${input.scope}`;
+  return consumeRateLimitKey(scopedKey, input.perScopeLimit);
+};
+
+const parseIdempotencyKey = (request: Request): { key: string } | { error: string } => {
+  const rawKey = request.headers.get(IDEMPOTENCY_KEY_HEADER)?.trim();
+  if (!rawKey) {
+    return { error: `${IDEMPOTENCY_KEY_HEADER} header is required.` };
+  }
+  if (rawKey.length < IDEMPOTENCY_KEY_MIN_LENGTH || rawKey.length > IDEMPOTENCY_KEY_MAX_LENGTH) {
+    return {
+      error: `${IDEMPOTENCY_KEY_HEADER} must be between ${IDEMPOTENCY_KEY_MIN_LENGTH} and ${IDEMPOTENCY_KEY_MAX_LENGTH} characters.`,
+    };
+  }
+  return { key: rawKey };
 };
 
 const recordAnalyticsFunnelEvent = async (
@@ -1552,6 +1641,158 @@ const withDatabase = async (
   } finally {
     await client.end();
   }
+};
+
+const hashIdempotencyRequestPayload = (input: Record<string, unknown>): string => {
+  return hashToken(JSON.stringify(input));
+};
+
+const claimIdempotencyRequest = async (
+  db: Database,
+  input: {
+    scope: IdempotencyScope;
+    rawKey: string;
+    requestHash: string;
+    now?: Date;
+  },
+): Promise<
+  | {
+      state: 'claimed';
+      keyHash: string;
+    }
+  | {
+      state: 'replay';
+      statusCode: 200 | 400 | 404 | 409 | 410;
+      responseBody: Record<string, unknown>;
+    }
+  | {
+      state: 'mismatch';
+    }
+  | {
+      state: 'in_progress';
+    }
+> => {
+  const now = input.now ?? new Date();
+  const keyHash = hashToken(input.rawKey);
+  const expiresAt = new Date(now.getTime() + IDEMPOTENCY_REQUEST_TTL_HOURS * 60 * 60 * 1000);
+
+  try {
+    await db.insert(idempotencyRequests).values({
+      scope: input.scope,
+      idempotencyKeyHash: keyHash,
+      requestHash: input.requestHash,
+      status: 'in_progress',
+      expiresAt,
+    });
+    return {
+      state: 'claimed',
+      keyHash,
+    };
+  } catch (error) {
+    if (!isUniqueViolation(error, 'idempotency_requests_scope_key_hash_unique')) {
+      throw error;
+    }
+  }
+
+  const [existing] = await db
+    .select({
+      requestHash: idempotencyRequests.requestHash,
+      status: idempotencyRequests.status,
+      responseStatusCode: idempotencyRequests.responseStatusCode,
+      responseBody: idempotencyRequests.responseBody,
+      expiresAt: idempotencyRequests.expiresAt,
+    })
+    .from(idempotencyRequests)
+    .where(
+      and(
+        eq(idempotencyRequests.scope, input.scope),
+        eq(idempotencyRequests.idempotencyKeyHash, keyHash),
+      ),
+    )
+    .limit(1);
+
+  if (!existing) {
+    return { state: 'in_progress' };
+  }
+
+  if (existing.expiresAt.getTime() <= now.getTime()) {
+    await db
+      .delete(idempotencyRequests)
+      .where(
+        and(
+          eq(idempotencyRequests.scope, input.scope),
+          eq(idempotencyRequests.idempotencyKeyHash, keyHash),
+          lte(idempotencyRequests.expiresAt, now),
+        ),
+      );
+
+    await db.insert(idempotencyRequests).values({
+      scope: input.scope,
+      idempotencyKeyHash: keyHash,
+      requestHash: input.requestHash,
+      status: 'in_progress',
+      expiresAt,
+    });
+    return {
+      state: 'claimed',
+      keyHash,
+    };
+  }
+
+  if (existing.requestHash !== input.requestHash) {
+    return { state: 'mismatch' };
+  }
+
+  const responseStatusCode = existing.responseStatusCode;
+  const isReplayStatusCode =
+    responseStatusCode === 200 ||
+    responseStatusCode === 400 ||
+    responseStatusCode === 404 ||
+    responseStatusCode === 409 ||
+    responseStatusCode === 410;
+  if (
+    existing.status === 'completed' &&
+    isReplayStatusCode &&
+    existing.responseBody &&
+    typeof existing.responseBody === 'object' &&
+    !Array.isArray(existing.responseBody)
+  ) {
+    return {
+      state: 'replay',
+      statusCode: responseStatusCode,
+      responseBody: existing.responseBody as Record<string, unknown>,
+    };
+  }
+
+  return { state: 'in_progress' };
+};
+
+const completeIdempotencyRequest = async (
+  db: Database,
+  input: {
+    scope: IdempotencyScope;
+    keyHash: string;
+    statusCode: 200 | 400 | 404 | 409 | 410;
+    responseBody: Record<string, unknown>;
+    now?: Date;
+  },
+): Promise<void> => {
+  const now = input.now ?? new Date();
+  await db
+    .update(idempotencyRequests)
+    .set({
+      status: 'completed',
+      responseStatusCode: input.statusCode,
+      responseBody: input.responseBody,
+      completedAt: now,
+      expiresAt: new Date(now.getTime() + IDEMPOTENCY_REQUEST_TTL_HOURS * 60 * 60 * 1000),
+    })
+    .where(
+      and(
+        eq(idempotencyRequests.scope, input.scope),
+        eq(idempotencyRequests.idempotencyKeyHash, input.keyHash),
+      ),
+    );
 };
 
 const findPublicEventType = async (
@@ -4718,9 +4959,20 @@ app.get('/v0/users/:username/event-types/:slug', async (context) => {
 });
 
 app.get('/v0/users/:username/event-types/:slug/availability', async (context) => {
+  const username = context.req.param('username');
+  const slug = context.req.param('slug');
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicBookingRateLimited({
+      ip: requestIp,
+      scope: `availability|${username}|${slug}`,
+      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
+
   return withDatabase(context, async (db) => {
-    const username = context.req.param('username');
-    const slug = context.req.param('slug');
     const eventType = await findPublicEventType(db, username, slug);
 
     if (!eventType) {
@@ -4822,9 +5074,20 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
 });
 
 app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (context) => {
+  const teamSlug = context.req.param('teamSlug');
+  const eventSlug = context.req.param('eventSlug');
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicBookingRateLimited({
+      ip: requestIp,
+      scope: `team-availability|${teamSlug}|${eventSlug}`,
+      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
+
   return withDatabase(context, async (db) => {
-    const teamSlug = context.req.param('teamSlug');
-    const eventSlug = context.req.param('eventSlug');
     const teamEventContext = await findTeamEventTypeContext(db, teamSlug, eventSlug);
 
     if (!teamEventContext) {
@@ -4881,23 +5144,68 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (contex
 });
 
 app.post('/v0/team-bookings', async (context) => {
+  const body = await context.req.json().catch(() => null);
+  const parsed = teamBookingCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+  }
+
+  const idempotencyKey = parseIdempotencyKey(context.req.raw);
+  if ('error' in idempotencyKey) {
+    return jsonError(context, 400, idempotencyKey.error);
+  }
+
+  const payload = parsed.data;
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicBookingRateLimited({
+      ip: requestIp,
+      scope: `team-booking|${payload.teamSlug}|${payload.eventSlug}`,
+      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
+
+  const timezone = normalizeTimezone(payload.timezone);
+  const startsAt = DateTime.fromISO(payload.startsAt, { zone: 'utc' });
+  if (!startsAt.isValid) {
+    return jsonError(context, 400, 'Invalid startsAt value.');
+  }
+
+  const requestedStartsAtIso = startsAt.toUTC().toISO();
+  if (!requestedStartsAtIso) {
+    return jsonError(context, 400, 'Unable to normalize startsAt.');
+  }
+
+  const idempotencyRequestHash = hashIdempotencyRequestPayload({
+    teamSlug: payload.teamSlug,
+    eventSlug: payload.eventSlug,
+    startsAt: payload.startsAt,
+    timezone,
+    inviteeName: payload.inviteeName,
+    inviteeEmail: payload.inviteeEmail,
+    answers: payload.answers ?? {},
+  });
+
   return withDatabase(context, async (db) => {
-    const body = await context.req.json().catch(() => null);
-    const parsed = teamBookingCreateSchema.safeParse(body);
-    if (!parsed.success) {
-      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    const idempotencyState = await claimIdempotencyRequest(db, {
+      scope: 'team_booking_create',
+      rawKey: idempotencyKey.key,
+      requestHash: idempotencyRequestHash,
+    });
+    if (idempotencyState.state === 'replay') {
+      return context.json(idempotencyState.responseBody, idempotencyState.statusCode);
     }
-
-    const payload = parsed.data;
-    const timezone = normalizeTimezone(payload.timezone);
-    const startsAt = DateTime.fromISO(payload.startsAt, { zone: 'utc' });
-    if (!startsAt.isValid) {
-      return jsonError(context, 400, 'Invalid startsAt value.');
+    if (idempotencyState.state === 'mismatch') {
+      return jsonError(
+        context,
+        409,
+        'Idempotency key reuse with different request payload is not allowed.',
+      );
     }
-
-    const requestedStartsAtIso = startsAt.toUTC().toISO();
-    if (!requestedStartsAtIso) {
-      return jsonError(context, 400, 'Unable to normalize startsAt.');
+    if (idempotencyState.state === 'in_progress') {
+      return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
     }
 
     try {
@@ -5203,9 +5511,9 @@ app.post('/v0/team-bookings', async (context) => {
               succeeded: 0,
               retried: 0,
               failed: 0,
-            };
+          };
 
-      return context.json({
+      const responseBody: Record<string, unknown> = {
         ok: true,
         booking: {
           id: result.booking.id,
@@ -5240,16 +5548,49 @@ app.post('/v0/team-bookings', async (context) => {
           queued: writebackQueue.queued,
           ...writebackResult,
         },
+      };
+
+      await completeIdempotencyRequest(db, {
+        scope: 'team_booking_create',
+        keyHash: idempotencyState.keyHash,
+        statusCode: 200,
+        responseBody,
       });
+
+      return context.json(responseBody);
     } catch (error) {
       if (error instanceof BookingNotFoundError) {
-        return jsonError(context, 404, 'Team event type not found.');
+        const responseBody: Record<string, unknown> = {
+          ok: false,
+          error: 'Team event type not found.',
+        };
+        await completeIdempotencyRequest(db, {
+          scope: 'team_booking_create',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 404,
+          responseBody,
+        });
+        return context.json(responseBody, 404);
       }
       if (error instanceof BookingValidationError) {
-        return jsonError(context, 400, error.message);
+        const responseBody: Record<string, unknown> = { ok: false, error: error.message };
+        await completeIdempotencyRequest(db, {
+          scope: 'team_booking_create',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 400,
+          responseBody,
+        });
+        return context.json(responseBody, 400);
       }
       if (error instanceof BookingConflictError) {
-        return jsonError(context, 409, error.message);
+        const responseBody: Record<string, unknown> = { ok: false, error: error.message };
+        await completeIdempotencyRequest(db, {
+          scope: 'team_booking_create',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 409,
+          responseBody,
+        });
+        return context.json(responseBody, 409);
       }
       throw error;
     }
@@ -5257,16 +5598,60 @@ app.post('/v0/team-bookings', async (context) => {
 });
 
 app.post('/v0/bookings', async (context) => {
+  const body = await context.req.json().catch(() => null);
+  const parsed = bookingCreateSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+  }
+
+  const idempotencyKey = parseIdempotencyKey(context.req.raw);
+  if ('error' in idempotencyKey) {
+    return jsonError(context, 400, idempotencyKey.error);
+  }
+
+  const payload = parsed.data;
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicBookingRateLimited({
+      ip: requestIp,
+      scope: `booking|${payload.username}|${payload.eventSlug}`,
+      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
+
+  const timezone = normalizeTimezone(payload.timezone);
+  const idempotencyRequestHash = hashIdempotencyRequestPayload({
+    username: payload.username,
+    eventSlug: payload.eventSlug,
+    startsAt: payload.startsAt,
+    timezone,
+    inviteeName: payload.inviteeName,
+    inviteeEmail: payload.inviteeEmail,
+    answers: payload.answers ?? {},
+  });
+
   return withDatabase(context, async (db) => {
-    const body = await context.req.json().catch(() => null);
-    const parsed = bookingCreateSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    const idempotencyState = await claimIdempotencyRequest(db, {
+      scope: 'booking_create',
+      rawKey: idempotencyKey.key,
+      requestHash: idempotencyRequestHash,
+    });
+    if (idempotencyState.state === 'replay') {
+      return context.json(idempotencyState.responseBody, idempotencyState.statusCode);
     }
-
-    const payload = parsed.data;
-    const timezone = normalizeTimezone(payload.timezone);
+    if (idempotencyState.state === 'mismatch') {
+      return jsonError(
+        context,
+        409,
+        'Idempotency key reuse with different request payload is not allowed.',
+      );
+    }
+    if (idempotencyState.state === 'in_progress') {
+      return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
+    }
 
     try {
       const result = await commitBooking(
@@ -5479,9 +5864,9 @@ app.post('/v0/bookings', async (context) => {
               succeeded: 0,
               retried: 0,
               failed: 0,
-            };
+          };
 
-      return context.json({
+      const responseBody: Record<string, unknown> = {
         ok: true,
         booking: {
           id: result.booking.id,
@@ -5514,16 +5899,49 @@ app.post('/v0/bookings', async (context) => {
           queued: writebackQueue.queued,
           ...writebackResult,
         },
+      };
+
+      await completeIdempotencyRequest(db, {
+        scope: 'booking_create',
+        keyHash: idempotencyState.keyHash,
+        statusCode: 200,
+        responseBody,
       });
+
+      return context.json(responseBody);
     } catch (error) {
       if (error instanceof BookingNotFoundError) {
-        return jsonError(context, 404, 'Event type not found.');
+        const responseBody: Record<string, unknown> = {
+          ok: false,
+          error: 'Event type not found.',
+        };
+        await completeIdempotencyRequest(db, {
+          scope: 'booking_create',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 404,
+          responseBody,
+        });
+        return context.json(responseBody, 404);
       }
       if (error instanceof BookingValidationError) {
-        return jsonError(context, 400, error.message);
+        const responseBody: Record<string, unknown> = { ok: false, error: error.message };
+        await completeIdempotencyRequest(db, {
+          scope: 'booking_create',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 400,
+          responseBody,
+        });
+        return context.json(responseBody, 400);
       }
       if (error instanceof BookingConflictError) {
-        return jsonError(context, 409, error.message);
+        const responseBody: Record<string, unknown> = { ok: false, error: error.message };
+        await completeIdempotencyRequest(db, {
+          scope: 'booking_create',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 409,
+          responseBody,
+        });
+        return context.json(responseBody, 409);
       }
       throw error;
     }
@@ -5929,31 +6347,72 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
 });
 
 app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
+  const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
+  if (!tokenParam.success) {
+    return jsonError(context, 404, 'Action link is invalid or expired.');
+  }
+
+  const body = await context.req.json().catch(() => null);
+  const parsed = bookingRescheduleSchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+  }
+
+  const idempotencyKey = parseIdempotencyKey(context.req.raw);
+  if ('error' in idempotencyKey) {
+    return jsonError(context, 400, idempotencyKey.error);
+  }
+
+  const timezone = normalizeTimezone(parsed.data.timezone);
+  const startsAt = DateTime.fromISO(parsed.data.startsAt, { zone: 'utc' });
+  if (!startsAt.isValid) {
+    return jsonError(context, 400, 'Invalid startsAt value.');
+  }
+
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicBookingRateLimited({
+      ip: requestIp,
+      scope: `reschedule|${hashToken(tokenParam.data)}`,
+      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
+
+  const requestedStartsAtIso = startsAt.toUTC().toISO();
+  if (!requestedStartsAtIso) {
+    return jsonError(context, 400, 'Unable to normalize startsAt.');
+  }
+
+  const idempotencyRequestHash = hashIdempotencyRequestPayload({
+    token: tokenParam.data,
+    startsAt: parsed.data.startsAt,
+    timezone,
+  });
+
   return withDatabase(context, async (db) => {
-    const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
-    if (!tokenParam.success) {
-      return jsonError(context, 404, 'Action link is invalid or expired.');
+    const idempotencyState = await claimIdempotencyRequest(db, {
+      scope: 'booking_reschedule',
+      rawKey: idempotencyKey.key,
+      requestHash: idempotencyRequestHash,
+    });
+    if (idempotencyState.state === 'replay') {
+      return context.json(idempotencyState.responseBody, idempotencyState.statusCode);
     }
-
-    const body = await context.req.json().catch(() => null);
-    const parsed = bookingRescheduleSchema.safeParse(body);
-    if (!parsed.success) {
-      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    if (idempotencyState.state === 'mismatch') {
+      return jsonError(
+        context,
+        409,
+        'Idempotency key reuse with different request payload is not allowed.',
+      );
     }
-
-    const timezone = normalizeTimezone(parsed.data.timezone);
-    const startsAt = DateTime.fromISO(parsed.data.startsAt, { zone: 'utc' });
-    if (!startsAt.isValid) {
-      return jsonError(context, 400, 'Invalid startsAt value.');
-    }
-
-    const now = new Date();
-    const requestedStartsAtIso = startsAt.toUTC().toISO();
-    if (!requestedStartsAtIso) {
-      return jsonError(context, 400, 'Unable to normalize startsAt.');
+    if (idempotencyState.state === 'in_progress') {
+      return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
     }
 
     try {
+      const now = new Date();
       const result = await db.transaction(async (transaction) => {
         const token = await lockActionToken(transaction, hashToken(tokenParam.data));
         if (!token || token.actionType !== 'reschedule') {
@@ -6495,7 +6954,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           })()
         : null;
 
-      return context.json({
+      const responseBody: Record<string, unknown> = {
         ok: true,
         oldBooking: {
           id: result.oldBooking.id,
@@ -6517,19 +6976,62 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           queued: writebackQueue.queued,
           ...writebackResult,
         },
+      };
+
+      await completeIdempotencyRequest(db, {
+        scope: 'booking_reschedule',
+        keyHash: idempotencyState.keyHash,
+        statusCode: 200,
+        responseBody,
       });
+
+      return context.json(responseBody);
     } catch (error) {
       if (error instanceof BookingActionNotFoundError) {
-        return jsonError(context, 404, 'Action link is invalid or expired.');
+        const responseBody: Record<string, unknown> = {
+          ok: false,
+          error: 'Action link is invalid or expired.',
+        };
+        await completeIdempotencyRequest(db, {
+          scope: 'booking_reschedule',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 404,
+          responseBody,
+        });
+        return context.json(responseBody, 404);
       }
       if (error instanceof BookingActionGoneError) {
-        return jsonError(context, 410, 'Action link is invalid or expired.');
+        const responseBody: Record<string, unknown> = {
+          ok: false,
+          error: 'Action link is invalid or expired.',
+        };
+        await completeIdempotencyRequest(db, {
+          scope: 'booking_reschedule',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 410,
+          responseBody,
+        });
+        return context.json(responseBody, 410);
       }
       if (error instanceof BookingValidationError) {
-        return jsonError(context, 400, error.message);
+        const responseBody: Record<string, unknown> = { ok: false, error: error.message };
+        await completeIdempotencyRequest(db, {
+          scope: 'booking_reschedule',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 400,
+          responseBody,
+        });
+        return context.json(responseBody, 400);
       }
       if (error instanceof BookingConflictError) {
-        return jsonError(context, 409, error.message);
+        const responseBody: Record<string, unknown> = { ok: false, error: error.message };
+        await completeIdempotencyRequest(db, {
+          scope: 'booking_reschedule',
+          keyHash: idempotencyState.keyHash,
+          statusCode: 409,
+          responseBody,
+        });
+        return context.json(responseBody, 409);
       }
       throw error;
     }

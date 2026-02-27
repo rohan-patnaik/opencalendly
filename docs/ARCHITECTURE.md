@@ -32,6 +32,7 @@ flowchart LR
 - `webhook_deliveries`: queued delivery attempts with retry state and final status.
 - `analytics_funnel_events`: page/slot/booking funnel stages keyed by organizer + event type.
 - `email_deliveries`: best-effort delivery telemetry for confirmation/cancellation/reschedule emails.
+- `idempotency_requests`: request dedupe records for booking mutations (`scope + key hash + request hash + replay payload`).
 
 ## Critical flows
 
@@ -105,6 +106,14 @@ flowchart LR
    - webhook/email delivery health summaries
 5. Web dashboard reads those authenticated endpoints with date/event/team filters.
 
+### Reliability + platform hardening (Feature 9)
+
+1. Public availability and booking mutation routes apply request-level rate limiting by IP + route scope.
+2. Booking create and reschedule mutations require `Idempotency-Key`.
+3. API stores idempotency claim/replay state in `idempotency_requests`.
+4. Repeated identical requests replay stored response; mismatched payload reuse returns `409`.
+5. Branch protection enforces required checks + PR-only merges on `main`.
+
 ## Correctness and idempotency notes
 
 - Booking writes must be transactional.
@@ -112,5 +121,7 @@ flowchart LR
 - Team bookings additionally enforce per-member slot uniqueness through `team_booking_assignments`.
 - External calendar conflicts are enforced at compute-time and re-checked at commit-time.
 - External event writeback state is idempotent per booking+provider and retry-safe.
+- Booking-create and booking-reschedule endpoints are idempotent by explicit request keys.
 - Email sends should be keyed by idempotency token to avoid duplicates on retries.
 - Webhooks use exponential backoff and dedupe by subscription + event id.
+- Public booking and availability routes are rate-limited to reduce abuse and free-tier DB exhaustion.

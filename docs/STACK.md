@@ -55,3 +55,18 @@ Useful references:
 - [Cloudflare Pages docs](https://developers.cloudflare.com/pages/)
 - [Resend docs](https://resend.com/docs)
 - [Drizzle docs](https://orm.drizzle.team/docs/overview)
+
+## Platform hardening decisions (Feature 9)
+
+- Branch protection is enabled on `main` with:
+  - required checks: `lint-test-typecheck`, `Greptile Review`, `CodeRabbit`, `GitGuardian Security Checks`, `trigger-coderabbit-review`
+  - required PR reviews: 1 approval
+  - required conversation resolution: enabled
+  - direct pushes blocked by branch protection policy
+- `@cloudflare/next-on-pages` deprecation handling decision:
+  - keep current adapter for now to avoid mid-feature deployment churn
+  - plan migration to OpenNext before `v1.0.0` with dedicated validation checklist (preview deploy parity, env parity, rollback path)
+- Next.js multiple-lockfile warning strategy:
+  - repository source of truth remains `/open-calendly/package-lock.json`
+  - if a parent-directory lockfile exists, warning is expected locally and does not affect runtime behavior
+  - run Node/npm commands from repository root to keep deterministic workspace resolution
