@@ -28,7 +28,11 @@ const removeSessionFromStorage = (): void => {
 };
 
 export const isSessionExpired = (session: AuthSession): boolean => {
-  return Date.now() >= new Date(session.expiresAt).getTime();
+  const expiresAtMs = new Date(session.expiresAt).getTime();
+  if (Number.isNaN(expiresAtMs)) {
+    return true;
+  }
+  return Date.now() >= expiresAtMs;
 };
 
 export const readAuthSession = (): AuthSession | null => {

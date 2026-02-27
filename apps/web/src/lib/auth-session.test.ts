@@ -24,4 +24,9 @@ describe('isSessionExpired', () => {
     const session = buildSession(new Date(Date.now() - 15 * 60 * 1000).toISOString());
     expect(isSessionExpired(session)).toBe(true);
   });
+
+  it('returns true for an invalid expiry timestamp', () => {
+    const session = buildSession('invalid-timestamp');
+    expect(isSessionExpired(session)).toBe(true);
+  });
 });
