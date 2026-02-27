@@ -144,7 +144,7 @@
 .textarea {
   min-height: 170px;
   resize: vertical;
-  font-family: 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-family: 'JetBrains Mono', SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.82rem;
 }
 

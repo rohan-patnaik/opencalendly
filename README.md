@@ -115,10 +115,10 @@ npm run dev:web
 ### 8) Feature 12 organizer console smoke test
 
 1. Open `http://localhost:3000/organizer` (authenticated session required).
-2. Confirm event types list/create/edit works from UI.
-3. Confirm availability rules/overrides can be loaded and saved.
-4. Confirm teams/members/team event types can be listed and created.
-5. Confirm webhooks and calendar/writeback controls load and actions execute.
+2. Verify event types list/create/edit works from UI.
+3. Validate availability rules/overrides can be loaded and saved.
+4. Check teams/members/team event types can be listed and created.
+5. Ensure webhooks and calendar/writeback controls load and actions execute.
 
 ### Key web routes
 

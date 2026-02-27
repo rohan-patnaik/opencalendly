@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { authedGetJson } from '../../lib/api-client';
 import {
@@ -55,8 +55,14 @@ const parseIntegerOrUndefined = (value: string): number | undefined => {
   if (!trimmed) {
     return undefined;
   }
+  if (!/^\d+$/.test(trimmed)) {
+    return undefined;
+  }
   const parsed = Number.parseInt(trimmed, 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return undefined;
+  }
+  return parsed;
 };
 
 const parseJsonArray = <T,>(
@@ -215,7 +221,31 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
 
-  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [busyActions, setBusyActions] = useState<Set<string>>(new Set());
+  const teamDetailsRequestIdRef = useRef(0);
+
+  const beginBusy = useCallback((action: string) => {
+    setBusyActions((previous) => {
+      const next = new Set(previous);
+      next.add(action);
+      return next;
+    });
+  }, []);
+
+  const endBusy = useCallback((action: string) => {
+    setBusyActions((previous) => {
+      const next = new Set(previous);
+      next.delete(action);
+      return next;
+    });
+  }, []);
+
+  const isBusy = useCallback(
+    (action: string) => {
+      return busyActions.has(action);
+    },
+    [busyActions],
+  );
 
   const selectedTeam = useMemo(
     () => teams.find((team) => team.id === selectedTeamId) ?? null,
@@ -303,6 +333,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
+      const requestId = teamDetailsRequestIdRef.current + 1;
+      teamDetailsRequestIdRef.current = requestId;
       setTeamDetailsLoading(true);
       setTeamDetailsError(null);
       try {
@@ -310,17 +342,23 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           organizerApi.listTeamMembers(apiBaseUrl, session, teamId),
           organizerApi.listTeamEventTypes(apiBaseUrl, session, teamId),
         ]);
-        setTeamMembers(membersPayload.members);
-        setTeamEventTypes(teamEventTypePayload.eventTypes);
+        if (requestId === teamDetailsRequestIdRef.current) {
+          setTeamMembers(membersPayload.members);
+          setTeamEventTypes(teamEventTypePayload.eventTypes);
+        }
       } catch (caught) {
-        setTeamMembers([]);
-        setTeamEventTypes([]);
-        setTeamDetailsError(caught instanceof Error ? caught.message : 'Unable to load team details.');
+        if (requestId === teamDetailsRequestIdRef.current) {
+          setTeamMembers([]);
+          setTeamEventTypes([]);
+          setTeamDetailsError(caught instanceof Error ? caught.message : 'Unable to load team details.');
+        }
       } finally {
-        setTeamDetailsLoading(false);
+        if (requestId === teamDetailsRequestIdRef.current) {
+          setTeamDetailsLoading(false);
+        }
       }
     },
-    [apiBaseUrl, session],
+    [apiBaseUrl, session, teamDetailsRequestIdRef],
   );
 
   useEffect(() => {
@@ -429,7 +467,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction('eventTypeCreate');
+      const action = 'eventTypeCreate';
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -448,10 +487,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       } catch (caught) {
         setPanelError(caught instanceof Error ? caught.message : 'Unable to create event type.');
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, eventTypeCreateForm, refreshOrganizerState, session],
+    [apiBaseUrl, beginBusy, endBusy, eventTypeCreateForm, refreshOrganizerState, session],
   );
 
   const handleUpdateEventType = useCallback(
@@ -461,7 +500,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction('eventTypeUpdate');
+      const action = 'eventTypeUpdate';
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -480,10 +520,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       } catch (caught) {
         setPanelError(caught instanceof Error ? caught.message : 'Unable to update event type.');
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, eventTypeUpdateForm, eventTypeUpdateId, refreshOrganizerState, session],
+    [apiBaseUrl, beginBusy, endBusy, eventTypeUpdateForm, eventTypeUpdateId, refreshOrganizerState, session],
   );
 
   const handleToggleEventTypeActive = useCallback(
@@ -492,7 +532,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction(`eventTypeToggle:${eventTypeId}`);
+      const action = `eventTypeToggle:${eventTypeId}`;
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -505,10 +546,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       } catch (caught) {
         setPanelError(caught instanceof Error ? caught.message : 'Unable to update event type status.');
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, refreshOrganizerState, session],
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session],
   );
 
   const handleSaveRules = useCallback(async () => {
@@ -516,7 +557,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       return;
     }
 
-    setBusyAction('rulesSave');
+    const action = 'rulesSave';
+    beginBusy(action);
     setPanelError(null);
     setPanelMessage(null);
 
@@ -533,16 +575,17 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     } catch (caught) {
       setPanelError(caught instanceof Error ? caught.message : 'Unable to update availability rules.');
     } finally {
-      setBusyAction(null);
+      endBusy(action);
     }
-  }, [apiBaseUrl, refreshOrganizerState, rulesDraft, session]);
+  }, [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, rulesDraft, session]);
 
   const handleSaveOverrides = useCallback(async () => {
     if (!session) {
       return;
     }
 
-    setBusyAction('overridesSave');
+    const action = 'overridesSave';
+    beginBusy(action);
     setPanelError(null);
     setPanelMessage(null);
 
@@ -559,9 +602,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     } catch (caught) {
       setPanelError(caught instanceof Error ? caught.message : 'Unable to update availability overrides.');
     } finally {
-      setBusyAction(null);
+      endBusy(action);
     }
-  }, [apiBaseUrl, overridesDraft, refreshOrganizerState, session]);
+  }, [apiBaseUrl, beginBusy, endBusy, overridesDraft, refreshOrganizerState, session]);
 
   const handleCreateTeam = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -570,7 +613,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction('teamCreate');
+      const action = 'teamCreate';
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -586,10 +630,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       } catch (caught) {
         setPanelError(caught instanceof Error ? caught.message : 'Unable to create team.');
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, refreshOrganizerState, session, teamCreateForm],
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session, teamCreateForm],
   );
 
   const handleAddTeamMember = useCallback(
@@ -599,7 +643,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction('teamMemberCreate');
+      const action = 'teamMemberCreate';
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -618,10 +663,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       } catch (caught) {
         setPanelError(caught instanceof Error ? caught.message : 'Unable to add team member.');
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, refreshOrganizerState, refreshTeamDetails, selectedTeamId, session, teamMemberForm],
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, refreshTeamDetails, selectedTeamId, session, teamMemberForm],
   );
 
   const handleCreateTeamEventType = useCallback(
@@ -631,7 +676,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction('teamEventTypeCreate');
+      const action = 'teamEventTypeCreate';
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -666,11 +712,13 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       } catch (caught) {
         setPanelError(caught instanceof Error ? caught.message : 'Unable to create team event type.');
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
     [
       apiBaseUrl,
+      beginBusy,
+      endBusy,
       refreshOrganizerState,
       refreshTeamDetails,
       selectedTeamId,
@@ -700,11 +748,17 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction('webhookCreate');
+      const action = 'webhookCreate';
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
       try {
+        if (selectedWebhookEvents.length === 0) {
+          setPanelError('Select at least one webhook event.');
+          return;
+        }
+
         await organizerApi.createWebhook(apiBaseUrl, session, {
           url: webhookForm.url.trim(),
           secret: webhookForm.secret,
@@ -722,10 +776,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       } catch (caught) {
         setPanelError(caught instanceof Error ? caught.message : 'Unable to create webhook.');
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, refreshOrganizerState, selectedWebhookEvents, session, webhookForm],
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, selectedWebhookEvents, session, webhookForm],
   );
 
   const handleToggleWebhookActive = useCallback(
@@ -734,7 +788,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction(`webhookToggle:${webhookId}`);
+      const action = `webhookToggle:${webhookId}`;
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -747,10 +802,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       } catch (caught) {
         setPanelError(caught instanceof Error ? caught.message : 'Unable to update webhook status.');
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, refreshOrganizerState, session],
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session],
   );
 
   const handleRunWebhookDeliveries = useCallback(async () => {
@@ -758,7 +813,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       return;
     }
 
-    setBusyAction('webhookRun');
+    const action = 'webhookRun';
+    beginBusy(action);
     setPanelError(null);
     setPanelMessage(null);
 
@@ -776,9 +832,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     } catch (caught) {
       setPanelError(caught instanceof Error ? caught.message : 'Unable to run webhook deliveries.');
     } finally {
-      setBusyAction(null);
+      endBusy(action);
     }
-  }, [apiBaseUrl, refreshOrganizerState, session, webhookRunLimit]);
+  }, [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session, webhookRunLimit]);
 
   const handleStartCalendarConnect = useCallback(
     async (provider: 'google' | 'microsoft') => {
@@ -786,7 +842,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction(`calendarConnect:${provider}`);
+      const action = `calendarConnect:${provider}`;
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -804,10 +861,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             ? caught.message
             : `Unable to start ${provider === 'google' ? 'Google' : 'Microsoft'} connect flow.`,
         );
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, session],
+    [apiBaseUrl, beginBusy, endBusy, session],
   );
 
   const handleCalendarSync = useCallback(
@@ -816,7 +873,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction(`calendarSync:${provider}`);
+      const action = `calendarSync:${provider}`;
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -835,10 +893,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           caught instanceof Error ? caught.message : `Unable to sync ${provider === 'google' ? 'Google' : 'Microsoft'} calendar.`,
         );
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, refreshOrganizerState, session],
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session],
   );
 
   const handleCalendarDisconnect = useCallback(
@@ -847,7 +905,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
-      setBusyAction(`calendarDisconnect:${provider}`);
+      const action = `calendarDisconnect:${provider}`;
+      beginBusy(action);
       setPanelError(null);
       setPanelMessage(null);
 
@@ -866,10 +925,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             : `Unable to disconnect ${provider === 'google' ? 'Google' : 'Microsoft'} calendar.`,
         );
       } finally {
-        setBusyAction(null);
+        endBusy(action);
       }
     },
-    [apiBaseUrl, refreshOrganizerState, session],
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session],
   );
 
   const handleRunWritebackQueue = useCallback(async () => {
@@ -877,7 +936,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       return;
     }
 
-    setBusyAction('writebackRun');
+    const action = 'writebackRun';
+    beginBusy(action);
     setPanelError(null);
     setPanelMessage(null);
 
@@ -894,9 +954,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     } catch (caught) {
       setPanelError(caught instanceof Error ? caught.message : 'Unable to run writeback queue.');
     } finally {
-      setBusyAction(null);
+      endBusy(action);
     }
-  }, [apiBaseUrl, refreshOrganizerState, session, writebackRunLimit]);
+  }, [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session, writebackRunLimit]);
 
   if (!ready || authChecking) {
     return (
@@ -955,7 +1015,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             type="button"
             className={styles.secondaryButton}
             onClick={() => void refreshOrganizerState()}
-            disabled={isRefreshing || busyAction !== null}
+            disabled={isRefreshing || busyActions.size > 0}
           >
             {isRefreshing ? 'Refreshing…' : 'Refresh console data'}
           </button>
@@ -993,9 +1053,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
                   type="button"
                   className={styles.ghostButton}
                   onClick={() => void handleToggleEventTypeActive(eventType.id, eventType.isActive)}
-                  disabled={busyAction === `eventTypeToggle:${eventType.id}`}
+                  disabled={isBusy(`eventTypeToggle:${eventType.id}`)}
                 >
-                  {busyAction === `eventTypeToggle:${eventType.id}`
+                  {isBusy(`eventTypeToggle:${eventType.id}`)
                     ? 'Saving…'
                     : eventType.isActive
                       ? 'Deactivate'
@@ -1071,8 +1131,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
                 placeholder="https://meet.example.com/room"
               />
             </label>
-            <button type="submit" className={styles.primaryButton} disabled={busyAction === 'eventTypeCreate'}>
-              {busyAction === 'eventTypeCreate' ? 'Creating…' : 'Create event type'}
+            <button type="submit" className={styles.primaryButton} disabled={isBusy('eventTypeCreate')}>
+              {isBusy('eventTypeCreate') ? 'Creating…' : 'Create event type'}
             </button>
           </form>
 
@@ -1178,8 +1238,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
               />
               Active
             </label>
-            <button type="submit" className={styles.primaryButton} disabled={busyAction === 'eventTypeUpdate'}>
-              {busyAction === 'eventTypeUpdate' ? 'Saving…' : 'Save event type'}
+            <button type="submit" className={styles.primaryButton} disabled={isBusy('eventTypeUpdate')}>
+              {isBusy('eventTypeUpdate') ? 'Saving…' : 'Save event type'}
             </button>
           </form>
         </div>
@@ -1221,9 +1281,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
               type="button"
               className={styles.primaryButton}
               onClick={() => void handleSaveRules()}
-              disabled={busyAction === 'rulesSave'}
+              disabled={isBusy('rulesSave')}
             >
-              {busyAction === 'rulesSave' ? 'Saving…' : 'Save rules'}
+              {isBusy('rulesSave') ? 'Saving…' : 'Save rules'}
             </button>
           </div>
 
@@ -1256,9 +1316,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
               type="button"
               className={styles.primaryButton}
               onClick={() => void handleSaveOverrides()}
-              disabled={busyAction === 'overridesSave'}
+              disabled={isBusy('overridesSave')}
             >
-              {busyAction === 'overridesSave' ? 'Saving…' : 'Save overrides'}
+              {isBusy('overridesSave') ? 'Saving…' : 'Save overrides'}
             </button>
           </div>
         </div>
@@ -1291,8 +1351,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
                 required
               />
             </label>
-            <button type="submit" className={styles.primaryButton} disabled={busyAction === 'teamCreate'}>
-              {busyAction === 'teamCreate' ? 'Creating…' : 'Create team'}
+            <button type="submit" className={styles.primaryButton} disabled={isBusy('teamCreate')}>
+              {isBusy('teamCreate') ? 'Creating…' : 'Create team'}
             </button>
           </form>
 
@@ -1371,9 +1431,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
                 <button
                   type="submit"
                   className={styles.primaryButton}
-                  disabled={busyAction === 'teamMemberCreate'}
+                  disabled={isBusy('teamMemberCreate')}
                 >
-                  {busyAction === 'teamMemberCreate' ? 'Adding…' : 'Add member'}
+                  {isBusy('teamMemberCreate') ? 'Adding…' : 'Add member'}
                 </button>
 
                 {teamMembers.length === 0 ? (
@@ -1490,9 +1550,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
                 <button
                   type="submit"
                   className={styles.primaryButton}
-                  disabled={busyAction === 'teamEventTypeCreate'}
+                  disabled={isBusy('teamEventTypeCreate')}
                 >
-                  {busyAction === 'teamEventTypeCreate' ? 'Creating…' : 'Create team event type'}
+                  {isBusy('teamEventTypeCreate') ? 'Creating…' : 'Create team event type'}
                 </button>
 
                 {teamEventTypes.length === 0 ? (
@@ -1543,6 +1603,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
               Secret
               <input
                 className={styles.input}
+                type="password"
+                autoComplete="new-password"
                 value={webhookForm.secret}
                 onChange={(event) => setWebhookForm((prev) => ({ ...prev, secret: event.target.value }))}
                 minLength={8}
@@ -1583,8 +1645,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
               </label>
             </fieldset>
 
-            <button type="submit" className={styles.primaryButton} disabled={busyAction === 'webhookCreate'}>
-              {busyAction === 'webhookCreate' ? 'Creating…' : 'Create webhook'}
+            <button type="submit" className={styles.primaryButton} disabled={isBusy('webhookCreate')}>
+              {isBusy('webhookCreate') ? 'Creating…' : 'Create webhook'}
             </button>
 
             <div className={styles.inlineActions}>
@@ -1601,9 +1663,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
                 type="button"
                 className={styles.secondaryButton}
                 onClick={() => void handleRunWebhookDeliveries()}
-                disabled={busyAction === 'webhookRun'}
+                disabled={isBusy('webhookRun')}
               >
-                {busyAction === 'webhookRun' ? 'Running…' : 'Run delivery worker'}
+                {isBusy('webhookRun') ? 'Running…' : 'Run delivery worker'}
               </button>
             </div>
           </form>
@@ -1625,9 +1687,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
                       type="button"
                       className={styles.ghostButton}
                       onClick={() => void handleToggleWebhookActive(webhook.id, webhook.isActive)}
-                      disabled={busyAction === `webhookToggle:${webhook.id}`}
+                      disabled={isBusy(`webhookToggle:${webhook.id}`)}
                     >
-                      {busyAction === `webhookToggle:${webhook.id}`
+                      {isBusy(`webhookToggle:${webhook.id}`)
                         ? 'Saving…'
                         : webhook.isActive
                           ? 'Disable'
@@ -1673,25 +1735,25 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
                     type="button"
                     className={styles.secondaryButton}
                     onClick={() => void handleStartCalendarConnect(status.provider)}
-                    disabled={busyAction === `calendarConnect:${status.provider}`}
+                    disabled={isBusy(`calendarConnect:${status.provider}`)}
                   >
-                    {busyAction === `calendarConnect:${status.provider}` ? 'Starting…' : 'Connect'}
+                    {isBusy(`calendarConnect:${status.provider}`) ? 'Starting…' : 'Connect'}
                   </button>
                   <button
                     type="button"
                     className={styles.secondaryButton}
                     onClick={() => void handleCalendarSync(status.provider)}
-                    disabled={busyAction === `calendarSync:${status.provider}`}
+                    disabled={isBusy(`calendarSync:${status.provider}`)}
                   >
-                    {busyAction === `calendarSync:${status.provider}` ? 'Syncing…' : 'Sync now'}
+                    {isBusy(`calendarSync:${status.provider}`) ? 'Syncing…' : 'Sync now'}
                   </button>
                   <button
                     type="button"
                     className={styles.ghostButton}
                     onClick={() => void handleCalendarDisconnect(status.provider)}
-                    disabled={busyAction === `calendarDisconnect:${status.provider}`}
+                    disabled={isBusy(`calendarDisconnect:${status.provider}`)}
                   >
-                    {busyAction === `calendarDisconnect:${status.provider}` ? 'Disconnecting…' : 'Disconnect'}
+                    {isBusy(`calendarDisconnect:${status.provider}`) ? 'Disconnecting…' : 'Disconnect'}
                   </button>
                 </div>
               </article>
@@ -1739,9 +1801,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             type="button"
             className={styles.secondaryButton}
             onClick={() => void handleRunWritebackQueue()}
-            disabled={busyAction === 'writebackRun'}
+            disabled={isBusy('writebackRun')}
           >
-            {busyAction === 'writebackRun' ? 'Running…' : 'Run writeback queue'}
+            {isBusy('writebackRun') ? 'Running…' : 'Run writeback queue'}
           </button>
         </div>
 
