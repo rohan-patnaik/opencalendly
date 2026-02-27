@@ -445,10 +445,6 @@ Request:
 }
 ```
 
-Required header:
-
-- `Idempotency-Key: <16-200 char unique key>`
-
 Success response:
 
 ```json
@@ -525,6 +521,10 @@ Request:
   "timezone": "America/Los_Angeles"
 }
 ```
+
+Required header:
+
+- `Idempotency-Key: <16-200 char unique key>`
 
 Success response:
 
@@ -623,10 +623,6 @@ Request:
   "email": "pat@example.com"
 }
 ```
-
-Required header:
-
-- `Idempotency-Key: <16-200 char unique key>`
 
 Success response:
 
@@ -1009,6 +1005,10 @@ Request:
   }
 }
 ```
+
+Required header:
+
+- `Idempotency-Key: <16-200 char unique key>`
 
 Success response:
 

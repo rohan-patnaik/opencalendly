@@ -109,7 +109,7 @@ flowchart LR
 ### Reliability + platform hardening (Feature 9)
 
 1. Public availability and booking mutation routes apply request-level rate limiting by IP + route scope.
-2. Booking create and reschedule mutations require `Idempotency-Key`.
+2. Booking create, team booking create, and reschedule mutations require `Idempotency-Key`.
 3. API stores idempotency claim/replay state in `idempotency_requests`.
 4. Repeated identical requests replay stored response; mismatched payload reuse returns `409`.
 5. Branch protection enforces required checks + PR-only merges on `main`.
@@ -121,7 +121,7 @@ flowchart LR
 - Team bookings additionally enforce per-member slot uniqueness through `team_booking_assignments`.
 - External calendar conflicts are enforced at compute-time and re-checked at commit-time.
 - External event writeback state is idempotent per booking+provider and retry-safe.
-- Booking-create and booking-reschedule endpoints are idempotent by explicit request keys.
+- Booking-create, team-booking-create, and booking-reschedule endpoints are idempotent by explicit request keys.
 - Email sends should be keyed by idempotency token to avoid duplicates on retries.
 - Webhooks use exponential backoff and dedupe by subscription + event id.
 - Public booking and availability routes are rate-limited to reduce abuse and free-tier DB exhaustion.

@@ -152,7 +152,7 @@ Acceptance criteria:
 
 - GitHub branch protection is fully configured to enforce required checks and no direct `main` pushes.
 - API adds request-level rate limiting for public booking/availability routes.
-- Idempotency keys are enforced for booking-create and booking-reschedule mutation endpoints.
+- Idempotency keys are enforced for booking-create, team booking-create, and booking-reschedule mutation endpoints.
 - Platform warning debt is resolved or documented with a tracked migration plan:
   - evaluate and decide migration path from `@cloudflare/next-on-pages` to OpenNext
   - document lockfile warning strategy for local dev

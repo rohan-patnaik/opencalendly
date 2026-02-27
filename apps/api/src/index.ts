@@ -1726,17 +1726,24 @@ const claimIdempotencyRequest = async (
         ),
       );
 
-    await db.insert(idempotencyRequests).values({
-      scope: input.scope,
-      idempotencyKeyHash: keyHash,
-      requestHash: input.requestHash,
-      status: 'in_progress',
-      expiresAt,
-    });
-    return {
-      state: 'claimed',
-      keyHash,
-    };
+    try {
+      await db.insert(idempotencyRequests).values({
+        scope: input.scope,
+        idempotencyKeyHash: keyHash,
+        requestHash: input.requestHash,
+        status: 'in_progress',
+        expiresAt,
+      });
+      return {
+        state: 'claimed',
+        keyHash,
+      };
+    } catch (error) {
+      if (isUniqueViolation(error, 'idempotency_requests_scope_key_hash_unique')) {
+        return { state: 'in_progress' };
+      }
+      throw error;
+    }
   }
 
   if (existing.requestHash !== input.requestHash) {
@@ -1791,6 +1798,24 @@ const completeIdempotencyRequest = async (
       and(
         eq(idempotencyRequests.scope, input.scope),
         eq(idempotencyRequests.idempotencyKeyHash, input.keyHash),
+      ),
+    );
+};
+
+const releaseIdempotencyRequest = async (
+  db: Database,
+  input: {
+    scope: IdempotencyScope;
+    keyHash: string;
+  },
+): Promise<void> => {
+  await db
+    .delete(idempotencyRequests)
+    .where(
+      and(
+        eq(idempotencyRequests.scope, input.scope),
+        eq(idempotencyRequests.idempotencyKeyHash, input.keyHash),
+        eq(idempotencyRequests.status, 'in_progress'),
       ),
     );
 };
@@ -5157,15 +5182,6 @@ app.post('/v0/team-bookings', async (context) => {
 
   const payload = parsed.data;
   const requestIp = resolveClientIp(context.req.raw);
-  if (
-    isPublicBookingRateLimited({
-      ip: requestIp,
-      scope: `team-booking|${payload.teamSlug}|${payload.eventSlug}`,
-      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
-    })
-  ) {
-    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
-  }
 
   const timezone = normalizeTimezone(payload.timezone);
   const startsAt = DateTime.fromISO(payload.startsAt, { zone: 'utc' });
@@ -5206,6 +5222,19 @@ app.post('/v0/team-bookings', async (context) => {
     }
     if (idempotencyState.state === 'in_progress') {
       return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
+    }
+    if (
+      isPublicBookingRateLimited({
+        ip: requestIp,
+        scope: `team-booking|${payload.teamSlug}|${payload.eventSlug}`,
+        perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
+      })
+    ) {
+      await releaseIdempotencyRequest(db, {
+        scope: 'team_booking_create',
+        keyHash: idempotencyState.keyHash,
+      });
+      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
     }
 
     try {
@@ -5592,6 +5621,10 @@ app.post('/v0/team-bookings', async (context) => {
         });
         return context.json(responseBody, 409);
       }
+      await releaseIdempotencyRequest(db, {
+        scope: 'team_booking_create',
+        keyHash: idempotencyState.keyHash,
+      });
       throw error;
     }
   });
@@ -5612,15 +5645,6 @@ app.post('/v0/bookings', async (context) => {
 
   const payload = parsed.data;
   const requestIp = resolveClientIp(context.req.raw);
-  if (
-    isPublicBookingRateLimited({
-      ip: requestIp,
-      scope: `booking|${payload.username}|${payload.eventSlug}`,
-      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
-    })
-  ) {
-    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
-  }
 
   const timezone = normalizeTimezone(payload.timezone);
   const idempotencyRequestHash = hashIdempotencyRequestPayload({
@@ -5651,6 +5675,19 @@ app.post('/v0/bookings', async (context) => {
     }
     if (idempotencyState.state === 'in_progress') {
       return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
+    }
+    if (
+      isPublicBookingRateLimited({
+        ip: requestIp,
+        scope: `booking|${payload.username}|${payload.eventSlug}`,
+        perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
+      })
+    ) {
+      await releaseIdempotencyRequest(db, {
+        scope: 'booking_create',
+        keyHash: idempotencyState.keyHash,
+      });
+      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
     }
 
     try {
@@ -5943,6 +5980,10 @@ app.post('/v0/bookings', async (context) => {
         });
         return context.json(responseBody, 409);
       }
+      await releaseIdempotencyRequest(db, {
+        scope: 'booking_create',
+        keyHash: idempotencyState.keyHash,
+      });
       throw error;
     }
   });
@@ -6370,15 +6411,6 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
   }
 
   const requestIp = resolveClientIp(context.req.raw);
-  if (
-    isPublicBookingRateLimited({
-      ip: requestIp,
-      scope: `reschedule|${hashToken(tokenParam.data)}`,
-      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
-    })
-  ) {
-    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
-  }
 
   const requestedStartsAtIso = startsAt.toUTC().toISO();
   if (!requestedStartsAtIso) {
@@ -6409,6 +6441,19 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
     }
     if (idempotencyState.state === 'in_progress') {
       return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
+    }
+    if (
+      isPublicBookingRateLimited({
+        ip: requestIp,
+        scope: `reschedule|${hashToken(tokenParam.data)}`,
+        perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
+      })
+    ) {
+      await releaseIdempotencyRequest(db, {
+        scope: 'booking_reschedule',
+        keyHash: idempotencyState.keyHash,
+      });
+      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
     }
 
     try {
@@ -7033,6 +7078,10 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         });
         return context.json(responseBody, 409);
       }
+      await releaseIdempotencyRequest(db, {
+        scope: 'booking_reschedule',
+        keyHash: idempotencyState.keyHash,
+      });
       throw error;
     }
   });

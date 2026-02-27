@@ -120,6 +120,13 @@
       "when": 1772158929343,
       "tag": "0016_fixed_famine",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1772163168559,
+      "tag": "0017_amazing_the_stranger",
+      "breakpoints": true
     }
   ]
 }
