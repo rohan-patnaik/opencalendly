@@ -1,9 +1,25 @@
+import { randomUUID } from 'node:crypto';
+
+import { and, eq, gte, lte } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+
+import {
+  availabilityOverrides,
+  availabilityRules,
+  bookingActionTokens,
+  bookings,
+  calendarBusyWindows,
+  calendarConnections,
+  createDb,
+  eventTypes,
+  users,
+} from '@opencalendly/db';
 
 import { evaluateBookingActionToken } from './booking-actions';
 import {
   BookingConflictError,
   commitBooking,
+  BookingUniqueConstraintError,
   type BookingDataAccess,
   type PublicEventType,
 } from './booking';
@@ -66,6 +82,145 @@ const buildBookingDataAccess = (options?: {
   };
 
   return dataAccess;
+};
+
+type Database = ReturnType<typeof createDb>['db'];
+
+const buildDbBackedBookingDataAccess = (db: Database): BookingDataAccess => {
+  return {
+    getPublicEventType: async (username, eventSlug) => {
+      const [row] = await db
+        .select({
+          id: eventTypes.id,
+          userId: eventTypes.userId,
+          slug: eventTypes.slug,
+          name: eventTypes.name,
+          durationMinutes: eventTypes.durationMinutes,
+          locationType: eventTypes.locationType,
+          locationValue: eventTypes.locationValue,
+          questions: eventTypes.questions,
+          isActive: eventTypes.isActive,
+          organizerDisplayName: users.displayName,
+          organizerEmail: users.email,
+          organizerTimezone: users.timezone,
+        })
+        .from(eventTypes)
+        .innerJoin(users, eq(users.id, eventTypes.userId))
+        .where(and(eq(users.username, username), eq(eventTypes.slug, eventSlug)))
+        .limit(1);
+
+      return row ?? null;
+    },
+    withEventTypeTransaction: async (eventTypeId, callback) => {
+      return db.transaction(async (transaction) => {
+        return callback({
+          lockEventType: async () => undefined,
+          listRules: async (userId) => {
+            return transaction.select().from(availabilityRules).where(eq(availabilityRules.userId, userId));
+          },
+          listOverrides: async (userId, rangeStart, rangeEnd) => {
+            return transaction
+              .select({
+                startAt: availabilityOverrides.startAt,
+                endAt: availabilityOverrides.endAt,
+                isAvailable: availabilityOverrides.isAvailable,
+              })
+              .from(availabilityOverrides)
+              .where(
+                and(
+                  eq(availabilityOverrides.userId, userId),
+                  lte(availabilityOverrides.startAt, rangeEnd),
+                  gte(availabilityOverrides.endAt, rangeStart),
+                ),
+              );
+          },
+          listExternalBusyWindows: async (userId, rangeStart, rangeEnd) => {
+            return transaction
+              .select({
+                startsAt: calendarBusyWindows.startsAt,
+                endsAt: calendarBusyWindows.endsAt,
+              })
+              .from(calendarBusyWindows)
+              .where(
+                and(
+                  eq(calendarBusyWindows.userId, userId),
+                  lte(calendarBusyWindows.startsAt, rangeEnd),
+                  gte(calendarBusyWindows.endsAt, rangeStart),
+                ),
+              );
+          },
+          listConfirmedBookings: async (organizerId, rangeStart, rangeEnd) => {
+            return transaction
+              .select({
+                startsAt: bookings.startsAt,
+                endsAt: bookings.endsAt,
+                status: bookings.status,
+                metadata: bookings.metadata,
+              })
+              .from(bookings)
+              .where(
+                and(
+                  eq(bookings.organizerId, organizerId),
+                  lte(bookings.startsAt, rangeEnd),
+                  gte(bookings.endsAt, rangeStart),
+                ),
+              );
+          },
+          insertBooking: async (input) => {
+            try {
+              const [created] = await transaction
+                .insert(bookings)
+                .values({
+                  eventTypeId,
+                  organizerId: input.organizerId,
+                  inviteeName: input.inviteeName,
+                  inviteeEmail: input.inviteeEmail,
+                  startsAt: input.startsAt,
+                  endsAt: input.endsAt,
+                  status: 'confirmed',
+                  metadata: input.metadata,
+                })
+                .returning({
+                  id: bookings.id,
+                  eventTypeId: bookings.eventTypeId,
+                  organizerId: bookings.organizerId,
+                  inviteeName: bookings.inviteeName,
+                  inviteeEmail: bookings.inviteeEmail,
+                  startsAt: bookings.startsAt,
+                  endsAt: bookings.endsAt,
+                });
+
+              if (!created) {
+                throw new Error('Failed to create booking record.');
+              }
+
+              return created;
+            } catch (error) {
+              if (
+                error &&
+                typeof error === 'object' &&
+                'code' in error &&
+                (error as { code?: string }).code === '23505'
+              ) {
+                throw new BookingUniqueConstraintError('Slot already booked.');
+              }
+              throw error;
+            }
+          },
+          insertActionTokens: async (bookingId, tokens) => {
+            await transaction.insert(bookingActionTokens).values(
+              tokens.map((token) => ({
+                bookingId,
+                actionType: token.actionType,
+                tokenHash: token.tokenHash,
+                expiresAt: token.expiresAt,
+              })),
+            );
+          },
+        });
+      });
+    },
+  };
 };
 
 describe('release readiness', () => {
@@ -211,5 +366,102 @@ describe('release readiness', () => {
         },
       ),
     ).rejects.toBeInstanceOf(BookingConflictError);
+  });
+
+  const dbIntegration = process.env.DATABASE_URL ? it : it.skip;
+  dbIntegration('covers booking lifecycle and conflict blocking against a real database', async () => {
+    const suffix = randomUUID();
+    const userId = randomUUID();
+    const eventTypeId = randomUUID();
+    const connectionId = randomUUID();
+    const username = `release-${suffix.slice(0, 8)}`;
+    const now = new Date();
+
+    const { client, db } = createDb(process.env.DATABASE_URL, { enforceNeon: false });
+    await client.connect();
+    try {
+      await db.insert(users).values({
+        id: userId,
+        email: `${username}@example.com`,
+        username,
+        displayName: 'Release Readiness Organizer',
+        timezone: 'UTC',
+      });
+
+      await db.insert(eventTypes).values({
+        id: eventTypeId,
+        userId,
+        slug: 'integration-intro',
+        name: 'Integration Intro',
+        durationMinutes: 30,
+        locationType: 'video',
+        locationValue: 'https://meet.example.com/integration',
+        questions: [],
+        isActive: true,
+      });
+
+      await db.insert(availabilityRules).values({
+        userId,
+        dayOfWeek: 1,
+        startMinute: 540,
+        endMinute: 660,
+        bufferBeforeMinutes: 0,
+        bufferAfterMinutes: 0,
+      });
+
+      await db.insert(calendarConnections).values({
+        id: connectionId,
+        userId,
+        provider: 'google',
+        accessTokenEncrypted: 'enc-access-token',
+        refreshTokenEncrypted: 'enc-refresh-token',
+        accessTokenExpiresAt: new Date(now.getTime() + 60 * 60 * 1000),
+      });
+
+      const bookingDataAccess = buildDbBackedBookingDataAccess(db);
+
+      const created = await commitBooking(bookingDataAccess, {
+        username,
+        eventSlug: 'integration-intro',
+        startsAt: '2026-03-02T09:00:00.000Z',
+        timezone: 'UTC',
+        inviteeName: 'Pat Lee',
+        inviteeEmail: 'pat@example.com',
+      });
+      expect(created.booking.organizerId).toBe(userId);
+
+      await expect(
+        commitBooking(bookingDataAccess, {
+          username,
+          eventSlug: 'integration-intro',
+          startsAt: '2026-03-02T09:00:00.000Z',
+          timezone: 'UTC',
+          inviteeName: 'Pat Lee',
+          inviteeEmail: 'pat@example.com',
+        }),
+      ).rejects.toBeInstanceOf(BookingConflictError);
+
+      await db.insert(calendarBusyWindows).values({
+        connectionId,
+        userId,
+        provider: 'google',
+        startsAt: new Date('2026-03-02T09:30:00.000Z'),
+        endsAt: new Date('2026-03-02T10:00:00.000Z'),
+      });
+
+      await expect(
+        commitBooking(bookingDataAccess, {
+          username,
+          eventSlug: 'integration-intro',
+          startsAt: '2026-03-02T09:30:00.000Z',
+          timezone: 'UTC',
+          inviteeName: 'Pat Lee',
+          inviteeEmail: 'pat@example.com',
+        }),
+      ).rejects.toBeInstanceOf(BookingConflictError);
+    } finally {
+      await db.delete(users).where(eq(users.id, userId));
+      await client.end();
+    }
   });
 });
