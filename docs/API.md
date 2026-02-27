@@ -1193,7 +1193,8 @@ Success response:
     "name": "Team Intro Call",
     "durationMinutes": 30,
     "locationType": "video",
-    "locationValue": "https://meet.example.com/team-demo"
+    "locationValue": "https://meet.example.com/team-demo",
+    "questions": []
   },
   "mode": "round_robin",
   "members": [

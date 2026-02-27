@@ -222,6 +222,7 @@ type EventTypeProfile = {
   durationMinutes: number;
   locationType: string;
   locationValue: string | null;
+  questions?: EventQuestion[];
   isActive: boolean;
 };
 
@@ -1981,6 +1982,7 @@ const findTeamEventTypeContext = async (
       durationMinutes: eventTypes.durationMinutes,
       locationType: eventTypes.locationType,
       locationValue: eventTypes.locationValue,
+      questions: eventTypes.questions,
       isActive: eventTypes.isActive,
     })
     .from(teamEventTypes)
@@ -2038,6 +2040,7 @@ const findTeamEventTypeContext = async (
       durationMinutes: row.durationMinutes,
       locationType: row.locationType,
       locationValue: row.locationValue,
+      questions: toEventQuestions(row.questions),
       isActive: row.isActive,
     },
     mode,
@@ -5630,6 +5633,7 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug', async (context) => {
         durationMinutes: teamEventContext.eventType.durationMinutes,
         locationType: teamEventContext.eventType.locationType,
         locationValue: teamEventContext.eventType.locationValue,
+        questions: teamEventContext.eventType.questions ?? [],
       },
       mode: teamEventContext.mode,
       members: teamEventContext.members.map((member) => ({

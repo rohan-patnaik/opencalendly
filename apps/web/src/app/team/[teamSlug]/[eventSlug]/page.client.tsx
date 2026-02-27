@@ -25,6 +25,12 @@ type TeamEventResponse = {
     durationMinutes: number;
     locationType: string;
     locationValue: string | null;
+    questions: Array<{
+      id: string;
+      label: string;
+      required: boolean;
+      placeholder?: string;
+    }>;
   };
   mode: 'round_robin' | 'collective';
   members: Array<{
@@ -70,6 +76,15 @@ type TeamBookingPageClientProps = {
   apiBaseUrl: string;
 };
 
+const buildInitialAnswers = (
+  questions: TeamEventResponse['eventType']['questions'],
+): Record<string, string> => {
+  return questions.reduce<Record<string, string>>((accumulator, question) => {
+    accumulator[question.id] = '';
+    return accumulator;
+  }, {});
+};
+
 const readableLocation = (locationType: string, locationValue: string | null): string => {
   if (locationValue && locationValue.trim().length > 0) {
     return locationValue;
@@ -90,6 +105,8 @@ export default function TeamBookingPageClient({
   const [selectedSlot, setSelectedSlot] = useState('');
   const [inviteeName, setInviteeName] = useState('');
   const [inviteeEmail, setInviteeEmail] = useState('');
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [bookingRequestKey, setBookingRequestKey] = useState('');
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -128,6 +145,7 @@ export default function TeamBookingPageClient({
       }
 
       setTeamEvent(payload);
+      setAnswers(buildInitialAnswers(payload.eventType.questions));
     } catch {
       setError('Unable to load team event details.');
       setTeamEvent(null);
@@ -184,6 +202,14 @@ export default function TeamBookingPageClient({
     void loadAvailability();
   }, [loadAvailability, teamEvent]);
 
+  useEffect(() => {
+    if (!selectedSlot) {
+      setBookingRequestKey('');
+      return;
+    }
+    setBookingRequestKey(createIdempotencyKey());
+  }, [selectedSlot]);
+
   const submitTeamBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
@@ -194,13 +220,25 @@ export default function TeamBookingPageClient({
       return;
     }
 
+    const missingRequiredQuestion = teamEvent?.eventType.questions.find(
+      (question) => question.required && !(answers[question.id] ?? '').trim(),
+    );
+    if (missingRequiredQuestion) {
+      setError(`Answer required question: "${missingRequiredQuestion.label}".`);
+      return;
+    }
+
     setSubmitting(true);
     try {
+      const requestIdempotencyKey = bookingRequestKey || createIdempotencyKey();
+      if (!bookingRequestKey) {
+        setBookingRequestKey(requestIdempotencyKey);
+      }
       const response = await fetch(`${apiBaseUrl}/v0/team-bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': createIdempotencyKey(),
+          'Idempotency-Key': requestIdempotencyKey,
         },
         body: JSON.stringify({
           teamSlug,
@@ -209,7 +247,9 @@ export default function TeamBookingPageClient({
           timezone,
           inviteeName,
           inviteeEmail,
-          answers: {},
+          answers: Object.fromEntries(
+            Object.entries(answers).filter((entry) => entry[1].trim().length > 0),
+          ),
         }),
       });
 
@@ -225,6 +265,8 @@ export default function TeamBookingPageClient({
       setInviteeName('');
       setInviteeEmail('');
       setSelectedSlot('');
+      setBookingRequestKey('');
+      setAnswers(buildInitialAnswers(teamEvent?.eventType.questions ?? []));
       void loadAvailability();
     } catch {
       setError('Team booking failed. Please try again.');
@@ -263,7 +305,7 @@ export default function TeamBookingPageClient({
         <h1>{teamEvent.eventType.name}</h1>
         <p>
           Team: <strong>{teamEvent.team.name}</strong> · Mode:{' '}
-          <strong>{teamEvent.mode.replace('_', ' ')}</strong>
+          <strong>{teamEvent.mode.replaceAll('_', ' ')}</strong>
         </p>
         <p>
           Duration: {teamEvent.eventType.durationMinutes} min · Location:{' '}
@@ -353,6 +395,25 @@ export default function TeamBookingPageClient({
               onChange={(entry) => setInviteeEmail(entry.target.value)}
               required
             />
+
+            {teamEvent.eventType.questions.map((question) => (
+              <label key={question.id} className={styles.label} htmlFor={`team-question-${question.id}`}>
+                {question.label}
+                <input
+                  id={`team-question-${question.id}`}
+                  className={styles.input}
+                  value={answers[question.id] ?? ''}
+                  onChange={(entry) =>
+                    setAnswers((previous) => ({
+                      ...previous,
+                      [question.id]: entry.target.value,
+                    }))
+                  }
+                  placeholder={question.placeholder ?? ''}
+                  required={question.required}
+                />
+              </label>
+            ))}
 
             <button className={styles.primaryButton} type="submit" disabled={submitting}>
               {submitting ? 'Booking...' : 'Confirm team booking'}

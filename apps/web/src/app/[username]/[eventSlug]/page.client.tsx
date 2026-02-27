@@ -60,6 +60,15 @@ type BookingPageClientProps = {
   apiBaseUrl: string;
 };
 
+const buildInitialAnswers = (
+  questions: PublicEventResponse['eventType']['questions'],
+): Record<string, string> => {
+  return questions.reduce<Record<string, string>>((accumulator, question) => {
+    accumulator[question.id] = '';
+    return accumulator;
+  }, {});
+};
+
 const readableLocation = (locationType: string, locationValue: string | null): string => {
   if (locationValue && locationValue.trim().length > 0) {
     return locationValue;
@@ -75,6 +84,7 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   const [inviteeName, setInviteeName] = useState('');
   const [inviteeEmail, setInviteeEmail] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [bookingRequestKey, setBookingRequestKey] = useState('');
   const [pageError, setPageError] = useState<string | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -128,12 +138,7 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       }
 
       setEventData(payload);
-      setAnswers(
-        payload.eventType.questions.reduce<Record<string, string>>((accumulator, question) => {
-          accumulator[question.id] = '';
-          return accumulator;
-        }, {}),
-      );
+      setAnswers(buildInitialAnswers(payload.eventType.questions));
       trackFunnelEvent('page_view');
     } catch {
       setPageError('Unable to load event details.');
@@ -192,6 +197,14 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     void loadAvailability();
   }, [eventData, loadAvailability]);
 
+  useEffect(() => {
+    if (!selectedSlot) {
+      setBookingRequestKey('');
+      return;
+    }
+    setBookingRequestKey(createIdempotencyKey());
+  }, [selectedSlot]);
+
   const submitBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setConfirmation(null);
@@ -212,11 +225,15 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
 
     setSubmitting(true);
     try {
+      const requestIdempotencyKey = bookingRequestKey || createIdempotencyKey();
+      if (!bookingRequestKey) {
+        setBookingRequestKey(requestIdempotencyKey);
+      }
       const response = await fetch(`${apiBaseUrl}/v0/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': createIdempotencyKey(),
+          'Idempotency-Key': requestIdempotencyKey,
         },
         body: JSON.stringify({
           username,
@@ -240,12 +257,8 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       setInviteeName('');
       setInviteeEmail('');
       setSelectedSlot('');
-      setAnswers(
-        eventData?.eventType.questions.reduce<Record<string, string>>((accumulator, question) => {
-          accumulator[question.id] = '';
-          return accumulator;
-        }, {}) ?? {},
-      );
+      setBookingRequestKey('');
+      setAnswers(buildInitialAnswers(eventData?.eventType.questions ?? []));
       void loadAvailability();
     } catch {
       setPageError('Booking failed. Please try again.');

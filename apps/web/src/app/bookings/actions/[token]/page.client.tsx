@@ -431,8 +431,8 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
           <p className={styles.kicker}>Booking actions</p>
           <h1>{actionStatus === 'expired' ? 'Action link expired' : 'Action link unavailable'}</h1>
           <p className={styles.error}>{error || 'Action link is invalid or expired.'}</p>
-          <Link className={styles.secondaryButton} href="/demo/intro-call">
-            Return to demo booking
+          <Link className={styles.secondaryButton} href="/">
+            Return to home
           </Link>
         </section>
       </main>
