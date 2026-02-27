@@ -134,6 +134,15 @@ export type WritebackFailure = {
   updatedAt: string;
 };
 
+export type WritebackStatus = {
+  summary: {
+    pending: number;
+    succeeded: number;
+    failed: number;
+  };
+  failures: WritebackFailure[];
+};
+
 const fallback = {
   eventTypesList: 'Unable to load event types.',
   eventTypeCreate: 'Unable to create event type.',
@@ -413,7 +422,7 @@ export const organizerApi = {
       retried: number;
       failed: number;
     }>({
-      url: `${apiBaseUrl}/v0/webhooks/deliveries/run${limit ? `?limit=${encodeURIComponent(String(limit))}` : ''}`,
+      url: `${apiBaseUrl}/v0/webhooks/deliveries/run${typeof limit === 'number' ? `?limit=${encodeURIComponent(String(limit))}` : ''}`,
       session,
       body: {},
       fallbackError: fallback.webhookRun,
@@ -591,15 +600,7 @@ export const organizerApi = {
   },
 
   getWritebackStatus: async (apiBaseUrl: string, session: AuthSession | null) => {
-    return authedGetJson<{
-      ok: true;
-      summary: {
-        pending: number;
-        succeeded: number;
-        failed: number;
-      };
-      failures: WritebackFailure[];
-    }>({
+    return authedGetJson<{ ok: true } & WritebackStatus>({
       url: `${apiBaseUrl}/v0/calendar/writeback/status`,
       session,
       fallbackError: fallback.writebackStatus,

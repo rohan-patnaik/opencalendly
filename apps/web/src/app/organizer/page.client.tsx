@@ -4,7 +4,18 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { authedGetJson } from '../../lib/api-client';
-import { organizerApi, type OrganizerEventType, type TeamSummary } from '../../lib/organizer-api';
+import {
+  organizerApi,
+  type AvailabilityOverride,
+  type AvailabilityRule,
+  type CalendarProviderStatus,
+  type OrganizerEventType,
+  type OrganizerWebhook,
+  type TeamEventType,
+  type TeamMember,
+  type TeamSummary,
+  type WritebackStatus,
+} from '../../lib/organizer-api';
 import { useAuthSession } from '../../lib/use-auth-session';
 import styles from './page.module.css';
 
@@ -48,7 +59,11 @@ const parseIntegerOrUndefined = (value: string): number | undefined => {
   return Number.isNaN(parsed) ? undefined : parsed;
 };
 
-const parseJsonArray = <T,>(raw: string, label: string): T[] => {
+const parseJsonArray = <T,>(
+  raw: string,
+  label: string,
+  isValidItem: (value: unknown) => value is T,
+): T[] => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -60,7 +75,69 @@ const parseJsonArray = <T,>(raw: string, label: string): T[] => {
     throw new Error(`${label} must be a JSON array.`);
   }
 
-  return parsed as T[];
+  for (let index = 0; index < parsed.length; index += 1) {
+    if (!isValidItem(parsed[index])) {
+      throw new Error(`${label} contains invalid item at index ${index}.`);
+    }
+  }
+
+  return parsed;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+type AvailabilityRuleInput = {
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
+};
+
+const isAvailabilityRuleInput = (value: unknown): value is AvailabilityRuleInput => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.dayOfWeek === 'number' &&
+    typeof value.startMinute === 'number' &&
+    typeof value.endMinute === 'number' &&
+    typeof value.bufferBeforeMinutes === 'number' &&
+    typeof value.bufferAfterMinutes === 'number'
+  );
+};
+
+type AvailabilityOverrideInput = {
+  startAt: string;
+  endAt: string;
+  isAvailable: boolean;
+  reason?: string | null;
+};
+
+const isAvailabilityOverrideInput = (value: unknown): value is AvailabilityOverrideInput => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const reason = value.reason;
+
+  return (
+    typeof value.startAt === 'string' &&
+    typeof value.endAt === 'string' &&
+    typeof value.isAvailable === 'boolean' &&
+    (typeof reason === 'undefined' || typeof reason === 'string' || reason === null)
+  );
+};
+
+const formatDateTime = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'Invalid date';
+  }
+  return parsed.toLocaleString();
 };
 
 const buildDefaultEventTypeForm = () => ({
@@ -83,121 +160,16 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   const [eventTypes, setEventTypes] = useState<OrganizerEventType[]>([]);
-  const [availabilityRules, setAvailabilityRules] = useState<
-    Array<{
-      id: string;
-      dayOfWeek: number;
-      startMinute: number;
-      endMinute: number;
-      bufferBeforeMinutes: number;
-      bufferAfterMinutes: number;
-      createdAt: string;
-    }>
-  >([]);
-  const [availabilityOverrides, setAvailabilityOverrides] = useState<
-    Array<{
-      id: string;
-      startAt: string;
-      endAt: string;
-      isAvailable: boolean;
-      reason: string | null;
-      createdAt: string;
-    }>
-  >([]);
+  const [availabilityRules, setAvailabilityRules] = useState<AvailabilityRule[]>([]);
+  const [availabilityOverrides, setAvailabilityOverrides] = useState<AvailabilityOverride[]>([]);
   const [teams, setTeams] = useState<TeamSummary[]>([]);
-  const [webhooks, setWebhooks] = useState<
-    Array<{
-      id: string;
-      url: string;
-      events: Array<'booking.created' | 'booking.canceled' | 'booking.rescheduled'>;
-      isActive: boolean;
-      createdAt: string;
-      updatedAt: string;
-    }>
-  >([]);
-  const [calendarStatuses, setCalendarStatuses] = useState<
-    Array<{
-      provider: 'google' | 'microsoft';
-      connected: boolean;
-      externalEmail: string | null;
-      lastSyncedAt: string | null;
-      nextSyncAt: string | null;
-      lastError: string | null;
-    }>
-  >([]);
-  const [writebackStatus, setWritebackStatus] = useState<{
-    summary: {
-      pending: number;
-      succeeded: number;
-      failed: number;
-    };
-    failures: Array<{
-      id: string;
-      bookingId: string;
-      provider: string;
-      operation: string;
-      attemptCount: number;
-      maxAttempts: number;
-      nextAttemptAt: string;
-      lastAttemptAt: string | null;
-      lastError: string | null;
-      updatedAt: string;
-    }>;
-  } | null>(null);
+  const [webhooks, setWebhooks] = useState<OrganizerWebhook[]>([]);
+  const [calendarStatuses, setCalendarStatuses] = useState<CalendarProviderStatus[]>([]);
+  const [writebackStatus, setWritebackStatus] = useState<WritebackStatus | null>(null);
 
   const [selectedTeamId, setSelectedTeamId] = useState('');
-  const [teamMembers, setTeamMembers] = useState<
-    Array<{
-      id: string;
-      teamId: string;
-      userId: string;
-      role: 'owner' | 'member';
-      createdAt: string;
-      user: {
-        id: string;
-        email: string;
-        username: string;
-        displayName: string;
-        timezone: string;
-      };
-    }>
-  >([]);
-  const [teamEventTypes, setTeamEventTypes] = useState<
-    Array<{
-      id: string;
-      mode: 'round_robin' | 'collective';
-      roundRobinCursor: number;
-      createdAt: string;
-      requiredMemberUserIds: string[];
-      members: Array<{
-        userId: string;
-        isRequired: boolean;
-        role: 'owner' | 'member';
-        user: {
-          id: string;
-          email: string;
-          username: string;
-          displayName: string;
-          timezone: string;
-        };
-      }>;
-      eventType: {
-        id: string;
-        slug: string;
-        name: string;
-        durationMinutes: number;
-        locationType: 'video' | 'phone' | 'in_person' | 'custom';
-        locationValue: string | null;
-        questions: Array<{
-          id: string;
-          label: string;
-          required: boolean;
-          placeholder?: string;
-        }>;
-        isActive: boolean;
-      };
-    }>
-  >([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teamEventTypes, setTeamEventTypes] = useState<TeamEventType[]>([]);
 
   const [teamDetailsLoading, setTeamDetailsLoading] = useState(false);
   const [teamDetailsError, setTeamDetailsError] = useState<string | null>(null);
@@ -549,13 +521,11 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     setPanelMessage(null);
 
     try {
-      const parsedRules = parseJsonArray<{
-        dayOfWeek: number;
-        startMinute: number;
-        endMinute: number;
-        bufferBeforeMinutes: number;
-        bufferAfterMinutes: number;
-      }>(rulesDraft, 'Rules payload');
+      const parsedRules = parseJsonArray<AvailabilityRuleInput>(
+        rulesDraft,
+        'Rules payload',
+        isAvailabilityRuleInput,
+      );
 
       await organizerApi.replaceAvailabilityRules(apiBaseUrl, session, parsedRules);
       setPanelMessage('Availability rules updated.');
@@ -577,12 +547,11 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     setPanelMessage(null);
 
     try {
-      const parsedOverrides = parseJsonArray<{
-        startAt: string;
-        endAt: string;
-        isAvailable: boolean;
-        reason?: string | null;
-      }>(overridesDraft, 'Overrides payload');
+      const parsedOverrides = parseJsonArray<AvailabilityOverrideInput>(
+        overridesDraft,
+        'Overrides payload',
+        isAvailabilityOverrideInput,
+      );
 
       await organizerApi.replaceAvailabilityOverrides(apiBaseUrl, session, parsedOverrides);
       setPanelMessage('Availability overrides updated.');
@@ -1266,8 +1235,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
               <ul>
                 {availabilityOverrides.map((override) => (
                   <li key={override.id}>
-                    {override.isAvailable ? 'Available' : 'Unavailable'}: {new Date(override.startAt).toLocaleString()}{' '}
-                    - {new Date(override.endAt).toLocaleString()}
+                    {override.isAvailable ? 'Available' : 'Unavailable'}: {formatDateTime(override.startAt)} -{' '}
+                    {formatDateTime(override.endAt)}
                     {override.reason ? ` (${override.reason})` : ''}
                   </li>
                 ))}

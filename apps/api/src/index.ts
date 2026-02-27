@@ -368,6 +368,12 @@ const jsonError = (context: ContextLike, status: number, error: string): Respons
   return context.json({ ok: false, error }, status);
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value: string): boolean => {
+  return UUID_PATTERN.test(value);
+};
+
 const normalizeTimezone = (timezone: string | undefined): string => {
   if (!timezone) {
     return 'UTC';
@@ -4613,6 +4619,10 @@ app.get('/v0/teams/:teamId/members', async (context) => {
     }
 
     const teamId = context.req.param('teamId');
+    if (!isUuid(teamId)) {
+      return jsonError(context, 400, 'Invalid teamId.');
+    }
+
     const [team] = await db
       .select({
         id: teams.id,
@@ -4674,6 +4684,10 @@ app.get('/v0/teams/:teamId/event-types', async (context) => {
     }
 
     const teamId = context.req.param('teamId');
+    if (!isUuid(teamId)) {
+      return jsonError(context, 400, 'Invalid teamId.');
+    }
+
     const [team] = await db
       .select({
         id: teams.id,
@@ -5024,6 +5038,10 @@ app.post('/v0/teams/:teamId/members', async (context) => {
     }
 
     const teamId = context.req.param('teamId');
+    if (!isUuid(teamId)) {
+      return jsonError(context, 400, 'Invalid teamId.');
+    }
+
     const body = await context.req.json().catch(() => null);
     const parsed = teamAddMemberSchema.safeParse(body);
     if (!parsed.success) {

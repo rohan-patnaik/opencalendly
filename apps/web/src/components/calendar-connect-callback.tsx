@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { organizerApi } from '../lib/organizer-api';
 import { useAuthSession } from '../lib/use-auth-session';
@@ -19,6 +19,7 @@ export default function CalendarConnectCallback({
 }: CalendarConnectCallbackProps) {
   const searchParams = useSearchParams();
   const { ready, session } = useAuthSession();
+  const hasCompletedRef = useRef(false);
 
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
@@ -42,20 +43,27 @@ export default function CalendarConnectCallback({
       return;
     }
 
+    if (hasCompletedRef.current) {
+      return;
+    }
+
     if (search.error) {
       const description = search.errorDescription ? ` (${search.errorDescription})` : '';
       setStatus('error');
       setMessage(`Provider returned an OAuth error: ${search.error}${description}`);
+      hasCompletedRef.current = true;
       return;
     }
 
     if (!search.code || !search.state) {
       setStatus('error');
       setMessage('Missing OAuth callback code/state. Restart connection from Organizer Console.');
+      hasCompletedRef.current = true;
       return;
     }
 
     const run = async () => {
+      hasCompletedRef.current = true;
       setStatus('loading');
       setMessage(`Completing ${providerLabel} connection…`);
 

@@ -63,7 +63,7 @@ flowchart LR
   - `/settings/calendar/microsoft/callback`
   - each callback completes provider OAuth by calling `/v0/calendar/{provider}/connect/complete` with the returned code/state
 - Typed API client utilities:
-  - centralized authenticated `GET`/`POST` wrappers
+  - centralized authenticated `GET`/`POST`/`PATCH`/`PUT` wrappers
   - organizer-focused typed client module used by console panels
   - normalized error extraction from API payloads for consistent UI state handling
 
