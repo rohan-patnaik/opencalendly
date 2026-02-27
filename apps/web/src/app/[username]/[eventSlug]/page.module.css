@@ -16,10 +16,7 @@
 
 .heroCard {
   padding: 1.35rem 1.4rem;
-  background:
-    linear-gradient(130deg, color-mix(in oklab, var(--accent-1) 16%, transparent), transparent 55%),
-    linear-gradient(225deg, color-mix(in oklab, var(--accent-2) 18%, transparent), transparent 64%),
-    color-mix(in oklab, var(--surface-1) 96%, transparent);
+  background: var(--surface-1);
 }
 
 .heroCard h1 {
@@ -125,13 +122,13 @@
 
 .slot:hover,
 .slotActive:hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .slotActive {
   border-color: color-mix(in oklab, var(--accent-1) 60%, var(--border-strong));
   background: color-mix(in oklab, var(--accent-1) 16%, var(--surface-2));
-  box-shadow: 0 8px 20px color-mix(in oklab, var(--accent-1) 22%, transparent);
+  box-shadow: none;
 }
 
 .form {
@@ -140,14 +137,10 @@
 
 .primaryButton {
   margin-top: 1rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--accent-1) 70%, transparent);
-  background: linear-gradient(
-    110deg,
-    color-mix(in oklab, var(--accent-1) 86%, white),
-    color-mix(in oklab, var(--accent-2) 76%, white)
-  );
-  color: #081126;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
   width: 100%;
   padding: 0.73rem 1rem;
   font-weight: 700;

@@ -1,42 +1,38 @@
 :root {
   color-scheme: light;
-  font-family: Sora, 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
-  --bg: #f5f7ff;
-  --bg-accent-a: #fef3c7;
-  --bg-accent-b: #c4b5fd;
-  --bg-accent-c: #86efac;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji',
+    'Segoe UI Emoji', sans-serif;
+  --bg: #f5f5f5;
   --surface-1: #ffffff;
-  --surface-2: #f9fbff;
-  --text: #0f172a;
-  --muted: #334155;
-  --border-subtle: #d5def0;
-  --border-strong: #9fb2d1;
+  --surface-2: #f0f0f0;
+  --text: #111111;
+  --muted: #555555;
+  --border-subtle: #dddddd;
+  --border-strong: #bdbdbd;
   --accent-1: #2563eb;
-  --accent-2: #14b8a6;
-  --accent-3: #f97316;
-  --error-text: #7f1d1d;
-  --success-text: #155e75;
-  --shadow-soft: 0 12px 36px rgba(15, 23, 42, 0.09);
+  --accent-2: #2563eb;
+  --accent-3: #2563eb;
+  --error-text: #b91c1c;
+  --success-text: #15803d;
+  --shadow-soft: none;
 }
 
 html[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #090d1a;
-  --bg-accent-a: #4c1d95;
-  --bg-accent-b: #0ea5e9;
-  --bg-accent-c: #14532d;
-  --surface-1: #121a2e;
-  --surface-2: #19233c;
-  --text: #e2e8f0;
-  --muted: #b8c4db;
-  --border-subtle: #2f3d5d;
-  --border-strong: #5c76a5;
+  --bg: #111111;
+  --surface-1: #1a1a1a;
+  --surface-2: #232323;
+  --text: #f5f5f5;
+  --muted: #cfcfcf;
+  --border-subtle: #3b3b3b;
+  --border-strong: #5b5b5b;
   --accent-1: #60a5fa;
-  --accent-2: #2dd4bf;
-  --accent-3: #fb923c;
+  --accent-2: #60a5fa;
+  --accent-3: #60a5fa;
   --error-text: #fecaca;
-  --success-text: #99f6e4;
-  --shadow-soft: 0 16px 42px rgba(3, 7, 18, 0.65);
+  --success-text: #bbf7d0;
+  --shadow-soft: none;
 }
 
 *,
@@ -53,23 +49,7 @@ body {
 
 body {
   color: var(--text);
-  background:
-    radial-gradient(
-      1000px 640px at 6% -20%,
-      color-mix(in oklab, var(--bg-accent-a) 46%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      880px 680px at 98% -8%,
-      color-mix(in oklab, var(--bg-accent-b) 38%, transparent),
-      transparent 75%
-    ),
-    radial-gradient(
-      720px 600px at 78% 92%,
-      color-mix(in oklab, var(--bg-accent-c) 32%, transparent),
-      transparent 75%
-    ),
-    var(--bg);
+  background: var(--bg);
 }
 
 a {
@@ -91,6 +71,4 @@ p {
 ul {
   margin: 0;
   padding-left: 1.1rem;
-  display: grid;
-  gap: 0.45rem;
 }

@@ -129,7 +129,7 @@ npm run dev:web
 
 ### Key web routes
 
-- `/` modern product homepage
+- `/` barebones implemented-feature index homepage
 - `/auth/sign-in` magic-link session start
 - `/auth/verify` magic-link token verification
 - `/demo/intro-call` public one-on-one booking demo
@@ -217,6 +217,7 @@ Calendar sync + writeback endpoints (authenticated, Feature 7):
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/BACKLOG.md](docs/BACKLOG.md)
 - [docs/API.md](docs/API.md)
+- [docs/LLM_BAREBONES_UX_CONTEXT.md](docs/LLM_BAREBONES_UX_CONTEXT.md)
 - [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md)
 - [docs/OPERATOR_RUNBOOK.md](docs/OPERATOR_RUNBOOK.md)
 - [docs/PROD_DEPLOY_CHECKLIST.md](docs/PROD_DEPLOY_CHECKLIST.md)

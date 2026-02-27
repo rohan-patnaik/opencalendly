@@ -285,3 +285,17 @@ Acceptance criteria:
 - Embed playground route exists for script generation and preview.
 - Existing analytics funnel tracking remains wired from public page interactions.
 - Regression coverage includes `/demo/intro-call` and `/dashboard` behavior post-redesign.
+
+### Feature 14: Barebones UX reset + implemented feature index
+
+Acceptance criteria:
+
+- Web UI styling is reduced to a barebones, low-decoration baseline while preserving existing page routes and feature functionality.
+- Homepage (`/`) clearly lists all implemented features and links to their primary UI routes.
+- Public booking pages, team booking pages, organizer console, dashboard, auth pages, booking action page, and embed playground remain functional after the visual reset.
+- Confirmation UX on booking explicitly indicates email delivery result (`sent` vs `failed` with reason).
+- A copy-paste ready context doc is added for external LLM redesign input, covering:
+  - implemented backend/app capabilities
+  - current barebones UX information architecture
+  - current route map and key user flows
+- Regression validation includes `npm run lint`, `npm run typecheck`, and `npm run test`.

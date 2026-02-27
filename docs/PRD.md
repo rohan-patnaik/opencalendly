@@ -44,9 +44,10 @@ Build a practical open-source scheduling platform for solo creators, consultants
 - Feature 11: UI foundation + homepage parity + theme toggle + magic-link auth UX.
 - Feature 12: organizer console parity for already-implemented authenticated APIs.
 - Feature 13: public booking/action UX parity (one-on-one/team/cancel/reschedule/embed playground).
+- Feature 14: barebones UX reset and implemented-feature index to unblock full flow redesign.
 
 ### Done definition for UI parity track
 
-- Feature 11 through Feature 13 are merged to `main` with CI green.
+- Feature 11 through Feature 14 are merged to `main` with CI green.
 - CodeRabbit and Greptile review gates are satisfied for each feature PR.
 - Frontend architecture and route documentation stay in sync with shipped UX.

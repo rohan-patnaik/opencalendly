@@ -10,9 +10,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
   padding: 1.2rem;
-  background:
-    linear-gradient(138deg, color-mix(in oklab, var(--accent-1) 12%, transparent), transparent 58%),
-    color-mix(in oklab, var(--surface-1) 94%, transparent);
+  background: var(--surface-1);
   box-shadow: var(--shadow-soft);
 }
 
@@ -92,13 +90,9 @@
 }
 
 .primaryButton {
-  border-color: color-mix(in oklab, var(--accent-1) 64%, transparent);
-  color: #0d1224;
-  background: linear-gradient(
-    102deg,
-    color-mix(in oklab, var(--accent-1) 84%, white),
-    color-mix(in oklab, var(--accent-2) 73%, white)
-  );
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface-2);
 }
 
 .secondaryButton,
@@ -110,8 +104,8 @@
 .primaryButton:hover,
 .secondaryButton:hover,
 .linkButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 18px color-mix(in oklab, var(--accent-1) 22%, transparent);
+  transform: none;
+  box-shadow: none;
 }
 
 .primaryButton:disabled,

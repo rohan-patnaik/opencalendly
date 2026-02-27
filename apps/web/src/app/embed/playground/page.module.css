@@ -16,10 +16,7 @@
 
 .heroCard {
   padding: 1.35rem 1.4rem;
-  background:
-    linear-gradient(130deg, color-mix(in oklab, var(--accent-2) 16%, transparent), transparent 55%),
-    linear-gradient(225deg, color-mix(in oklab, var(--accent-1) 18%, transparent), transparent 64%),
-    color-mix(in oklab, var(--surface-1) 96%, transparent);
+  background: var(--surface-1);
 }
 
 .kicker {
@@ -115,7 +112,7 @@
 
 .primaryButton,
 .secondaryButton {
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 0.66rem 1rem;
   text-decoration: none;
   display: inline-flex;
@@ -126,13 +123,9 @@
 }
 
 .primaryButton {
-  border: 1px solid color-mix(in oklab, var(--accent-1) 70%, transparent);
-  background: linear-gradient(
-    110deg,
-    color-mix(in oklab, var(--accent-1) 86%, white),
-    color-mix(in oklab, var(--accent-2) 76%, white)
-  );
-  color: #081126;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .secondaryButton {

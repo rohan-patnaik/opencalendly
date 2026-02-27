@@ -49,7 +49,7 @@
 .primaryButton,
 .secondaryButton,
 .linkButton {
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 0.58rem 0.98rem;
   font-weight: 700;
   border: 1px solid var(--border-strong);
@@ -59,13 +59,9 @@
 }
 
 .primaryButton {
-  border-color: color-mix(in oklab, var(--accent-1) 64%, transparent);
-  background: linear-gradient(
-    102deg,
-    color-mix(in oklab, var(--accent-1) 88%, white),
-    color-mix(in oklab, var(--accent-2) 72%, white)
-  );
-  color: #0d1224;
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -84,8 +80,8 @@
 .primaryButton:hover,
 .secondaryButton:hover,
 .linkButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px color-mix(in oklab, var(--accent-1) 22%, transparent);
+  transform: none;
+  box-shadow: none;
 }
 
 .primaryButton:disabled {

@@ -16,10 +16,7 @@
 
 .heroCard {
   padding: 1.35rem 1.4rem;
-  background:
-    linear-gradient(130deg, color-mix(in oklab, var(--accent-3) 16%, transparent), transparent 55%),
-    linear-gradient(225deg, color-mix(in oklab, var(--accent-2) 18%, transparent), transparent 64%),
-    color-mix(in oklab, var(--surface-1) 96%, transparent);
+  background: var(--surface-1);
 }
 
 .heroCard h1 {
@@ -125,23 +122,23 @@
 
 .slot:hover,
 .slotActive:hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .slot:focus-visible,
 .slotActive:focus-visible {
   border-color: color-mix(in oklab, var(--accent-1) 60%, var(--border-strong));
   background: color-mix(in oklab, var(--accent-1) 16%, var(--surface-2));
-  box-shadow: 0 8px 20px color-mix(in oklab, var(--accent-1) 22%, transparent);
+  box-shadow: none;
   outline: 2px solid color-mix(in oklab, var(--accent-1) 72%, white);
   outline-offset: 2px;
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .slotActive {
   border-color: color-mix(in oklab, var(--accent-1) 60%, var(--border-strong));
   background: color-mix(in oklab, var(--accent-1) 16%, var(--surface-2));
-  box-shadow: 0 8px 20px color-mix(in oklab, var(--accent-1) 22%, transparent);
+  box-shadow: none;
 }
 
 .selection {
@@ -160,7 +157,7 @@
 .dangerButton,
 .secondaryButton {
   margin-top: 0.9rem;
-  border-radius: 999px;
+  border-radius: 8px;
   width: 100%;
   padding: 0.72rem 1rem;
   font-weight: 700;
@@ -173,19 +170,15 @@
 }
 
 .primaryButton {
-  border: 1px solid color-mix(in oklab, var(--accent-1) 70%, transparent);
-  background: linear-gradient(
-    110deg,
-    color-mix(in oklab, var(--accent-1) 86%, white),
-    color-mix(in oklab, var(--accent-2) 76%, white)
-  );
-  color: #081126;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .dangerButton {
-  border: 1px solid color-mix(in oklab, #dc2626 72%, transparent);
-  background: linear-gradient(110deg, #ef4444, #f97316);
-  color: #fff;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 .secondaryButton {
