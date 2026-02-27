@@ -1,9 +1,9 @@
 .page {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2.5rem 1.15rem 4rem;
+  padding: 2.25rem 1.2rem 4rem;
   display: grid;
-  gap: 1.25rem;
+  gap: 1.1rem;
 }
 
 .hero {
@@ -12,17 +12,17 @@
   border-radius: 28px;
   border: 1px solid var(--border-subtle);
   background:
-    linear-gradient(132deg, color-mix(in oklab, var(--accent-1) 17%, transparent), transparent 55%),
-    linear-gradient(220deg, color-mix(in oklab, var(--accent-2) 22%, transparent), transparent 62%),
+    linear-gradient(130deg, color-mix(in oklab, var(--accent-1) 16%, transparent), transparent 56%),
+    linear-gradient(220deg, color-mix(in oklab, var(--accent-2) 20%, transparent), transparent 68%),
     var(--surface-1);
   box-shadow: var(--shadow-soft);
 }
 
 .heroOrbit {
   position: absolute;
-  inset: -18% auto auto 52%;
-  width: 32rem;
-  height: 32rem;
+  inset: -20% auto auto 52%;
+  width: 30rem;
+  height: 30rem;
   border-radius: 50%;
   background:
     radial-gradient(
@@ -36,21 +36,19 @@
       transparent 72%
     );
   opacity: 0.45;
-  filter: blur(2px);
-  pointer-events: none;
-  animation: pulse-orbit 7.4s ease-in-out infinite;
+  animation: pulse-orbit 8s ease-in-out infinite;
 }
 
 .heroContent {
   position: relative;
   z-index: 1;
-  padding: 2rem 2rem 2.15rem;
-  max-width: 44rem;
+  padding: 2rem 2rem 2.2rem;
+  max-width: 46rem;
 }
 
 .kicker {
   margin: 0;
-  display: inline-block;
+  width: fit-content;
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-size: 0.72rem;
@@ -64,7 +62,7 @@
 
 .hero h1 {
   margin: 0.85rem 0 0.9rem;
-  font-size: clamp(2rem, 3.5vw, 3.2rem);
+  font-size: clamp(2.1rem, 3.6vw, 3.25rem);
   line-height: 1.08;
   letter-spacing: -0.03em;
   text-wrap: balance;
@@ -77,7 +75,7 @@
 }
 
 .heroActions {
-  margin-top: 1.3rem;
+  margin-top: 1.25rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.72rem;
@@ -123,63 +121,120 @@
   box-shadow: 0 10px 24px color-mix(in oklab, var(--accent-1) 25%, transparent);
 }
 
-.valueGrid {
+.proofStrip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.9rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
 }
 
-.valueCard {
-  border-radius: 18px;
+.proofCard {
+  border-radius: 14px;
   border: 1px solid var(--border-subtle);
   background: color-mix(in oklab, var(--surface-1) 94%, transparent);
-  padding: 1rem;
+  padding: 0.85rem;
   box-shadow: var(--shadow-soft);
 }
 
-.valueCard h2 {
+.proofValue {
   margin: 0;
-  font-size: 1.08rem;
-  letter-spacing: -0.01em;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
-.valueCard p {
-  margin: 0.6rem 0 0;
+.proofLabel {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
-.routePanel {
-  border-radius: 20px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-1) 95%, transparent);
-  padding: 1.2rem;
-  box-shadow: var(--shadow-soft);
+.valueGrid,
+.routeGrid,
+.integrationGrid,
+.pricingGrid,
+.workflowGrid {
+  display: grid;
+  gap: 0.78rem;
 }
 
-.routePanel h2 {
-  margin: 0;
-  font-size: 1.34rem;
+.valueGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.routePanel > p {
-  margin: 0.5rem 0 0;
+.workflowGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .routeGrid {
-  margin-top: 0.9rem;
-  display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.7rem;
+}
+
+.integrationGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.pricingGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.valueCard,
+.routeCard,
+.integrationCard,
+.pricingCard,
+.workflowCard {
+  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-1) 94%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+.valueCard,
+.integrationCard,
+.workflowCard {
+  padding: 1rem;
+}
+
+.valueCard h2,
+.integrationCard h3,
+.workflowCard h3 {
+  margin: 0;
+  font-size: 1.04rem;
+}
+
+.valueCard p,
+.integrationCard p,
+.workflowCard p {
+  margin: 0.56rem 0 0;
+}
+
+.workflowPanel,
+.routePanel,
+.integrationPanel,
+.pricingPanel {
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-1) 95%, transparent);
+  box-shadow: var(--shadow-soft);
+  padding: 1.15rem;
+}
+
+.workflowPanel h2,
+.routePanel h2,
+.integrationPanel h2,
+.pricingPanel h2 {
+  margin: 0;
+}
+
+.routePanel p {
+  margin: 0.5rem 0 0;
 }
 
 .routeCard {
   text-decoration: none;
-  border-radius: 14px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
+  color: var(--text);
+  padding: 0.86rem;
   display: grid;
   gap: 0.34rem;
-  padding: 0.86rem;
-  color: var(--text);
   transition:
     transform 120ms ease,
     border-color 120ms ease,
@@ -214,31 +269,87 @@
   padding: 0.18rem 0.42rem;
 }
 
-.metaStrip {
-  margin-top: 1rem;
-  border-radius: 14px;
-  border: 1px dashed var(--border-strong);
-  background: color-mix(in oklab, var(--surface-2) 85%, transparent);
+.pricingCard {
+  padding: 1rem;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem;
-  padding: 0.9rem;
+  gap: 0.7rem;
 }
 
-.metaStrip > div {
-  display: grid;
-  gap: 0.2rem;
-}
-
-.metaStrip > div p {
+.pricingCard h3 {
   margin: 0;
 }
 
-.metaNumber {
+.pricingCard ul {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pricingCard li {
+  color: var(--muted);
+}
+
+.ctaBand {
+  border-radius: 22px;
+  border: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(140deg, color-mix(in oklab, var(--accent-2) 16%, transparent), transparent 64%),
+    color-mix(in oklab, var(--surface-1) 95%, transparent);
+  box-shadow: var(--shadow-soft);
+  padding: 1.3rem;
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: 1.4fr 1fr;
+  align-items: center;
+}
+
+.ctaBand h2 {
+  margin: 0;
+}
+
+.ctaBand p {
+  margin: 0.4rem 0 0;
+}
+
+.footer {
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-1) 95%, transparent);
+  box-shadow: var(--shadow-soft);
+  padding: 1.1rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 2fr;
+}
+
+.footer h3 {
+  margin: 0;
+}
+
+.footer p {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+}
+
+.footerLinks {
+  display: grid;
+  gap: 0.45rem 0.8rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.footerLinks a {
+  text-decoration: none;
   color: var(--text);
-  font-size: 1.3rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 0.45rem 0.58rem;
+  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  font-size: 0.9rem;
+}
+
+.footerLinks a:hover {
+  background: color-mix(in oklab, var(--accent-1) 12%, transparent);
 }
 
 @keyframes pulse-orbit {
@@ -254,21 +365,27 @@
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1040px) {
   .valueGrid,
+  .workflowGrid,
   .routeGrid,
-  .metaStrip {
+  .integrationGrid,
+  .pricingGrid,
+  .proofStrip,
+  .ctaBand,
+  .footer,
+  .footerLinks {
     grid-template-columns: 1fr;
   }
 
   .heroContent {
-    padding: 1.35rem 1.1rem 1.55rem;
+    padding: 1.4rem 1.1rem 1.6rem;
   }
 
   .heroOrbit {
-    left: 22%;
+    left: 24%;
     top: -30%;
-    width: 23rem;
-    height: 23rem;
+    width: 22rem;
+    height: 22rem;
   }
 }

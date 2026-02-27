@@ -142,6 +142,12 @@ npm run dev:web
 3. After creating a booking, open the action link `http://localhost:3000/bookings/actions/<token>` and test cancel/reschedule flows.
 4. Open embed playground: `http://localhost:3000/embed/playground` and verify script preview renders.
 
+### 9.1) Feature 18 marketing parity smoke test
+
+1. Open `http://localhost:3000/` and verify hero, proof strip, workflow, integrations, pricing preview, CTA band, and footer sections render.
+2. Open `http://localhost:3000/features`, `http://localhost:3000/solutions`, `http://localhost:3000/pricing`, and `http://localhost:3000/resources`.
+3. Verify marketing CTA links route to implemented product surfaces (`/demo/intro-call`, `/team/demo-team/team-intro-call`, `/embed/playground`, `/organizer`, `/dashboard`).
+
 ### Key web routes
 
 - `/` modern product homepage
@@ -151,6 +157,10 @@ npm run dev:web
 - `/team/demo-team/team-intro-call` public team booking demo
 - `/bookings/actions/[token]` public cancel/reschedule action page
 - `/embed/playground` embed script generator + live preview
+- `/features` marketing feature matrix page
+- `/solutions` marketing solutions page
+- `/pricing` marketing pricing page
+- `/resources` marketing resources page
 - `/organizer` authenticated organizer operations console (event types, availability, teams, webhooks, calendar, writeback)
 - `/organizer#event-types|availability|teams|webhooks|calendars|writeback` direct organizer section anchors
 - `/dashboard` authenticated organizer analytics dashboard

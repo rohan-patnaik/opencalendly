@@ -75,6 +75,9 @@ flowchart LR
   - `/team/:teamSlug/:eventSlug` team booking UX over team availability/booking APIs
   - `/bookings/actions/:token` cancel/reschedule UX with token state handling (`404`, `410`, `409` conflict)
   - `/embed/playground` script generator + live widget preview for `/v0/embed/widget.js`
+- Marketing shells:
+  - `/` product homepage with proof strip, workflow blocks, integration highlights, and route CTAs
+  - `/pricing`, `/features`, `/solutions`, `/resources` for top-level product information architecture
 - Typed API client utilities:
   - centralized authenticated `GET`/`POST`/`PATCH`/`PUT` wrappers
   - organizer-focused typed client module used by console panels
