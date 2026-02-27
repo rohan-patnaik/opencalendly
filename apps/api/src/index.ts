@@ -222,6 +222,7 @@ type EventTypeProfile = {
   durationMinutes: number;
   locationType: string;
   locationValue: string | null;
+  questions?: EventQuestion[];
   isActive: boolean;
 };
 
@@ -753,7 +754,7 @@ const resolveAppBaseUrl = (env: Bindings, request: Request): string => {
     try {
       return stripTrailingSlash(new URL(configured).toString());
     } catch {
-      // Fall back to request-derived URL if APP_BASE_URL is malformed.
+      throw new Error('APP_BASE_URL must be a valid absolute URL.');
     }
   }
 
@@ -762,7 +763,7 @@ const resolveAppBaseUrl = (env: Bindings, request: Request): string => {
     return 'http://localhost:3000';
   }
 
-  return requestUrl.origin;
+  throw new Error('APP_BASE_URL is required for non-local environments.');
 };
 
 const resolveEmbedTheme = (rawTheme: string | undefined): 'light' | 'dark' => {
@@ -1981,6 +1982,7 @@ const findTeamEventTypeContext = async (
       durationMinutes: eventTypes.durationMinutes,
       locationType: eventTypes.locationType,
       locationValue: eventTypes.locationValue,
+      questions: eventTypes.questions,
       isActive: eventTypes.isActive,
     })
     .from(teamEventTypes)
@@ -2038,6 +2040,7 @@ const findTeamEventTypeContext = async (
       durationMinutes: row.durationMinutes,
       locationType: row.locationType,
       locationValue: row.locationValue,
+      questions: toEventQuestions(row.questions),
       isActive: row.isActive,
     },
     mode,
@@ -2354,6 +2357,7 @@ const actionTokenMap = (
 
 const buildActionUrls = (
   request: Request,
+  appBaseUrl: string,
   tokenMap: {
     cancelToken: string;
     rescheduleToken: string;
@@ -2363,14 +2367,18 @@ const buildActionUrls = (
   lookupRescheduleUrl: string;
   cancelUrl: string;
   rescheduleUrl: string;
+  cancelPageUrl: string;
+  reschedulePageUrl: string;
 } => {
-  const origin = new URL(request.url).origin;
+  const apiOrigin = new URL(request.url).origin;
 
   return {
-    lookupCancelUrl: `${origin}/v0/bookings/actions/${tokenMap.cancelToken}`,
-    lookupRescheduleUrl: `${origin}/v0/bookings/actions/${tokenMap.rescheduleToken}`,
-    cancelUrl: `${origin}/v0/bookings/actions/${tokenMap.cancelToken}/cancel`,
-    rescheduleUrl: `${origin}/v0/bookings/actions/${tokenMap.rescheduleToken}/reschedule`,
+    lookupCancelUrl: `${apiOrigin}/v0/bookings/actions/${tokenMap.cancelToken}`,
+    lookupRescheduleUrl: `${apiOrigin}/v0/bookings/actions/${tokenMap.rescheduleToken}`,
+    cancelUrl: `${apiOrigin}/v0/bookings/actions/${tokenMap.cancelToken}/cancel`,
+    rescheduleUrl: `${apiOrigin}/v0/bookings/actions/${tokenMap.rescheduleToken}/reschedule`,
+    cancelPageUrl: `${appBaseUrl}/bookings/actions/${tokenMap.cancelToken}`,
+    reschedulePageUrl: `${appBaseUrl}/bookings/actions/${tokenMap.rescheduleToken}`,
   };
 };
 
@@ -5585,6 +5593,78 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (contex
   });
 });
 
+app.get('/v0/teams/:teamSlug/event-types/:eventSlug', async (context) => {
+  const teamSlug = context.req.param('teamSlug');
+  const eventSlug = context.req.param('eventSlug');
+  const requestIp = resolveClientIp(context.req.raw);
+  if (
+    isPublicBookingRateLimited({
+      ip: requestIp,
+      scope: `team-event|${teamSlug}|${eventSlug}`,
+      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
+    })
+  ) {
+    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+  }
+
+  return withDatabase(context, async (db) => {
+    const teamEventContext = await findTeamEventTypeContext(db, teamSlug, eventSlug);
+    if (!teamEventContext) {
+      return jsonError(context, 404, 'Team event type not found.');
+    }
+
+    const memberIds = teamEventContext.members.map((member) => member.userId);
+    const memberRows =
+      memberIds.length > 0
+        ? await db
+            .select({
+              id: users.id,
+              username: users.username,
+              displayName: users.displayName,
+              timezone: users.timezone,
+            })
+            .from(users)
+            .where(inArray(users.id, memberIds))
+        : [];
+    const memberById = new Map(memberRows.map((member) => [member.id, member]));
+
+    return context.json({
+      ok: true,
+      team: {
+        id: teamEventContext.team.id,
+        slug: teamEventContext.team.slug,
+        name: teamEventContext.team.name,
+      },
+      eventType: {
+        id: teamEventContext.eventType.id,
+        slug: teamEventContext.eventType.slug,
+        name: teamEventContext.eventType.name,
+        durationMinutes: teamEventContext.eventType.durationMinutes,
+        locationType: teamEventContext.eventType.locationType,
+        locationValue: teamEventContext.eventType.locationValue,
+        questions: teamEventContext.eventType.questions ?? [],
+      },
+      mode: teamEventContext.mode,
+      members: teamEventContext.members.map((member) => ({
+        userId: member.userId,
+        role: member.role,
+        user: (() => {
+          const profile = memberById.get(member.userId);
+          if (!profile) {
+            return null;
+          }
+          return {
+            id: profile.id,
+            username: profile.username,
+            displayName: profile.displayName,
+            timezone: normalizeTimezone(profile.timezone),
+          };
+        })(),
+      })),
+    });
+  });
+});
+
 app.post('/v0/team-bookings', async (context) => {
   const body = await context.req.json().catch(() => null);
   const parsed = teamBookingCreateSchema.safeParse(body);
@@ -5620,6 +5700,17 @@ app.post('/v0/team-bookings', async (context) => {
     inviteeEmail: payload.inviteeEmail,
     answers: payload.answers ?? {},
   });
+
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolveAppBaseUrl(context.env, context.req.raw);
+  } catch (error) {
+    return jsonError(
+      context,
+      500,
+      error instanceof Error ? error.message : 'APP_BASE_URL must be a valid URL.',
+    );
+  }
 
   return withDatabase(context, async (db) => {
     const idempotencyState = await claimIdempotencyRequest(db, {
@@ -5877,7 +5968,7 @@ app.post('/v0/team-bookings', async (context) => {
       });
 
       const tokens = actionTokenMap(result.actionTokens);
-      const actionUrls = buildActionUrls(context.req.raw, {
+      const actionUrls = buildActionUrls(context.req.raw, appBaseUrl, {
         cancelToken: tokens.cancelToken,
         rescheduleToken: tokens.rescheduleToken,
       });
@@ -5900,8 +5991,8 @@ app.post('/v0/team-bookings', async (context) => {
         timezone,
         locationType: result.eventType.locationType,
         locationValue: result.eventType.locationValue,
-        cancelLink: actionUrls.lookupCancelUrl,
-        rescheduleLink: actionUrls.lookupRescheduleUrl,
+        cancelLink: actionUrls.cancelPageUrl,
+        rescheduleLink: actionUrls.reschedulePageUrl,
         idempotencyKey: `booking-confirmation:${result.booking.id}`,
       });
 
@@ -5976,12 +6067,14 @@ app.post('/v0/team-bookings', async (context) => {
           cancel: {
             token: tokens.cancelToken,
             expiresAt: tokens.cancelExpiresAt,
+            pageUrl: actionUrls.cancelPageUrl,
             lookupUrl: actionUrls.lookupCancelUrl,
             url: actionUrls.cancelUrl,
           },
           reschedule: {
             token: tokens.rescheduleToken,
             expiresAt: tokens.rescheduleExpiresAt,
+            pageUrl: actionUrls.reschedulePageUrl,
             lookupUrl: actionUrls.lookupRescheduleUrl,
             url: actionUrls.rescheduleUrl,
           },
@@ -6080,6 +6173,17 @@ app.post('/v0/bookings', async (context) => {
     inviteeEmail: payload.inviteeEmail,
     answers: payload.answers ?? {},
   });
+
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolveAppBaseUrl(context.env, context.req.raw);
+  } catch (error) {
+    return jsonError(
+      context,
+      500,
+      error instanceof Error ? error.message : 'APP_BASE_URL must be a valid URL.',
+    );
+  }
 
   return withDatabase(context, async (db) => {
     const idempotencyState = await claimIdempotencyRequest(db, {
@@ -6251,7 +6355,7 @@ app.post('/v0/bookings', async (context) => {
       );
 
       const tokens = actionTokenMap(result.actionTokens);
-      const actionUrls = buildActionUrls(context.req.raw, {
+      const actionUrls = buildActionUrls(context.req.raw, appBaseUrl, {
         cancelToken: tokens.cancelToken,
         rescheduleToken: tokens.rescheduleToken,
       });
@@ -6272,8 +6376,8 @@ app.post('/v0/bookings', async (context) => {
         timezone,
         locationType: result.eventType.locationType,
         locationValue: result.eventType.locationValue,
-        cancelLink: actionUrls.lookupCancelUrl,
-        rescheduleLink: actionUrls.lookupRescheduleUrl,
+        cancelLink: actionUrls.cancelPageUrl,
+        rescheduleLink: actionUrls.reschedulePageUrl,
         idempotencyKey: `booking-confirmation:${result.booking.id}`,
       });
 
@@ -6342,12 +6446,14 @@ app.post('/v0/bookings', async (context) => {
           cancel: {
             token: tokens.cancelToken,
             expiresAt: tokens.cancelExpiresAt,
+            pageUrl: actionUrls.cancelPageUrl,
             lookupUrl: actionUrls.lookupCancelUrl,
             url: actionUrls.cancelUrl,
           },
           reschedule: {
             token: tokens.rescheduleToken,
             expiresAt: tokens.rescheduleExpiresAt,
+            pageUrl: actionUrls.reschedulePageUrl,
             lookupUrl: actionUrls.lookupRescheduleUrl,
             url: actionUrls.rescheduleUrl,
           },
@@ -6472,6 +6578,15 @@ app.get('/v0/bookings/actions/:token', async (context) => {
 
     const metadata = parseBookingMetadata(row.bookingMetadata, normalizeTimezone);
     const timezone = metadata.timezone ?? normalizeTimezone(row.organizerTimezone);
+    const teamMetadata = metadata.team
+      ? {
+          teamId: metadata.team.teamId,
+          teamSlug: metadata.team.teamSlug ?? null,
+          teamEventTypeId: metadata.team.teamEventTypeId,
+          mode: metadata.team.mode,
+          assignmentUserIds: metadata.team.assignmentUserIds,
+        }
+      : null;
 
     let rescheduledTo: { id: string; startsAt: string; endsAt: string } | null = null;
     if (row.bookingStatus === 'rescheduled') {
@@ -6517,6 +6632,7 @@ app.get('/v0/bookings/actions/:token', async (context) => {
         inviteeName: row.inviteeName,
         inviteeEmail: row.inviteeEmail,
         rescheduledTo,
+        team: teamMetadata,
       },
       eventType: {
         slug: row.eventTypeSlug,
@@ -6853,6 +6969,17 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
     startsAt: parsed.data.startsAt,
     timezone,
   });
+
+  let appBaseUrl: string;
+  try {
+    appBaseUrl = resolveAppBaseUrl(context.env, context.req.raw);
+  } catch (error) {
+    return jsonError(
+      context,
+      500,
+      error instanceof Error ? error.message : 'APP_BASE_URL must be a valid URL.',
+    );
+  }
 
   return withDatabase(context, async (db) => {
     const idempotencyState = await claimIdempotencyRequest(db, {
@@ -7408,7 +7535,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
       const actions = result.actionTokens
         ? (() => {
             const tokens = actionTokenMap(result.actionTokens);
-            const urls = buildActionUrls(context.req.raw, {
+            const urls = buildActionUrls(context.req.raw, appBaseUrl, {
               cancelToken: tokens.cancelToken,
               rescheduleToken: tokens.rescheduleToken,
             });
@@ -7417,12 +7544,14 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
               cancel: {
                 token: tokens.cancelToken,
                 expiresAt: tokens.cancelExpiresAt,
+                pageUrl: urls.cancelPageUrl,
                 lookupUrl: urls.lookupCancelUrl,
                 url: urls.cancelUrl,
               },
               reschedule: {
                 token: tokens.rescheduleToken,
                 expiresAt: tokens.rescheduleExpiresAt,
+                pageUrl: urls.reschedulePageUrl,
                 lookupUrl: urls.lookupRescheduleUrl,
                 url: urls.rescheduleUrl,
               },

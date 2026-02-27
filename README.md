@@ -120,12 +120,22 @@ npm run dev:web
 4. Check teams/members/team event types can be listed and created.
 5. Ensure webhooks and calendar/writeback controls load and actions execute.
 
+### 9) Feature 13 public parity smoke test
+
+1. Open one-on-one booking: `http://localhost:3000/demo/intro-call`
+2. Open team booking: `http://localhost:3000/team/demo-team/team-intro-call`
+3. After creating a booking, open the action link `http://localhost:3000/bookings/actions/<token>` and test cancel/reschedule flows.
+4. Open embed playground: `http://localhost:3000/embed/playground` and verify script preview renders.
+
 ### Key web routes
 
 - `/` modern product homepage
 - `/auth/sign-in` magic-link session start
 - `/auth/verify` magic-link token verification
 - `/demo/intro-call` public one-on-one booking demo
+- `/team/demo-team/team-intro-call` public team booking demo
+- `/bookings/actions/[token]` public cancel/reschedule action page
+- `/embed/playground` embed script generator + live preview
 - `/organizer` authenticated organizer operations console (event types, availability, teams, webhooks, calendar, writeback)
 - `/dashboard` authenticated organizer analytics dashboard
 - `/settings/calendar/google/callback` OAuth callback completion for Google Calendar connect

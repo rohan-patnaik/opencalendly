@@ -8,14 +8,20 @@ import {
   formatSlot,
   getBrowserTimezone,
   groupSlotsByDay,
-} from '../../../lib/public-booking';
+} from '../../../../lib/public-booking';
 import styles from './page.module.css';
 
-type PublicEventResponse = {
+type TeamEventResponse = {
   ok: boolean;
-  eventType: {
-    name: string;
+  team: {
+    id: string;
     slug: string;
+    name: string;
+  };
+  eventType: {
+    id: string;
+    slug: string;
+    name: string;
     durationMinutes: number;
     locationType: string;
     locationValue: string | null;
@@ -26,42 +32,52 @@ type PublicEventResponse = {
       placeholder?: string;
     }>;
   };
-  organizer: {
-    username: string;
-    displayName: string;
-    timezone: string;
-  };
-  error?: string;
-};
-
-type AvailabilityResponse = {
-  ok: boolean;
-  timezone: string;
-  slots: Array<{
-    startsAt: string;
-    endsAt: string;
+  mode: 'round_robin' | 'collective';
+  members: Array<{
+    userId: string;
+    role: 'owner' | 'member';
+    user: {
+      id: string;
+      username: string;
+      displayName: string;
+      timezone: string;
+    } | null;
   }>;
   error?: string;
 };
 
-type BookingResponse = {
+type TeamAvailabilityResponse = {
+  ok: boolean;
+  mode: 'round_robin' | 'collective';
+  timezone: string;
+  slots: Array<{
+    startsAt: string;
+    endsAt: string;
+    assignmentUserIds: string[];
+  }>;
+  error?: string;
+};
+
+type TeamBookingResponse = {
   ok: boolean;
   booking?: {
     id: string;
     startsAt: string;
     endsAt: string;
+    assignmentUserIds: string[];
+    teamMode: 'round_robin' | 'collective';
   };
   error?: string;
 };
 
-type BookingPageClientProps = {
-  username: string;
+type TeamBookingPageClientProps = {
+  teamSlug: string;
   eventSlug: string;
   apiBaseUrl: string;
 };
 
 const buildInitialAnswers = (
-  questions: PublicEventResponse['eventType']['questions'],
+  questions: TeamEventResponse['eventType']['questions'],
 ): Record<string, string> => {
   return questions.reduce<Record<string, string>>((accumulator, question) => {
     accumulator[question.id] = '';
@@ -76,19 +92,25 @@ const readableLocation = (locationType: string, locationValue: string | null): s
   return locationType.replaceAll('_', ' ');
 };
 
-export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: BookingPageClientProps) {
+export default function TeamBookingPageClient({
+  teamSlug,
+  eventSlug,
+  apiBaseUrl,
+}: TeamBookingPageClientProps) {
   const [timezone, setTimezone] = useState('UTC');
-  const [eventData, setEventData] = useState<PublicEventResponse | null>(null);
-  const [slots, setSlots] = useState<Array<{ startsAt: string; endsAt: string }>>([]);
+  const [teamEvent, setTeamEvent] = useState<TeamEventResponse | null>(null);
+  const [slots, setSlots] = useState<
+    Array<{ startsAt: string; endsAt: string; assignmentUserIds: string[] }>
+  >([]);
   const [selectedSlot, setSelectedSlot] = useState('');
   const [inviteeName, setInviteeName] = useState('');
   const [inviteeEmail, setInviteeEmail] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [bookingRequestKey, setBookingRequestKey] = useState('');
-  const [pageError, setPageError] = useState<string | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
   const timezoneOptions = useMemo(() => {
@@ -99,58 +121,42 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     return groupSlotsByDay(slots, timezone);
   }, [slots, timezone]);
 
-  const selectedSlotLabel = useMemo(() => {
+  const selectedSlotDetails = useMemo(() => {
     if (!selectedSlot) {
       return null;
     }
-    return formatSlot(selectedSlot, timezone);
-  }, [selectedSlot, timezone]);
+    return slots.find((slot) => slot.startsAt === selectedSlot) ?? null;
+  }, [selectedSlot, slots]);
 
-  const trackFunnelEvent = useCallback(
-    (stage: 'page_view' | 'slot_selection') => {
-      void fetch(`${apiBaseUrl}/v0/analytics/funnel/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          eventSlug,
-          stage,
-        }),
-      }).catch(() => undefined);
-    },
-    [apiBaseUrl, eventSlug, username],
-  );
-
-  const loadEvent = useCallback(async () => {
+  const loadTeamEvent = useCallback(async () => {
     setLoadingEvent(true);
-    setPageError(null);
+    setError(null);
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}`,
+        `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}`,
         { cache: 'no-store' },
       );
-      const payload = (await response.json()) as PublicEventResponse;
+      const payload = (await response.json()) as TeamEventResponse;
       if (!response.ok || !payload.ok) {
-        setPageError(payload.error || 'Unable to load event details.');
-        setEventData(null);
+        setError(payload.error || 'Unable to load team event details.');
+        setTeamEvent(null);
         return;
       }
 
-      setEventData(payload);
+      setTeamEvent(payload);
       setAnswers(buildInitialAnswers(payload.eventType.questions));
-      trackFunnelEvent('page_view');
     } catch {
-      setPageError('Unable to load event details.');
-      setEventData(null);
+      setError('Unable to load team event details.');
+      setTeamEvent(null);
     } finally {
       setLoadingEvent(false);
     }
-  }, [apiBaseUrl, eventSlug, trackFunnelEvent, username]);
+  }, [apiBaseUrl, eventSlug, teamSlug]);
 
   const loadAvailability = useCallback(async () => {
     setLoadingSlots(true);
-    setPageError(null);
+    setError(null);
 
     try {
       const params = new URLSearchParams({
@@ -158,15 +164,14 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
         start: new Date().toISOString(),
         days: '7',
       });
-
       const response = await fetch(
-        `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
+        `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
         { cache: 'no-store' },
       );
-      const payload = (await response.json()) as AvailabilityResponse;
+      const payload = (await response.json()) as TeamAvailabilityResponse;
       if (!response.ok || !payload.ok) {
         setSlots([]);
-        setPageError(payload.error || 'Unable to load availability.');
+        setError(payload.error || 'Unable to load team availability.');
         return;
       }
 
@@ -176,26 +181,26 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       });
     } catch {
       setSlots([]);
-      setPageError('Unable to load availability.');
+      setError('Unable to load team availability.');
     } finally {
       setLoadingSlots(false);
     }
-  }, [apiBaseUrl, eventSlug, timezone, username]);
+  }, [apiBaseUrl, eventSlug, teamSlug, timezone]);
 
   useEffect(() => {
     setTimezone(getBrowserTimezone());
   }, []);
 
   useEffect(() => {
-    void loadEvent();
-  }, [loadEvent]);
+    void loadTeamEvent();
+  }, [loadTeamEvent]);
 
   useEffect(() => {
-    if (!eventData) {
+    if (!teamEvent) {
       return;
     }
     void loadAvailability();
-  }, [eventData, loadAvailability]);
+  }, [loadAvailability, teamEvent]);
 
   useEffect(() => {
     if (!selectedSlot) {
@@ -205,21 +210,21 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     setBookingRequestKey(createIdempotencyKey());
   }, [selectedSlot]);
 
-  const submitBooking = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submitTeamBooking = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError(null);
     setConfirmation(null);
-    setPageError(null);
 
     if (!selectedSlot) {
-      setPageError('Select a timeslot before booking.');
+      setError('Select a timeslot before booking.');
       return;
     }
 
-    const missingRequiredQuestion = eventData?.eventType.questions.find(
+    const missingRequiredQuestion = teamEvent?.eventType.questions.find(
       (question) => question.required && !(answers[question.id] ?? '').trim(),
     );
     if (missingRequiredQuestion) {
-      setPageError(`Answer required question: "${missingRequiredQuestion.label}".`);
+      setError(`Answer required question: "${missingRequiredQuestion.label}".`);
       return;
     }
 
@@ -229,14 +234,14 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       if (!bookingRequestKey) {
         setBookingRequestKey(requestIdempotencyKey);
       }
-      const response = await fetch(`${apiBaseUrl}/v0/bookings`, {
+      const response = await fetch(`${apiBaseUrl}/v0/team-bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Idempotency-Key': requestIdempotencyKey,
         },
         body: JSON.stringify({
-          username,
+          teamSlug,
           eventSlug,
           startsAt: selectedSlot,
           timezone,
@@ -247,24 +252,27 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
           ),
         }),
       });
-      const payload = (await response.json()) as BookingResponse;
+
+      const payload = (await response.json()) as TeamBookingResponse;
       if (!response.ok || !payload.ok || !payload.booking) {
-        setPageError(payload.error || 'Booking failed. Please choose another slot.');
+        setError(payload.error || 'Team booking failed. Please pick another slot.');
         if (response.status === 409) {
           void loadAvailability();
         }
         return;
       }
 
-      setConfirmation(`Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} (${timezone}).`);
+      setConfirmation(
+        `Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} with ${payload.booking.assignmentUserIds.length} assigned team member(s).`,
+      );
       setInviteeName('');
       setInviteeEmail('');
       setSelectedSlot('');
       setBookingRequestKey('');
-      setAnswers(buildInitialAnswers(eventData?.eventType.questions ?? []));
+      setAnswers(buildInitialAnswers(teamEvent?.eventType.questions ?? []));
       void loadAvailability();
     } catch {
-      setPageError('Booking failed. Please try again.');
+      setError('Team booking failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -274,20 +282,20 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     return (
       <main className={styles.page}>
         <section className={styles.heroCard}>
-          <p className={styles.kicker}>Public booking</p>
-          <h1>Loading event...</h1>
+          <p className={styles.kicker}>Team booking</p>
+          <h1>Loading team event...</h1>
         </section>
       </main>
     );
   }
 
-  if (!eventData) {
+  if (!teamEvent) {
     return (
       <main className={styles.page}>
         <section className={styles.heroCard}>
-          <p className={styles.kicker}>Public booking</p>
-          <h1>Event unavailable</h1>
-          <p className={styles.error}>{pageError || 'Event not found.'}</p>
+          <p className={styles.kicker}>Team booking</p>
+          <h1>Team event unavailable</h1>
+          <p className={styles.error}>{error || 'Team event type not found.'}</p>
         </section>
       </main>
     );
@@ -296,30 +304,29 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   return (
     <main className={styles.page}>
       <section className={styles.heroCard}>
-        <p className={styles.kicker}>Open booking link</p>
-        <h1>{eventData.eventType.name}</h1>
+        <p className={styles.kicker}>Team booking link</p>
+        <h1>{teamEvent.eventType.name}</h1>
         <p>
-          Hosted by <strong>{eventData.organizer.displayName}</strong> ·{' '}
-          {eventData.eventType.durationMinutes} minutes
+          Team: <strong>{teamEvent.team.name}</strong> · Mode:{' '}
+          <strong>{teamEvent.mode.replaceAll('_', ' ')}</strong>
         </p>
-        <p>Location: {readableLocation(eventData.eventType.locationType, eventData.eventType.locationValue)}</p>
+        <p>
+          Duration: {teamEvent.eventType.durationMinutes} min · Location:{' '}
+          {readableLocation(teamEvent.eventType.locationType, teamEvent.eventType.locationValue)}
+        </p>
       </section>
 
       <section className={styles.layout}>
         <div className={styles.card}>
-          <div className={styles.sectionHead}>
-            <h2>Pick your time</h2>
-            <p>Slots are shown in your selected timezone.</p>
-          </div>
-
-          <label className={styles.label} htmlFor="timezone">
+          <h2>Choose a slot</h2>
+          <label className={styles.label} htmlFor="team-timezone">
             Timezone
           </label>
           <select
-            id="timezone"
+            id="team-timezone"
             className={styles.select}
             value={timezone}
-            onChange={(event) => setTimezone(event.target.value)}
+            onChange={(entry) => setTimezone(entry.target.value)}
           >
             {timezoneOptions.map((option) => (
               <option key={option} value={option}>
@@ -328,13 +335,9 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
             ))}
           </select>
 
-          <p className={styles.muted}>
-            Organizer timezone: <strong>{eventData.organizer.timezone}</strong>
-          </p>
-
           {loadingSlots ? <p className={styles.muted}>Loading slots...</p> : null}
           {!loadingSlots && slots.length === 0 ? (
-            <p className={styles.muted}>No slots available in the next 7 days.</p>
+            <p className={styles.muted}>No team slots available in the next 7 days.</p>
           ) : null}
 
           <div className={styles.slotDayStack}>
@@ -347,13 +350,7 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
                       key={slot.startsAt}
                       type="button"
                       className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
-                      onClick={() => {
-                        if (selectedSlot === slot.startsAt) {
-                          return;
-                        }
-                        setSelectedSlot(slot.startsAt);
-                        trackFunnelEvent('slot_selection');
-                      }}
+                      onClick={() => setSelectedSlot(slot.startsAt)}
                     >
                       {new Intl.DateTimeFormat(undefined, {
                         timeStyle: 'short',
@@ -368,53 +365,51 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
         </div>
 
         <div className={styles.card}>
-          <div className={styles.sectionHead}>
-            <h2>Your details</h2>
-            <p>We will email your booking confirmation and action links.</p>
-          </div>
-
-          {selectedSlotLabel ? (
+          <h2>Confirm team booking</h2>
+          {selectedSlotDetails ? (
             <p className={styles.selection}>
-              Selected slot: <strong>{selectedSlotLabel}</strong>
+              {formatSlot(selectedSlotDetails.startsAt, timezone)} ·{' '}
+              {selectedSlotDetails.assignmentUserIds.length} assigned member(s)
             </p>
           ) : (
             <p className={styles.selection}>Select a slot to continue.</p>
           )}
 
-          <form className={styles.form} onSubmit={submitBooking}>
-            <label className={styles.label} htmlFor="invitee-name">
+          <form className={styles.form} onSubmit={submitTeamBooking}>
+            <label className={styles.label} htmlFor="team-invitee-name">
               Your name
             </label>
             <input
-              id="invitee-name"
+              id="team-invitee-name"
               className={styles.input}
               value={inviteeName}
-              onChange={(event) => setInviteeName(event.target.value)}
+              onChange={(entry) => setInviteeName(entry.target.value)}
               required
             />
 
-            <label className={styles.label} htmlFor="invitee-email">
+            <label className={styles.label} htmlFor="team-invitee-email">
               Your email
             </label>
             <input
-              id="invitee-email"
+              id="team-invitee-email"
               type="email"
               className={styles.input}
               value={inviteeEmail}
-              onChange={(event) => setInviteeEmail(event.target.value)}
+              onChange={(entry) => setInviteeEmail(entry.target.value)}
               required
             />
 
-            {eventData.eventType.questions.map((question) => (
-              <label key={question.id} className={styles.label}>
+            {teamEvent.eventType.questions.map((question) => (
+              <label key={question.id} className={styles.label} htmlFor={`team-question-${question.id}`}>
                 {question.label}
                 <input
+                  id={`team-question-${question.id}`}
                   className={styles.input}
                   value={answers[question.id] ?? ''}
-                  onChange={(event) =>
+                  onChange={(entry) =>
                     setAnswers((previous) => ({
                       ...previous,
-                      [question.id]: event.target.value,
+                      [question.id]: entry.target.value,
                     }))
                   }
                   placeholder={question.placeholder ?? ''}
@@ -424,11 +419,22 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
             ))}
 
             <button className={styles.primaryButton} type="submit" disabled={submitting}>
-              {submitting ? 'Booking...' : 'Confirm booking'}
+              {submitting ? 'Booking...' : 'Confirm team booking'}
             </button>
           </form>
 
-          {pageError ? <p className={styles.error}>{pageError}</p> : null}
+          <div className={styles.memberPanel}>
+            <h3>Required members</h3>
+            <ul>
+              {teamEvent.members.map((member) => (
+                <li key={member.userId}>
+                  {member.user?.displayName ?? member.userId} · {member.role}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {error ? <p className={styles.error}>{error}</p> : null}
           {confirmation ? <p className={styles.confirmation}>{confirmation}</p> : null}
         </div>
       </section>

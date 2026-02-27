@@ -392,12 +392,14 @@ Success response:
     "cancel": {
       "token": "raw-cancel-token",
       "expiresAt": "2026-04-05T17:00:00.000Z",
+      "pageUrl": "http://localhost:3000/bookings/actions/raw-cancel-token",
       "lookupUrl": "http://localhost:8787/v0/bookings/actions/raw-cancel-token",
       "url": "http://localhost:8787/v0/bookings/actions/raw-cancel-token/cancel"
     },
     "reschedule": {
       "token": "raw-reschedule-token",
       "expiresAt": "2026-04-05T17:00:00.000Z",
+      "pageUrl": "http://localhost:3000/bookings/actions/raw-reschedule-token",
       "lookupUrl": "http://localhost:8787/v0/bookings/actions/raw-reschedule-token",
       "url": "http://localhost:8787/v0/bookings/actions/raw-reschedule-token/reschedule"
     }
@@ -476,7 +478,8 @@ Success response:
     "timezone": "America/Los_Angeles",
     "inviteeName": "Pat Lee",
     "inviteeEmail": "pat@example.com",
-    "rescheduledTo": null
+    "rescheduledTo": null,
+    "team": null
   },
   "eventType": {
     "slug": "intro-call",
@@ -503,6 +506,8 @@ Invalid/expired/consumed token response (`404` or `410`):
   "error": "Action link is invalid or expired."
 }
 ```
+
+For team bookings, `booking.team` includes `teamId`, `teamSlug`, `teamEventTypeId`, `mode`, and `assignmentUserIds`.
 
 ### `POST /v0/bookings/actions/:token/cancel`
 
@@ -616,11 +621,17 @@ Success response:
   "actions": {
     "cancel": {
       "token": "raw-cancel-token",
-      "expiresAt": "2026-04-05T18:00:00.000Z"
+      "expiresAt": "2026-04-05T18:00:00.000Z",
+      "pageUrl": "http://localhost:3000/bookings/actions/raw-cancel-token",
+      "lookupUrl": "http://localhost:8787/v0/bookings/actions/raw-cancel-token",
+      "url": "http://localhost:8787/v0/bookings/actions/raw-cancel-token/cancel"
     },
     "reschedule": {
       "token": "raw-reschedule-token",
-      "expiresAt": "2026-04-05T18:00:00.000Z"
+      "expiresAt": "2026-04-05T18:00:00.000Z",
+      "pageUrl": "http://localhost:3000/bookings/actions/raw-reschedule-token",
+      "lookupUrl": "http://localhost:8787/v0/bookings/actions/raw-reschedule-token",
+      "url": "http://localhost:8787/v0/bookings/actions/raw-reschedule-token/reschedule"
     }
   },
   "email": [
@@ -645,6 +656,10 @@ Success response:
   }
 }
 ```
+
+Notes:
+
+- Booking create and reschedule responses include both user-facing `pageUrl` (`/bookings/actions/:token`) and API mutation URLs (`lookupUrl`, `url`).
 
 Conflict response (`409`):
 
@@ -1158,6 +1173,49 @@ Success response:
 }
 ```
 
+### `GET /v0/teams/:teamSlug/event-types/:eventSlug`
+
+Public endpoint returning team event metadata for the booking page.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "team": {
+    "id": "88d979f3-4700-4a1b-b8c0-b3e0940d8e9f",
+    "slug": "demo-team",
+    "name": "Demo Team"
+  },
+  "eventType": {
+    "id": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+    "slug": "team-intro-call",
+    "name": "Team Intro Call",
+    "durationMinutes": 30,
+    "locationType": "video",
+    "locationValue": "https://meet.example.com/team-demo",
+    "questions": []
+  },
+  "mode": "round_robin",
+  "members": [
+    {
+      "userId": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+      "role": "owner",
+      "user": {
+        "id": "5e8d2e15-f2e2-4a39-9c58-b0d2f8ef7ef2",
+        "username": "demo",
+        "displayName": "Demo Organizer",
+        "timezone": "UTC"
+      }
+    }
+  ]
+}
+```
+
+Notes:
+
+- Public member profiles intentionally omit email addresses.
+
 ### `GET /v0/teams/:teamSlug/event-types/:eventSlug/availability`
 
 Public availability endpoint for team event types.
@@ -1236,12 +1294,14 @@ Success response:
     "cancel": {
       "token": "opaque-token",
       "expiresAt": "2026-04-03T17:00:00.000Z",
+      "pageUrl": "https://app.example.com/bookings/actions/opaque-token",
       "lookupUrl": "https://api.example.com/v0/bookings/actions/opaque-token",
       "url": "https://api.example.com/v0/bookings/actions/opaque-token/cancel"
     },
     "reschedule": {
       "token": "opaque-token",
       "expiresAt": "2026-04-03T17:00:00.000Z",
+      "pageUrl": "https://app.example.com/bookings/actions/opaque-token",
       "lookupUrl": "https://api.example.com/v0/bookings/actions/opaque-token",
       "url": "https://api.example.com/v0/bookings/actions/opaque-token/reschedule"
     }

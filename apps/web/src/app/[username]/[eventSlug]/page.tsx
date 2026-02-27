@@ -1,3 +1,4 @@
+import { resolveApiBaseUrl } from '../../../lib/api-base-url';
 import BookingPageClient from './page.client';
 
 type BookingPageProps = {
@@ -7,14 +8,6 @@ type BookingPageProps = {
   }>;
 };
 
-const resolveApiBaseUrl = (): string => {
-  return (
-    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
-    process.env.API_BASE_URL?.trim() ||
-    'http://127.0.0.1:8787'
-  );
-};
-
 export default async function BookingPage({ params }: BookingPageProps) {
   const { username, eventSlug } = await params;
 
@@ -22,7 +15,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
     <BookingPageClient
       username={username}
       eventSlug={eventSlug}
-      apiBaseUrl={resolveApiBaseUrl()}
+      apiBaseUrl={resolveApiBaseUrl('BookingPage')}
     />
   );
 }

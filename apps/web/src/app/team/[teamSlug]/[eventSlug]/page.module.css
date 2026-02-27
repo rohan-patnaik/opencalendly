@@ -18,7 +18,7 @@
   padding: 1.35rem 1.4rem;
   background:
     linear-gradient(130deg, color-mix(in oklab, var(--accent-1) 16%, transparent), transparent 55%),
-    linear-gradient(225deg, color-mix(in oklab, var(--accent-2) 18%, transparent), transparent 64%),
+    linear-gradient(225deg, color-mix(in oklab, var(--accent-3) 18%, transparent), transparent 64%),
     color-mix(in oklab, var(--surface-1) 96%, transparent);
 }
 
@@ -48,7 +48,7 @@
 
 .layout {
   display: grid;
-  grid-template-columns: 1.25fr 0.95fr;
+  grid-template-columns: 1.2fr 1fr;
   gap: 0.9rem;
 }
 
@@ -56,13 +56,9 @@
   padding: 1.15rem;
 }
 
-.sectionHead h2 {
+.card h2 {
   margin: 0;
   font-size: 1.18rem;
-}
-
-.sectionHead p {
-  margin: 0.38rem 0 0;
 }
 
 .label {
@@ -160,11 +156,28 @@
 }
 
 .selection {
-  margin: 0.9rem 0 0;
+  margin: 0.85rem 0 0;
   border-radius: 12px;
   border: 1px dashed var(--border-strong);
   background: color-mix(in oklab, var(--surface-2) 88%, transparent);
   padding: 0.6rem 0.65rem;
+}
+
+.memberPanel {
+  margin-top: 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--surface-2) 85%, transparent);
+  padding: 0.65rem;
+}
+
+.memberPanel h3 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.memberPanel ul {
+  margin-top: 0.45rem;
 }
 
 .muted {
