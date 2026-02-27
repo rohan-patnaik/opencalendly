@@ -448,6 +448,7 @@ const IDEMPOTENCY_KEY_MIN_LENGTH = 16;
 const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
 const IDEMPOTENCY_IN_PROGRESS_TTL_MINUTES = 10;
 const IDEMPOTENCY_COMPLETED_TTL_HOURS = 24;
+const IDEMPOTENCY_EXPIRED_CLEANUP_INTERVAL = 50;
 const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE = 120;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP = 300;
@@ -463,6 +464,7 @@ const publicAnalyticsRateLimitState = new Map<string, { windowStartMs: number; c
 let publicAnalyticsRateLimitRequestCounter = 0;
 const publicBookingRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
 let publicBookingRateLimitRequestCounter = 0;
+let idempotencyCleanupRequestCounter = 0;
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -1665,6 +1667,15 @@ const buildCompletedIdempotencyExpiry = (from: Date): Date => {
   return new Date(from.getTime() + IDEMPOTENCY_COMPLETED_TTL_HOURS * 60 * 60 * 1000);
 };
 
+const maybeCleanupExpiredIdempotencyRequests = async (db: Database, now: Date): Promise<void> => {
+  idempotencyCleanupRequestCounter += 1;
+  if (idempotencyCleanupRequestCounter % IDEMPOTENCY_EXPIRED_CLEANUP_INTERVAL !== 0) {
+    return;
+  }
+
+  await db.delete(idempotencyRequests).where(lte(idempotencyRequests.expiresAt, now));
+};
+
 const claimIdempotencyRequest = async (
   db: Database,
   input: {
@@ -1693,6 +1704,8 @@ const claimIdempotencyRequest = async (
   const now = input.now ?? new Date();
   const keyHash = hashToken(input.rawKey);
   const expiresAt = buildInProgressIdempotencyExpiry(now);
+
+  await maybeCleanupExpiredIdempotencyRequests(db, now);
 
   try {
     await db.insert(idempotencyRequests).values({
