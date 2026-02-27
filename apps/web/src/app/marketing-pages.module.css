@@ -127,6 +127,14 @@
   box-shadow: 0 10px 22px color-mix(in oklab, var(--accent-1) 20%, transparent);
 }
 
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px color-mix(in oklab, var(--accent-1) 20%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--accent-1) 82%, white);
+  outline-offset: 2px;
+}
+
 .cta {
   border-radius: 20px;
   border: 1px solid var(--border-subtle);
