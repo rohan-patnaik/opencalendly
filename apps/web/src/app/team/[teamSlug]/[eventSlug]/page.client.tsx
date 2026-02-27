@@ -256,6 +256,9 @@ export default function TeamBookingPageClient({
       const payload = (await response.json()) as TeamBookingResponse;
       if (!response.ok || !payload.ok || !payload.booking) {
         setError(payload.error || 'Team booking failed. Please pick another slot.');
+        if (response.status === 409) {
+          void loadAvailability();
+        }
         return;
       }
 

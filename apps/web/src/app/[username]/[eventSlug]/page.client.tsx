@@ -250,6 +250,9 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       const payload = (await response.json()) as BookingResponse;
       if (!response.ok || !payload.ok || !payload.booking) {
         setPageError(payload.error || 'Booking failed. Please choose another slot.');
+        if (response.status === 409) {
+          void loadAvailability();
+        }
         return;
       }
 
