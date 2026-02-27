@@ -15,8 +15,8 @@ export const buildEmailDeliveryMessage = (
     return `Confirmation email sent to ${inviteeEmail}.`;
   }
 
-  if (email.error) {
-    return `Booking confirmed, but email delivery failed: ${email.error}`;
+  if (email.error && email.error.trim().length > 0) {
+    return 'Booking confirmed, but we could not deliver the confirmation email.';
   }
 
   return 'Booking confirmed, but email delivery failed.';

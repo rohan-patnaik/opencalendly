@@ -23,7 +23,7 @@ describe('buildEmailDeliveryMessage', () => {
         },
         'invitee@example.com',
       ),
-    ).toBe('Booking confirmed, but email delivery failed: provider timeout');
+    ).toBe('Booking confirmed, but we could not deliver the confirmation email.');
   });
 
   it('returns unknown status message when payload is missing', () => {
