@@ -17,9 +17,9 @@ Last updated: 27 Feb 2026 (IST)
 
 ## Database and schema
 
-- [ ] Run schema generation and migrations:
-  - `npm run db:generate`
+- [ ] Apply committed migrations only (do not generate new migrations during deploy):
   - `npm run db:migrate`
+- [ ] Confirm there are no uncommitted schema/migration changes before deploy.
 - [ ] Confirm migration journal updated as expected.
 - [ ] Validate critical tables exist (bookings, action tokens, idempotency, webhooks, calendar writeback).
 

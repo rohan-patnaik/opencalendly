@@ -9,8 +9,9 @@ Last updated: 27 Feb 2026 (IST)
    - availability returning empty unexpectedly
    - delayed or missing confirmation/cancellation emails
 2. Check service health quickly:
-   - API: `curl http://localhost:8787/health`
-   - Web: `http://localhost:3000`
+   - API (prod/staging): `curl https://<api-domain>/health`
+   - Web (prod/staging): `https://<web-domain>`
+   - Local fallback (dev only): `curl http://localhost:8787/health`, `http://localhost:3000`
 3. Check latest CI and PR health for recent deploy changes.
 4. Categorize severity:
    - P1: booking flow down or data corruption risk
