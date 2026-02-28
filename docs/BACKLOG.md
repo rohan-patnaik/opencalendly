@@ -354,3 +354,22 @@ Acceptance criteria:
   - `/resources`
 - Marketing CTA actions route to live implemented product flows.
 - Marketing pages are responsive and coherent with app shell design system.
+
+### Feature 19: Cloudflare deploy + custom domain wiring hardening
+
+Scope:
+- Make production deployment/domain wiring reproducible from repo docs/scripts.
+- Configure API worker for production custom-domain routing.
+- Add domain verification checks to prevent accidental forwarding misconfiguration.
+
+Acceptance criteria:
+
+- API worker config includes a production route for `api.opencalendly.com/*`.
+- Repository includes explicit deploy scripts for:
+  - API worker production deploy
+  - Pages production deploy
+- Repository includes a domain verification script that validates:
+  - apex/app domain resolves and serves expected host
+  - API domain health endpoint responds successfully
+- Deployment docs include exact Cloudflare + Porkbun wiring steps and rollback checks.
+- `README.md` and `docs/PROD_DEPLOY_CHECKLIST.md` are updated to reference the production deploy/domain flow.

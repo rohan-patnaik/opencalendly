@@ -1,6 +1,6 @@
 # Production Deployment Checklist (v1.0.0)
 
-Last updated: 27 Feb 2026 (IST)
+Last updated: 28 Feb 2026 (IST)
 
 ## Pre-deploy
 
@@ -14,6 +14,8 @@ Last updated: 27 Feb 2026 (IST)
 - [ ] `npm run env:check` passes in deployment environment.
 - [ ] Neon `DATABASE_URL` points to production branch/database.
 - [ ] Required OAuth and email provider env vars are present.
+- [ ] Porkbun URL forwarding is disabled for `opencalendly.com`/`www`.
+- [ ] Domain wiring doc has been applied: `docs/CLOUDFLARE_DOMAIN_SETUP.md`.
 
 ## Database and schema
 
@@ -26,6 +28,7 @@ Last updated: 27 Feb 2026 (IST)
 ## API deploy (Cloudflare Worker)
 
 - [ ] Deploy API worker with current config/bindings.
+- [ ] Production route is active: `api.opencalendly.com/*`.
 - [ ] Confirm Hyperdrive binding points to production Neon connection.
 - [ ] Confirm secrets are set in Worker environment:
   - `DATABASE_URL`, `SESSION_SECRET`, provider secrets, `RESEND_API_KEY`
@@ -37,6 +40,9 @@ Last updated: 27 Feb 2026 (IST)
 ## Web deploy (Cloudflare Pages)
 
 - [ ] Build/deploy Next.js app to Pages.
+- [ ] Custom domains are attached in Pages project:
+  - `opencalendly.com`
+  - `www.opencalendly.com`
 - [ ] Confirm runtime env vars on Pages include API base URL and public config.
 - [ ] Verify homepage, public booking page, and booking submission path.
 
@@ -47,6 +53,7 @@ Last updated: 27 Feb 2026 (IST)
 - [ ] Webhook delivery run can process pending retries.
 - [ ] Calendar sync status endpoint reports healthy provider states.
 - [ ] Dashboard analytics endpoint returns expected data.
+- [ ] `npm run domain:check:production` passes.
 
 ## Rollback readiness
 

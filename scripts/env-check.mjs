@@ -17,6 +17,10 @@ const REQUIRED = {
 };
 
 const OPTIONAL = {
+  CLOUDFLARE_PAGES_PROJECT:
+    'Cloudflare Pages project name used by npm run deploy:web:production.',
+  CLOUDFLARE_PAGES_PRODUCTION_BRANCH:
+    'Optional production branch for Pages deploy (defaults to main).',
   DEMO_DAILY_PASS_LIMIT: 'Optional integer daily pass limit (Feature 3).',
   TELEMETRY_HMAC_KEY:
     'Recommended dedicated secret for telemetry HMAC. If unset, email delivery telemetry writes are skipped.',
