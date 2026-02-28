@@ -10,6 +10,7 @@ const getArgValue = (flag) => {
 
 const appDomain = getArgValue('--app-domain') || 'opencalendly.com';
 const apiDomain = getArgValue('--api-domain') || 'api.opencalendly.com';
+const allowedAppHosts = new Set([appDomain, `www.${appDomain}`]);
 
 const failures = [];
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -56,6 +57,11 @@ const checkAppHost = async () => {
 
   if (finalHost.includes('l.ink')) {
     failures.push(`${url}: still forwarding to ${finalHost}. Remove URL forwarding in Porkbun.`);
+    return;
+  }
+
+  if (!allowedAppHosts.has(finalHost)) {
+    failures.push(`${url}: resolved to unexpected host ${finalHost}.`);
     return;
   }
 

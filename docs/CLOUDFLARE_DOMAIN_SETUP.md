@@ -21,6 +21,7 @@ In Cloudflare Dashboard -> Pages -> your project:
 - Add custom domain: `www.opencalendly.com`
 
 Cloudflare will provide DNS target values if needed. Apply exactly what Pages requests.
+Cloudflare also auto-provisions SSL/TLS certificates for these custom domains; certificate issuance can take a few minutes before HTTPS is fully active.
 
 ## 3) Configure Worker custom domain route
 
@@ -29,6 +30,8 @@ Worker config in repo already includes production route:
 - `api.opencalendly.com/*`
 
 File: `apps/api/wrangler.toml`
+
+Before first production deploy, replace the production Hyperdrive placeholder ID (`00000000000000000000000000000000`) with your real production Hyperdrive ID.
 
 Deploy API using production env so the route is active:
 
@@ -68,11 +71,52 @@ Success criteria:
 - `https://opencalendly.com` responds and does not redirect to `l.ink`
 - `https://api.opencalendly.com/health` returns `{ "status": "ok" }`
 
+If checks fail immediately after DNS changes, wait for DNS/certificate propagation (minutes to hours depending on TTL) and re-run:
+
+```bash
+npm run domain:check:production
+```
+
+Helpful diagnostics:
+
+```bash
+dig +short opencalendly.com A
+dig +short www.opencalendly.com CNAME
+dig +short api.opencalendly.com CNAME
+```
+
 ## 7) Rollback
 
 If deploy is unhealthy:
 
-1. Roll API back to previous Worker deploy ID.
-2. Roll Pages back to previous production deployment.
-3. Re-run `npm run domain:check:production`.
-4. Follow incident + restore steps in `docs/OPERATOR_RUNBOOK.md`.
+1. List recent Worker deployments:
+
+```bash
+npx wrangler deployments list --name opencalendly-api
+```
+
+2. Roll Worker back to previous deployment ID:
+
+```bash
+npx wrangler rollback --name opencalendly-api --deployment-id <previous-worker-deployment-id>
+```
+
+3. List recent Pages deployments:
+
+```bash
+npx wrangler pages deployments list --project-name <your-pages-project>
+```
+
+4. Promote previous Pages deployment (or rollback in dashboard):
+
+```bash
+npx wrangler pages deployments promote <previous-pages-deployment-id> --project-name <your-pages-project>
+```
+
+5. Re-run:
+
+```bash
+npm run domain:check:production
+```
+
+6. Follow incident + restore steps in `docs/OPERATOR_RUNBOOK.md`.

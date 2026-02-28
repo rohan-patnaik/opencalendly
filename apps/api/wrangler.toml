@@ -28,3 +28,9 @@ routes = [{ pattern = "api.opencalendly.com/*", zone_name = "opencalendly.com" }
 [env.production.vars]
 APP_BASE_URL = "https://opencalendly.com"
 RESEND_FROM_EMAIL = "OpenCalendly <no-reply@opencalendly.com>"
+
+# Keep production Hyperdrive isolated from local/dev environments.
+# Replace this with the dedicated production Hyperdrive ID before production deploy.
+[[env.production.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "00000000000000000000000000000000"
