@@ -31,7 +31,7 @@ Worker config in repo already includes production route:
 
 File: `apps/api/wrangler.toml`
 
-Before first production deploy, replace the production Hyperdrive placeholder ID (`00000000000000000000000000000000`) with your real production Hyperdrive ID.
+`apps/api/wrangler.toml` currently points `env.production.hyperdrive` to `177ee8cb797040f58ba308bd85fa43cf` for bootstrap. Replace it with a dedicated production Hyperdrive ID before production go-live.
 
 Deploy API using production env so the route is active:
 
