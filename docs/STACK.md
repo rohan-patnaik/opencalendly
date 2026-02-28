@@ -47,6 +47,15 @@ Current code example: `apps/api/src/index.ts` uses `pg.Client` with `env.HYPERDR
 4. Set `DATABASE_URL` locally to the Neon direct Postgres URL for migrations and seed scripts.
 5. Deploy API Worker, then deploy web app to Pages.
 
+## Production routing (Feature 19)
+
+- Worker production route is configured as `api.opencalendly.com/*` in `apps/api/wrangler.toml` (`[env.production]`).
+- Deploy commands:
+  - API: `npm run deploy:api:production`
+  - Web: `npm run deploy:web:production`
+  - Domain verification: `npm run domain:check:production`
+- Domain wiring steps (Porkbun + Cloudflare): `docs/CLOUDFLARE_DOMAIN_SETUP.md`
+
 Useful references:
 
 - [Neon docs](https://neon.com/docs)

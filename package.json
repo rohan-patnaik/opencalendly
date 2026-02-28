@@ -27,6 +27,9 @@
     "db:generate": "node ./scripts/run-with-root-env.mjs npm run generate -w packages/db",
     "db:migrate": "node ./scripts/run-with-root-env.mjs npm run migrate -w packages/db",
     "db:seed": "node ./scripts/run-with-root-env.mjs npm run seed -w packages/db",
+    "deploy:api:production": "npm run deploy:production -w apps/api",
+    "deploy:web:production": "node ./scripts/deploy-pages.mjs --production",
+    "domain:check:production": "node ./scripts/domain-check.mjs --app-domain opencalendly.com --api-domain api.opencalendly.com",
     "ci": "npm run lint && npm run test && npm run typecheck"
   },
   "devDependencies": {

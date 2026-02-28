@@ -51,6 +51,8 @@ Populate required values in `.env` once, up front:
 | `CLOUDFLARE_ACCOUNT_ID`    | Cloudflare dashboard -> right sidebar account ID                                                   |
 | `CLOUDFLARE_API_TOKEN`     | Cloudflare dashboard -> My Profile -> API Tokens (token with Workers/Pages/Hyperdrive permissions) |
 | `HYPERDRIVE_ID`            | Cloudflare dashboard -> Hyperdrive -> created config ID                                            |
+| `CLOUDFLARE_PAGES_PROJECT` | Cloudflare Pages project name (required for `npm run deploy:web:production`)                      |
+| `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` | Optional Pages production branch (defaults to `main`)                                  |
 | `RESEND_API_KEY`           | Resend dashboard -> API Keys                                                                       |
 | `RESEND_FROM_EMAIL`        | Resend dashboard -> verified sender identity                                                       |
 | `GOOGLE_CLIENT_ID`         | Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID (Web application)    |
@@ -171,12 +173,28 @@ Theme toggle is available in the top-right app chrome and persists `light` / `da
 
 ## Deploy Overview (Cloudflare Pages + Workers)
 
-1. Deploy `apps/api` via Wrangler as a Cloudflare Worker.
-2. Create Hyperdrive binding to Neon Postgres and attach it to the Worker.
-3. Deploy `apps/web` to Cloudflare Pages using the Next.js adapter build (`npm run pages:build -w apps/web`).
-4. Set environment variables in both Worker and Pages projects. For Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`), use `wrangler secret put`.
+1. Configure domains and DNS first (Porkbun + Cloudflare): [docs/CLOUDFLARE_DOMAIN_SETUP.md](docs/CLOUDFLARE_DOMAIN_SETUP.md).
+2. Deploy API worker to production route (`api.opencalendly.com/*`):
 
-Details: [docs/STACK.md](docs/STACK.md)
+```bash
+npm run deploy:api:production
+```
+
+3. Deploy web app to Cloudflare Pages production:
+
+```bash
+npm run deploy:web:production
+```
+
+4. Verify production app + API domain wiring:
+
+```bash
+npm run domain:check:production
+```
+
+5. Set environment variables in both Worker and Pages projects. For Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`), use `wrangler secret put`.
+
+Details: [docs/STACK.md](docs/STACK.md), [docs/PROD_DEPLOY_CHECKLIST.md](docs/PROD_DEPLOY_CHECKLIST.md)
 
 ## Demo Credits Pool (Feature 3)
 
