@@ -1,6 +1,8 @@
 import { resolveApiBaseUrl } from '../../../../lib/api-base-url';
 import BookingActionPageClient from './page.client';
 
+export const runtime = 'edge';
+
 type BookingActionPageProps = {
   params: Promise<{
     token: string;

@@ -1,6 +1,8 @@
 import { resolveApiBaseUrl } from '../../../../lib/api-base-url';
 import TeamBookingPageClient from './page.client';
 
+export const runtime = 'edge';
+
 type TeamBookingPageProps = {
   params: Promise<{
     teamSlug: string;
