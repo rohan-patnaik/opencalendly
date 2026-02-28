@@ -8,8 +8,32 @@ const getArgValue = (flag) => {
   return process.argv[index + 1];
 };
 
-const appDomain = getArgValue('--app-domain') || 'opencalendly.com';
-const apiDomain = getArgValue('--api-domain') || 'api.opencalendly.com';
+const normalizeHost = (value) => value.trim().toLowerCase().replace(/\.$/, '');
+const isValidHost = (value) =>
+  value.length > 0 &&
+  value.length <= 253 &&
+  /^[a-z0-9.-]+$/.test(value) &&
+  !value.includes('..') &&
+  !value.startsWith('.') &&
+  !value.endsWith('.');
+
+const getDomainArg = (flag, fallback) => {
+  const raw = getArgValue(flag);
+  if (raw === undefined) {
+    return normalizeHost(fallback);
+  }
+  if (!raw || raw.startsWith('--')) {
+    throw new Error(`${flag} requires a hostname value.`);
+  }
+  const normalized = normalizeHost(raw);
+  if (!isValidHost(normalized)) {
+    throw new Error(`${flag} has invalid hostname "${raw}".`);
+  }
+  return normalized;
+};
+
+const appDomain = getDomainArg('--app-domain', 'opencalendly.com');
+const apiDomain = getDomainArg('--api-domain', 'api.opencalendly.com');
 const allowedAppHosts = new Set([appDomain, `www.${appDomain}`]);
 
 const failures = [];
@@ -26,9 +50,14 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_M
 };
 
 const checkDns = async (domain) => {
-  const ipv4 = await resolve4(domain).catch(() => []);
-  const ipv6 = await resolve6(domain).catch(() => []);
-  const cnames = await resolveCname(domain).catch(() => []);
+  const [ipv4Result, ipv6Result, cnameResult] = await Promise.allSettled([
+    resolve4(domain),
+    resolve6(domain),
+    resolveCname(domain),
+  ]);
+  const ipv4 = ipv4Result.status === 'fulfilled' ? ipv4Result.value : [];
+  const ipv6 = ipv6Result.status === 'fulfilled' ? ipv6Result.value : [];
+  const cnames = cnameResult.status === 'fulfilled' ? cnameResult.value : [];
 
   if (ipv4.length === 0 && ipv6.length === 0 && cnames.length === 0) {
     failures.push(`${domain}: no A/AAAA/CNAME DNS answer found.`);
@@ -53,7 +82,7 @@ const checkAppHost = async () => {
     failures.push(`${url}: request failed (${error instanceof Error ? error.message : String(error)}).`);
     return;
   }
-  const finalHost = new URL(response.url).hostname;
+  const finalHost = normalizeHost(new URL(response.url).hostname);
 
   if (finalHost.includes('l.ink')) {
     failures.push(`${url}: still forwarding to ${finalHost}. Remove URL forwarding in Porkbun.`);
@@ -88,7 +117,7 @@ const checkApiHealth = async () => {
     );
     return;
   }
-  const finalHost = new URL(response.url).hostname;
+  const finalHost = normalizeHost(new URL(response.url).hostname);
 
   if (finalHost.includes('l.ink')) {
     failures.push(`${healthUrl}: still forwarding to ${finalHost}. Point api subdomain to Cloudflare Worker route.`);
