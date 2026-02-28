@@ -1,6 +1,8 @@
 import { resolveApiBaseUrl } from '../../../lib/api-base-url';
 import BookingPageClient from './page.client';
 
+export const runtime = 'edge';
+
 type BookingPageProps = {
   params: Promise<{
     username: string;
