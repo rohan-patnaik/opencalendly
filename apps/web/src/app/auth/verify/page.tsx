@@ -13,7 +13,12 @@ export default function VerifyPage() {
 
 function VerifyPageFallback() {
   return (
-    <main style={{ margin: '3rem auto', maxWidth: 720, padding: '0 1rem' }}>
+    <main
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      style={{ margin: '3rem auto', maxWidth: 720, padding: '0 1rem' }}
+    >
       <h1>Verify magic-link token</h1>
       <p>Preparing verification...</p>
     </main>
