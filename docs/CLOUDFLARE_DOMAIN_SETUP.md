@@ -42,7 +42,7 @@ Use the DNS values required by Cloudflare Pages + Worker setup. Typical shape:
 
 - `@` -> Pages target (or flattened equivalent)
 - `www` -> CNAME to Pages target
-- `api` -> CNAME to Worker custom domain target (as instructed by Cloudflare)
+- `api` -> CNAME to Worker custom domain target (Cloudflare Dashboard -> Workers & Pages -> `opencalendly-api` -> Triggers -> Custom Domains)
 
 Keep existing email records (Resend SPF/DKIM/MX/DMARC) unchanged.
 

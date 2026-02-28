@@ -1,4 +1,4 @@
-import { resolve4, resolveCname } from 'node:dns/promises';
+import { resolve4, resolve6, resolveCname } from 'node:dns/promises';
 
 const getArgValue = (flag) => {
   const index = process.argv.indexOf(flag);
@@ -12,22 +12,46 @@ const appDomain = getArgValue('--app-domain') || 'opencalendly.com';
 const apiDomain = getArgValue('--api-domain') || 'api.opencalendly.com';
 
 const failures = [];
+const DEFAULT_TIMEOUT_MS = 10_000;
+
+const fetchWithTimeout = async (url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
 const checkDns = async (domain) => {
-  const ips = await resolve4(domain).catch(() => []);
+  const ipv4 = await resolve4(domain).catch(() => []);
+  const ipv6 = await resolve6(domain).catch(() => []);
   const cnames = await resolveCname(domain).catch(() => []);
 
-  if (ips.length === 0 && cnames.length === 0) {
+  if (ipv4.length === 0 && ipv6.length === 0 && cnames.length === 0) {
     failures.push(`${domain}: no A/AAAA/CNAME DNS answer found.`);
     return;
   }
 
-  console.log(`${domain}: DNS OK (A=${ips.join(', ') || 'none'}, CNAME=${cnames.join(', ') || 'none'})`);
+  console.log(
+    `${domain}: DNS OK (A=${ipv4.join(', ') || 'none'}, AAAA=${ipv6.join(', ') || 'none'}, CNAME=${cnames.join(', ') || 'none'})`,
+  );
 };
 
 const checkAppHost = async () => {
   const url = `https://${appDomain}`;
-  const response = await fetch(url, { redirect: 'follow' });
+  let response;
+  try {
+    response = await fetchWithTimeout(url, { redirect: 'follow' });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      failures.push(`${url}: request timed out after ${DEFAULT_TIMEOUT_MS}ms.`);
+      return;
+    }
+    failures.push(`${url}: request failed (${error instanceof Error ? error.message : String(error)}).`);
+    return;
+  }
   const finalHost = new URL(response.url).hostname;
 
   if (finalHost.includes('l.ink')) {
@@ -45,7 +69,19 @@ const checkAppHost = async () => {
 
 const checkApiHealth = async () => {
   const healthUrl = `https://${apiDomain}/health`;
-  const response = await fetch(healthUrl, { redirect: 'follow' });
+  let response;
+  try {
+    response = await fetchWithTimeout(healthUrl, { redirect: 'follow' });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      failures.push(`${healthUrl}: request timed out after ${DEFAULT_TIMEOUT_MS}ms.`);
+      return;
+    }
+    failures.push(
+      `${healthUrl}: request failed (${error instanceof Error ? error.message : String(error)}).`,
+    );
+    return;
+  }
   const finalHost = new URL(response.url).hostname;
 
   if (finalHost.includes('l.ink')) {

@@ -28,6 +28,3 @@ routes = [{ pattern = "api.opencalendly.com/*", zone_name = "opencalendly.com" }
 [env.production.vars]
 APP_BASE_URL = "https://opencalendly.com"
 RESEND_FROM_EMAIL = "OpenCalendly <no-reply@opencalendly.com>"
-DEMO_DAILY_PASS_LIMIT = ""
-GOOGLE_CLIENT_ID = ""
-MICROSOFT_CLIENT_ID = ""
