@@ -103,6 +103,7 @@
 .sectionNavLink:hover {
   background: var(--brand-primary);
   border-color: var(--brand-primary);
+  color: var(--on-brand);
   transform: translateY(-1px);
 }
 
@@ -238,7 +239,7 @@
 .input:focus,
 .select:focus,
 .textarea:focus {
-  outline: 2px solid var(--brand-secondary);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 

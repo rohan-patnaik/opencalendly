@@ -16,7 +16,6 @@
 
 .heroCard {
   padding: 1.35rem 1.4rem;
-  background: var(--bg-surface);
 }
 
 .heroCard h1 {
@@ -131,6 +130,18 @@
   background: var(--brand-primary);
   border-color: var(--brand-primary);
   color: var(--on-brand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot,
+  .slotActive {
+    transition: none;
+  }
+
+  .slot:hover,
+  .slotActive:hover {
+    transform: none;
+  }
 }
 
 .slotActive {
