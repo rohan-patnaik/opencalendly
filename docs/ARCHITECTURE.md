@@ -39,15 +39,13 @@ flowchart LR
 - Global app chrome wraps all routes and provides:
   - primary navigation
   - session state affordances (signed-in identity + sign-out)
-  - theme toggle control
   - mobile drawer navigation for compact viewports
 - Shared UI primitives live under `apps/web/src/components/ui`:
   - `PageShell`, `Card`, `Button`/`LinkButton`, `FormField`, `Toast`, `Modal`, `Tabs`, `DataTable`
   - shared tokenized styling via `primitives.module.css` for consistency across auth/dashboard/organizer routes
 - Theme system:
-  - CSS variable tokens in global stylesheet (`light` + `dark`)
-  - persisted theme preference (`light` | `dark` | `system`) in browser storage
-  - early `data-theme` hydration script to reduce theme flash during SSR/CSR handoff
+  - CSS variable tokens in global stylesheet for a single dark palette
+  - no runtime theme switching (`light`/`system` removed to reduce UX clutter)
 - Auth session model:
   - client-side `AuthSession` store in localStorage
   - shared hook to observe/update session across tabs via storage + custom events

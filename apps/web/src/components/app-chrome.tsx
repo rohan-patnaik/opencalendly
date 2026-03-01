@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../lib/use-auth-session';
-import ThemeToggle from './theme-toggle';
 import styles from './app-chrome.module.css';
 
 const navLinks = [
@@ -119,7 +118,6 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className={styles.right}>
-          <ThemeToggle className={styles.themeButton} />
           {ready && session ? (
             <>
               <span className={styles.sessionChip}>{session.user.email}</span>

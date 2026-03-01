@@ -117,7 +117,7 @@ npm run dev:web
 ### 7.1) Feature 15 app shell smoke test
 
 1. Confirm top navigation remains sticky while scrolling.
-2. Toggle theme (sun/moon/system cycle) and refresh to verify persistence.
+2. Confirm the single dark theme styling is applied consistently across header/cards/forms.
 3. Resize to mobile width and verify drawer navigation opens/closes and route links work.
 4. Sign in via `/auth/sign-in` (or keep an active session), then open `/auth/verify`, `/dashboard`, and `/organizer` to confirm shared shell/card/form styling is consistent.
 
@@ -169,7 +169,7 @@ npm run dev:web
 - `/settings/calendar/google/callback` OAuth callback completion for Google Calendar connect
 - `/settings/calendar/microsoft/callback` OAuth callback completion for Microsoft Calendar connect
 
-Theme toggle is available in the top-right app chrome and persists `light` / `dark` / `system`.
+OpenCalendly now uses a single dark theme across app and marketing routes (no runtime light/system toggle).
 
 ## Deploy Overview (Cloudflare Pages + Workers)
 
@@ -216,7 +216,7 @@ Feature 3 API endpoints:
 
 Embed script endpoint (public):
 
-- `GET /v0/embed/widget.js?username=demo&eventSlug=intro-call&timezone=Asia/Kolkata&theme=light`
+- `GET /v0/embed/widget.js?username=demo&eventSlug=intro-call&timezone=Asia/Kolkata&theme=dark`
 
 Example host-page snippet:
 
@@ -267,6 +267,11 @@ Calendar sync + writeback endpoints (authenticated, Feature 7):
 - [docs/releases/v1.0.0.md](docs/releases/v1.0.0.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [AGENTS.md](AGENTS.md)
+
+## PR Formatting
+
+- Use `.github/pull_request_template.md` when creating PRs.
+- Write PR bodies as normal Markdown (headings, bullet lists, fenced code), not escaped newline strings.
 
 ## License
 

@@ -373,3 +373,21 @@ Acceptance criteria:
   - API domain health endpoint responds successfully
 - Deployment docs include exact Cloudflare + Porkbun wiring steps and rollback checks.
 - `README.md` and `docs/PROD_DEPLOY_CHECKLIST.md` are updated to reference the production deploy/domain flow.
+
+### Feature 20: Dark single-theme UX alignment + PR formatting guardrails
+
+Scope:
+- Align OpenCalendly visual language with inspiration from `cal.com` and `calendly.com` while keeping OpenCalendly branding/copy.
+- Reduce theme clutter by standardizing on one dark theme across app and marketing routes.
+- Add repository guardrails so PR descriptions render as proper markdown (no escaped newline blobs).
+- Store captured design references under `docs/assets/ui-inspiration/`.
+- Supersede the Feature 11 runtime theme-toggle behavior with a single-theme model.
+
+Acceptance criteria:
+
+- Additional visual references from `cal.com` and `calendly.com` are captured and stored in-repo for design alignment.
+- Theme system is simplified to a single dark theme (no light/system toggle in runtime UI).
+- Core shell and major routes (`/`, `/auth/sign-in`, `/dashboard`, booking pages) use the updated dark palette and consistent component styling.
+- Theme-related docs are updated to reflect single-theme behavior.
+- A PR template exists in `.github/pull_request_template.md` with clean markdown sections for summary, validation, and notes.
+- README contributor flow includes concise guidance for writing properly formatted PR bodies.

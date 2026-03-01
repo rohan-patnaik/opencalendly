@@ -1,96 +1,50 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family: Sora, 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
 
-  --bg: #f4f7ff;
-  --bg-accent-a: #fef3c7;
-  --bg-accent-b: #c4b5fd;
-  --bg-accent-c: #93c5fd;
+  --bg: #070a10;
+  --bg-accent-a: #6d3d24;
+  --bg-accent-b: #20545a;
+  --bg-accent-c: #332a43;
 
-  --surface: #ffffff;
-  --surface-soft: #f6f9ff;
-  --surface-strong: #eef4ff;
+  --surface: #0f141d;
+  --surface-soft: #161e2b;
+  --surface-strong: #1d2738;
 
-  --text-strong: #0f172a;
-  --text-muted: #334155;
+  --text-strong: #ede7df;
+  --text-muted: #b8b0a4;
 
-  --border-subtle: #d7e1f3;
-  --border-strong: #9db2d4;
+  --border-subtle: #263247;
+  --border-strong: #4f5d79;
 
-  --accent-strong: #2563eb;
-  --accent-soft: #14b8a6;
-  --accent-warm: #f97316;
-  --accent-contrast: #0e1633;
-
-  --danger: #ef4444;
-  --danger-strong: #dc2626;
-  --danger-contrast: #7f1d1d;
-  --danger-soft: color-mix(in oklab, var(--danger) 16%, var(--surface));
-  --success-soft: color-mix(in oklab, #14b8a6 15%, var(--surface));
-  --overlay-strong: color-mix(in oklab, #020617 58%, transparent);
-
-  --error-text: #7f1d1d;
-  --success-text: #155e75;
-
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
-
-  --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 14px 32px rgba(15, 23, 42, 0.1);
-  --shadow-lg: 0 22px 46px rgba(15, 23, 42, 0.17);
-  --shadow-soft: var(--shadow-md);
-
-  --ring-focus: 2px solid color-mix(in oklab, var(--accent-strong) 52%, transparent);
-
-  --motion-fast: 140ms ease;
-  --motion-slow: 260ms ease;
-
-  /* Back-compat aliases for existing route styles */
-  --surface-1: var(--surface);
-  --surface-2: var(--surface-soft);
-  --text: var(--text-strong);
-  --muted: var(--text-muted);
-  --accent-1: var(--accent-strong);
-  --accent-2: var(--accent-soft);
-  --accent-3: var(--accent-warm);
-}
-
-html[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #0a1020;
-  --bg-accent-a: #4c1d95;
-  --bg-accent-b: #0369a1;
-  --bg-accent-c: #134e4a;
-
-  --surface: #121a30;
-  --surface-soft: #1a2440;
-  --surface-strong: #1e2b4a;
-
-  --text-strong: #e2e8f0;
-  --text-muted: #b8c4db;
-
-  --border-subtle: #2f3d5d;
-  --border-strong: #6179a5;
-
-  --accent-strong: #60a5fa;
-  --accent-soft: #2dd4bf;
-  --accent-warm: #fb923c;
-  --accent-contrast: #0b1228;
+  --accent-strong: #de9b57;
+  --accent-soft: #4cb8bb;
+  --accent-warm: #f5c48f;
+  --accent-contrast: #111723;
 
   --danger: #f87171;
   --danger-strong: #ef4444;
   --danger-contrast: #fecaca;
   --danger-soft: color-mix(in oklab, var(--danger) 24%, var(--surface));
-  --success-soft: color-mix(in oklab, #14b8a6 20%, var(--surface));
+  --success-soft: color-mix(in oklab, #14b8a6 24%, var(--surface));
   --overlay-strong: color-mix(in oklab, #020617 72%, transparent);
 
   --error-text: #fecaca;
-  --success-text: #99f6e4;
+  --success-text: #9ef1dc;
+
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
   --shadow-sm: 0 8px 18px rgba(3, 7, 18, 0.35);
   --shadow-md: 0 16px 34px rgba(3, 7, 18, 0.56);
   --shadow-lg: 0 22px 48px rgba(3, 7, 18, 0.72);
   --shadow-soft: var(--shadow-md);
+
+  --ring-focus: 2px solid color-mix(in oklab, var(--accent-strong) 48%, transparent);
+
+  --motion-fast: 140ms ease;
+  --motion-slow: 260ms ease;
 
   /* Back-compat aliases for existing route styles */
   --surface-1: var(--surface);
