@@ -35,6 +35,7 @@ const getDomainArg = (flag, fallback) => {
 const appDomain = getDomainArg('--app-domain', 'opencalendly.com');
 const apiDomain = getDomainArg('--api-domain', 'api.opencalendly.com');
 const allowedAppHosts = new Set([appDomain, `www.${appDomain}`]);
+const allowForbidden = process.env.DOMAIN_CHECK_ALLOW_FORBIDDEN === 'true';
 
 const failures = [];
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -95,6 +96,10 @@ const checkAppHost = async () => {
   }
 
   if (!response.ok) {
+    if (allowForbidden && response.status === 403) {
+      console.warn(`${url}: returned HTTP 403 (allowed by DOMAIN_CHECK_ALLOW_FORBIDDEN=true).`);
+      return;
+    }
     failures.push(`${url}: returned HTTP ${response.status} ${response.statusText}.`);
     return;
   }
@@ -130,6 +135,12 @@ const checkApiHealth = async () => {
   }
 
   if (!response.ok) {
+    if (allowForbidden && response.status === 403) {
+      console.warn(
+        `${healthUrl}: returned HTTP 403 (allowed by DOMAIN_CHECK_ALLOW_FORBIDDEN=true).`,
+      );
+      return;
+    }
     failures.push(`${healthUrl}: returned HTTP ${response.status} ${response.statusText}.`);
     return;
   }
