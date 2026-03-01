@@ -183,7 +183,7 @@ OpenCalendly now uses a single dark theme across app and marketing routes (no ru
      - `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` (defaults to `main`)
 3. Automatic production deploy is handled by:
    - `.github/workflows/deploy-production.yml`
-   - Trigger: every push to `main` (plus manual `workflow_dispatch`)
+   - Trigger: after `CI` succeeds on `main` pushes (plus manual `workflow_dispatch`)
    - Order: API deploy -> web deploy -> domain verification
 4. Set environment variables in both Worker and Pages projects before any deploy command.
    - Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`) should be set via `wrangler secret put`.

@@ -412,7 +412,7 @@ Acceptance criteria:
 ### Feature 21: Production auto-deploy on `main` pushes
 
 Scope:
-- Ensure production deployment is triggered automatically after every push to `main`.
+- Ensure production deployment is triggered automatically after successful `CI` completion for each push to `main`.
 - Cover both production surfaces:
   - Cloudflare Pages web (`opencalendly.com`, `www.opencalendly.com`)
   - Cloudflare Worker API (`api.opencalendly.com`)
@@ -421,7 +421,7 @@ Scope:
 Acceptance criteria:
 
 - A GitHub Actions workflow deploys production automatically on:
-  - push to `main`
+  - successful `CI` completion for `main` via `workflow_run`
   - manual `workflow_dispatch`
 - Deploy workflow runs API deploy first, then web deploy.
 - Workflow enforces branch-level concurrency (latest `main` run wins).

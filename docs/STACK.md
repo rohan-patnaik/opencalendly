@@ -45,14 +45,14 @@ Current code example: `apps/api/src/index.ts` uses `pg.Client` with `env.HYPERDR
 2. Create Cloudflare Hyperdrive config pointed at Neon.
 3. Bind Hyperdrive in `apps/api/wrangler.toml` as `HYPERDRIVE`.
 4. Set `DATABASE_URL` locally to the Neon direct Postgres URL for migrations and seed scripts.
-5. Configure production auto-deploy workflow (`.github/workflows/deploy-production.yml`) so every `main` push deploys API first, then web.
+5. Configure production auto-deploy workflow (`.github/workflows/deploy-production.yml`) so every `main` push deploys API first, then web after CI succeeds.
 
 ## Production routing (Feature 19)
 
 - Worker production route is configured as `api.opencalendly.com/*` in `apps/api/wrangler.toml` (`[env.production]`).
 - Production auto-deploy workflow:
   - `.github/workflows/deploy-production.yml`
-  - Trigger: push to `main` (and manual `workflow_dispatch`)
+  - Trigger: `workflow_run` on successful `CI` for `main` (and manual `workflow_dispatch`)
 - Deploy commands:
   - API: `npm run deploy:api:production`
   - Web: `npm run deploy:web:production`

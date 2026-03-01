@@ -54,7 +54,7 @@ Keep existing email records (Resend SPF/DKIM/MX/DMARC) unchanged.
 Production deploys are automated via:
 
 - `.github/workflows/deploy-production.yml`
-- Trigger: push to `main` (or manual `workflow_dispatch`)
+- Trigger: after `CI` succeeds for `main` pushes (or manual `workflow_dispatch`)
 - Order: API deploy -> Pages deploy -> domain verification
 
 Required GitHub repository secrets:
