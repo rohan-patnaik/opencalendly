@@ -29,7 +29,6 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
   const [username, setUsername] = useState('demo');
   const [eventSlug, setEventSlug] = useState('intro-call');
   const [timezone, setTimezone] = useState(getBrowserTimezone());
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [width, setWidth] = useState('100%');
   const [height, setHeight] = useState('760px');
   const [radius, setRadius] = useState('14px');
@@ -42,10 +41,10 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
       username: username.trim() || 'demo',
       eventSlug: eventSlug.trim() || 'intro-call',
       timezone: timezone.trim() || 'UTC',
-      theme,
+      theme: 'dark',
     });
     return `${apiBaseUrl}/v0/embed/widget.js?${params.toString()}`;
-  }, [apiBaseUrl, eventSlug, theme, timezone, username]);
+  }, [apiBaseUrl, eventSlug, timezone, username]);
 
   const scriptSnippet = useMemo(() => {
     return toScriptSnippet({
@@ -138,19 +137,6 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
               onChange={(entry) => setTimezone(entry.target.value)}
               placeholder="Asia/Kolkata"
             />
-
-            <label className={styles.label} htmlFor="embed-theme">
-              Theme
-            </label>
-            <select
-              id="embed-theme"
-              className={styles.select}
-              value={theme}
-              onChange={(entry) => setTheme(entry.target.value === 'dark' ? 'dark' : 'light')}
-            >
-              <option value="light">light</option>
-              <option value="dark">dark</option>
-            </select>
 
             <label className={styles.label} htmlFor="embed-width">
               data-width

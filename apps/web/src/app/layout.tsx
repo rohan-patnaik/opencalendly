@@ -9,15 +9,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "(function(){try{var key='opencalendly.theme';var pref=localStorage.getItem(key)||'system';var resolved=pref==='system'?(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):pref;document.documentElement.dataset.theme=resolved;}catch(_e){}})();",
-          }}
-        />
-      </head>
+    <html lang="en">
       <body>
         <AppChrome>{children}</AppChrome>
       </body>
