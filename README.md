@@ -185,33 +185,19 @@ OpenCalendly now uses a single dark theme across app and marketing routes (no ru
    - `.github/workflows/deploy-production.yml`
    - Trigger: every push to `main` (plus manual `workflow_dispatch`)
    - Order: API deploy -> web deploy -> domain verification
-4. For manual fallback deploys, run:
+4. Set environment variables in both Worker and Pages projects before any deploy command.
+   - Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`) should be set via `wrangler secret put`.
+5. For manual fallback deploys, run:
 
 ```bash
 npm run deploy:api:production
 npm run deploy:web:production
 ```
 
-5. Verify production app + API domain wiring:
+6. Verify production app + API domain wiring:
 
 ```bash
 npm run domain:check:production
-```
-
-6. Set environment variables in both Worker and Pages projects. For Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`), use `wrangler secret put`.
-
-### Manual deploy commands (fallback)
-
-Deploy API worker to production route (`api.opencalendly.com/*`):
-
-```bash
-npm run deploy:api:production
-```
-
-Deploy web app to Cloudflare Pages production:
-
-```bash
-npm run deploy:web:production
 ```
 
 Details: [docs/STACK.md](docs/STACK.md), [docs/PROD_DEPLOY_CHECKLIST.md](docs/PROD_DEPLOY_CHECKLIST.md)
