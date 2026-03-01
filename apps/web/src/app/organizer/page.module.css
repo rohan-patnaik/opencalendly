@@ -312,9 +312,16 @@
 }
 
 .secondaryButton:hover,
-.ghostButton:hover,
+.ghostButton:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
 .linkButton:hover {
-  background: var(--brand-primary);
+  background: transparent;
+  color: var(--brand-primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.1em;
 }
 
 .ghostButton {

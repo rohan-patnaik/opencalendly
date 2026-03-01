@@ -393,7 +393,7 @@ Acceptance criteria:
   - `--focus-ring`
   - interaction tokens (`--bg-hover`, `--bg-pressed`, `--border-hover`, `--border-focus`, `--brand-primary-active`, `--disabled-*`, `--on-brand`)
   - `--state-error-hover`
-- Root layout sets default theme via `data-theme=\"obsidian-amber\"`.
+- Root layout sets default theme via `data-theme="obsidian-amber"`.
 - Shared primitives in `apps/web/src/components/ui/primitives.module.css` use semantic tokens for:
   - button variants (`primary`, `secondary`, `ghost`, `danger`) including hover/active/disabled
   - form controls (input/select/textarea) including hover/focus/error/disabled

@@ -34,7 +34,8 @@
   color: var(--text-primary);
   font-size: 0.9rem;
   padding: 0.7rem 0.75rem;
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .actions {

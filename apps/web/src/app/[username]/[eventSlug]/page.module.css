@@ -120,11 +120,17 @@
     box-shadow 120ms ease;
 }
 
-.slot:hover,
-.slotActive:hover {
+.slot:hover {
   transform: translateY(-1px);
   background: var(--bg-hover);
   border-color: var(--border-strong);
+}
+
+.slotActive:hover {
+  transform: translateY(-1px);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: var(--on-brand);
 }
 
 .slotActive {
