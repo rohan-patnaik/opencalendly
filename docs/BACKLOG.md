@@ -427,3 +427,17 @@ Acceptance criteria:
 - Workflow enforces branch-level concurrency (latest `main` run wins).
 - Deployment docs clearly list required GitHub secrets and expected values.
 - Post-deploy verification includes production domain health checks.
+
+### Feature 22: CI-safe production domain verification
+
+Scope:
+- Keep strict production domain checks for local/manual verification.
+- Prevent false negatives in GitHub Actions where Cloudflare may return `403` for bot-protected requests.
+- Preserve DNS and host-resolution assertions even when HTTP 403 fallback is enabled.
+
+Acceptance criteria:
+
+- `scripts/domain-check.mjs` supports an explicit CI-only opt-in to tolerate HTTP `403` responses.
+- CI fallback does not bypass DNS or host validation; only HTTP status handling is relaxed for `403`.
+- Local/manual `npm run domain:check:production` remains strict by default.
+- Deploy workflow uses CI-only opt-in mode for the post-deploy domain verification step.

@@ -185,6 +185,7 @@ OpenCalendly now uses a single dark theme across app and marketing routes (no ru
    - `.github/workflows/deploy-production.yml`
    - Trigger: after `CI` succeeds on `main` pushes (plus manual `workflow_dispatch`)
    - Order: API deploy -> web deploy -> domain verification
+   - CI verification uses `DOMAIN_CHECK_ALLOW_FORBIDDEN=true` to tolerate Cloudflare bot-protection `403` responses from GitHub-hosted runners.
 4. Set environment variables in both Worker and Pages projects before any deploy command.
    - Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`) should be set via `wrangler secret put`.
 5. For manual fallback deploys, run:
@@ -199,6 +200,8 @@ npm run deploy:web:production
 ```bash
 npm run domain:check:production
 ```
+
+`npm run domain:check:production` is strict by default (expects HTTP 200/JSON OK). The `DOMAIN_CHECK_ALLOW_FORBIDDEN=true` mode is only for CI runner compatibility.
 
 Details: [docs/STACK.md](docs/STACK.md), [docs/PROD_DEPLOY_CHECKLIST.md](docs/PROD_DEPLOY_CHECKLIST.md)
 
