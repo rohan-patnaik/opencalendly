@@ -9,17 +9,14 @@
 .hero,
 .section {
   border-radius: 20px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-1) 95%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
   padding: 1.1rem;
 }
 
 .hero {
-  background:
-    linear-gradient(130deg, color-mix(in oklab, var(--accent-1) 14%, transparent), transparent 55%),
-    linear-gradient(210deg, color-mix(in oklab, var(--accent-2) 18%, transparent), transparent 72%),
-    color-mix(in oklab, var(--surface-1) 95%, transparent);
+  background: var(--bg-surface);
 }
 
 .kicker {
@@ -29,10 +26,10 @@
   letter-spacing: 0.14em;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--accent-1);
-  border: 1px solid color-mix(in oklab, var(--accent-1) 36%, transparent);
+  color: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
   border-radius: 999px;
-  background: color-mix(in oklab, var(--accent-1) 14%, transparent);
+  background: var(--bg-hover);
   padding: 0.3rem 0.5rem;
 }
 
@@ -55,9 +52,9 @@
 }
 
 .card {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 14px;
-  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
+  background: var(--bg-elevated);
   padding: 0.9rem;
   display: grid;
   gap: 0.5rem;
@@ -70,7 +67,7 @@
 
 .card p {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .card ul {
@@ -78,7 +75,7 @@
   padding-left: 1rem;
   display: grid;
   gap: 0.35rem;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .actions {
@@ -106,41 +103,50 @@
 }
 
 .primaryButton {
-  background: linear-gradient(
-    108deg,
-    color-mix(in oklab, var(--accent-1) 88%, white),
-    color-mix(in oklab, var(--accent-2) 72%, white)
-  );
-  color: #0b1124;
-  border-color: color-mix(in oklab, var(--accent-1) 64%, transparent);
+  background: var(--brand-primary);
+  color: var(--on-brand);
+  border-color: var(--brand-primary);
 }
 
 .secondaryButton {
   border-color: var(--border-strong);
-  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 .primaryButton:hover,
 .secondaryButton:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 22px color-mix(in oklab, var(--accent-1) 20%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.primaryButton:hover {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.primaryButton:active {
+  background: var(--brand-primary-active);
+  border-color: var(--brand-primary-active);
+}
+
+.secondaryButton:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible {
   transform: translateY(-1px);
-  box-shadow: 0 10px 22px color-mix(in oklab, var(--accent-1) 20%, transparent);
-  outline: 2px solid color-mix(in oklab, var(--accent-1) 82%, white);
+  box-shadow: var(--shadow-sm);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 
 .cta {
   border-radius: 20px;
-  border: 1px solid var(--border-subtle);
-  background:
-    linear-gradient(138deg, color-mix(in oklab, var(--accent-2) 15%, transparent), transparent 62%),
-    color-mix(in oklab, var(--surface-1) 95%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   padding: 1.2rem;
   display: grid;
   gap: 0.8rem;

@@ -12,7 +12,7 @@
 
 .meta {
   margin-top: 0.45rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.84rem;
 }
 
@@ -20,7 +20,7 @@
   margin: 0;
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--surface-soft) 92%, transparent);
+  background: var(--bg-elevated);
   padding: 0.7rem;
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',

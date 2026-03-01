@@ -10,11 +10,8 @@
   position: relative;
   overflow: hidden;
   border-radius: 28px;
-  border: 1px solid var(--border-subtle);
-  background:
-    linear-gradient(130deg, color-mix(in oklab, var(--accent-1) 16%, transparent), transparent 56%),
-    linear-gradient(220deg, color-mix(in oklab, var(--accent-2) 20%, transparent), transparent 68%),
-    var(--surface-1);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
 }
 
@@ -24,17 +21,7 @@
   width: 30rem;
   height: 30rem;
   border-radius: 50%;
-  background:
-    radial-gradient(
-      circle at center,
-      color-mix(in oklab, var(--accent-3) 56%, transparent) 0%,
-      transparent 62%
-    ),
-    radial-gradient(
-      circle at 62% 28%,
-      color-mix(in oklab, var(--accent-2) 48%, transparent) 0%,
-      transparent 72%
-    );
+  background: var(--bg-hover);
   opacity: 0.45;
   animation: pulse-orbit 8s ease-in-out infinite;
 }
@@ -53,9 +40,9 @@
   letter-spacing: 0.16em;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--accent-1);
-  background: color-mix(in oklab, var(--accent-1) 14%, transparent);
-  border: 1px solid color-mix(in oklab, var(--accent-1) 30%, transparent);
+  color: var(--brand-primary);
+  background: var(--bg-hover);
+  border: 1px solid var(--brand-primary);
   border-radius: 999px;
   padding: 0.34rem 0.56rem;
 }
@@ -98,19 +85,15 @@
 }
 
 .primaryButton {
-  background: linear-gradient(
-    105deg,
-    color-mix(in oklab, var(--accent-1) 88%, white),
-    color-mix(in oklab, var(--accent-2) 72%, white)
-  );
-  color: #0a1022;
-  border: 1px solid color-mix(in oklab, var(--accent-1) 70%, transparent);
+  background: var(--brand-primary);
+  color: var(--on-brand);
+  border: 1px solid var(--brand-primary);
   padding: 0.66rem 1.12rem;
 }
 
 .secondaryButton {
-  background: color-mix(in oklab, var(--surface-1) 88%, transparent);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   border: 1px solid var(--border-strong);
   padding: 0.64rem 1.05rem;
 }
@@ -118,7 +101,22 @@
 .primaryButton:hover,
 .secondaryButton:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 24px color-mix(in oklab, var(--accent-1) 25%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.primaryButton:hover {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.primaryButton:active {
+  background: var(--brand-primary-active);
+  border-color: var(--brand-primary-active);
+}
+
+.secondaryButton:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 .proofStrip {
@@ -129,8 +127,8 @@
 
 .proofCard {
   border-radius: 14px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-1) 94%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   padding: 0.85rem;
   box-shadow: var(--shadow-soft);
 }
@@ -144,7 +142,7 @@
 
 .proofLabel {
   margin: 0.2rem 0 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
@@ -183,8 +181,8 @@
 .pricingCard,
 .workflowCard {
   border-radius: 16px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-1) 94%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
 }
 
@@ -212,8 +210,8 @@
 .integrationPanel,
 .pricingPanel {
   border-radius: 20px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-1) 95%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
   padding: 1.15rem;
 }
@@ -231,7 +229,7 @@
 
 .routeCard {
   text-decoration: none;
-  color: var(--text);
+  color: var(--text-primary);
   padding: 0.86rem;
   display: grid;
   gap: 0.34rem;
@@ -247,21 +245,22 @@
 
 .routeCard span:last-child {
   font-size: 0.85rem;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .routeCard:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in oklab, var(--accent-1) 58%, var(--border-subtle));
-  box-shadow: 0 10px 22px color-mix(in oklab, var(--accent-2) 20%, transparent);
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+  box-shadow: var(--shadow-sm);
 }
 
 .badge {
   width: fit-content;
   border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--accent-1) 30%, transparent);
-  background: color-mix(in oklab, var(--accent-1) 12%, transparent);
-  color: var(--accent-1);
+  border: 1px solid var(--brand-primary);
+  background: var(--bg-hover);
+  color: var(--brand-primary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.66rem;
@@ -287,15 +286,13 @@
 }
 
 .pricingCard li {
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .ctaBand {
   border-radius: 22px;
-  border: 1px solid var(--border-subtle);
-  background:
-    linear-gradient(140deg, color-mix(in oklab, var(--accent-2) 16%, transparent), transparent 64%),
-    color-mix(in oklab, var(--surface-1) 95%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
   padding: 1.3rem;
   display: grid;
@@ -314,8 +311,8 @@
 
 .footer {
   border-radius: 20px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-1) 95%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
   padding: 1.1rem;
   display: grid;
@@ -329,7 +326,7 @@
 
 .footer p {
   margin: 0.45rem 0 0;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .footerLinks {
@@ -340,16 +337,17 @@
 
 .footerLinks a {
   text-decoration: none;
-  color: var(--text);
-  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
   padding: 0.45rem 0.58rem;
-  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  background: var(--bg-elevated);
   font-size: 0.9rem;
 }
 
 .footerLinks a:hover {
-  background: color-mix(in oklab, var(--accent-1) 12%, transparent);
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 @keyframes pulse-orbit {

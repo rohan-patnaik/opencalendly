@@ -20,7 +20,7 @@
   letter-spacing: 0.16em;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--accent-strong);
+  color: var(--brand-primary);
 }
 
 .pageTitle {
@@ -31,21 +31,24 @@
 
 .pageDescription {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   max-width: 70ch;
 }
 
 .card {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   padding: clamp(1rem, 1.2vw, 1.35rem);
-  background: linear-gradient(
-      160deg,
-      color-mix(in oklab, var(--surface-strong) 90%, transparent),
-      color-mix(in oklab, var(--surface) 94%, transparent)
-    ),
-    var(--surface);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-md);
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast);
+}
+
+.card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 .cardTight {
@@ -55,6 +58,7 @@
 .cardTitle {
   margin: 0;
   font-size: 1.12rem;
+  color: var(--text-primary);
 }
 
 .cardDescription {
@@ -70,8 +74,6 @@
   min-height: 2.4rem;
   padding: 0.55rem 0.95rem;
   transition:
-    transform var(--motion-fast),
-    box-shadow var(--motion-fast),
     background var(--motion-fast),
     border-color var(--motion-fast),
     color var(--motion-fast);
@@ -79,46 +81,78 @@
 }
 
 .button:focus-visible {
-  outline: var(--ring-focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
-}
-
-.button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px color-mix(in oklab, var(--accent-strong) 22%, transparent);
 }
 
 .button:disabled {
   cursor: not-allowed;
-  opacity: 0.66;
-  transform: none;
-  box-shadow: none;
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  border-color: var(--disabled-border);
 }
 
 .buttonPrimary {
-  border-color: color-mix(in oklab, var(--accent-strong) 64%, transparent);
-  background: linear-gradient(
-    102deg,
-    color-mix(in oklab, var(--accent-strong) 84%, white),
-    color-mix(in oklab, var(--accent-soft) 72%, white)
-  );
-  color: var(--accent-contrast);
+  border-color: var(--brand-primary);
+  background: var(--brand-primary);
+  color: var(--on-brand);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.buttonPrimary:active:not(:disabled) {
+  background: var(--brand-primary-active);
+  border-color: var(--brand-primary-active);
 }
 
 .buttonSecondary {
-  background: color-mix(in oklab, var(--surface) 92%, transparent);
-  color: var(--text-strong);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.buttonSecondary:active:not(:disabled) {
+  background: var(--bg-pressed);
 }
 
 .buttonGhost {
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+
+.buttonGhost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.buttonGhost:active:not(:disabled) {
+  background: var(--bg-pressed);
 }
 
 .buttonDanger {
-  border-color: color-mix(in oklab, var(--danger-strong) 48%, var(--border-strong));
-  background: var(--danger-soft);
-  color: var(--danger-contrast);
+  border-color: var(--state-error);
+  background: var(--state-error);
+  color: var(--white);
+}
+
+.buttonDanger:hover:not(:disabled) {
+  border-color: var(--state-error-hover);
+  background: var(--state-error-hover);
+}
+
+.buttonDanger:active:not(:disabled) {
+  border-color: var(--state-error-hover);
+  background: var(--state-error-hover);
 }
 
 .buttonSm {
@@ -156,24 +190,35 @@
 .label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-strong);
+  color: var(--text-primary);
 }
 
 .input,
 .textarea,
 .select {
   width: 100%;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   min-height: 2.6rem;
   padding: 0.62rem 0.74rem;
-  background: color-mix(in oklab, var(--surface) 94%, transparent);
-  color: var(--text-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   font: inherit;
   transition:
     border-color var(--motion-fast),
     box-shadow var(--motion-fast),
     background var(--motion-fast);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.input:hover,
+.textarea:hover,
+.select:hover {
+  border-color: var(--border-hover);
 }
 
 .textarea {
@@ -184,39 +229,36 @@
 .input:focus-visible,
 .textarea:focus-visible,
 .select:focus-visible {
-  outline: var(--ring-focus);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 0;
-  border-color: color-mix(in oklab, var(--accent-strong) 62%, var(--border-strong));
+  border-color: var(--border-focus);
 }
 
 .hint {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.82rem;
 }
 
 .toast {
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-strong);
   padding: 0.64rem 0.76rem;
   font-size: 0.9rem;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
 }
 
 .toastInfo {
-  color: var(--text-muted);
-  background: color-mix(in oklab, var(--accent-soft) 10%, var(--surface));
+  border-color: var(--state-info);
 }
 
 .toastSuccess {
-  color: var(--success-text);
-  background: var(--success-soft);
-  border-color: color-mix(in oklab, var(--accent-soft) 44%, var(--border-subtle));
+  border-color: var(--state-success);
 }
 
 .toastError {
-  color: var(--error-text);
-  background: var(--danger-soft);
-  border-color: color-mix(in oklab, var(--danger) 44%, var(--border-subtle));
+  border-color: var(--state-error);
 }
 
 .modalOverlay {
@@ -233,8 +275,8 @@
 .modal {
   width: min(640px, 100%);
   border-radius: var(--radius-xl);
-  border: 1px solid var(--border-subtle);
-  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-lg);
   padding: 1rem;
   display: grid;
@@ -253,20 +295,21 @@
 .modalTitle {
   margin: 0;
   font-size: 1.05rem;
+  color: var(--text-primary);
 }
 
 .modalBody {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .tabs {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 999px;
-  background: color-mix(in oklab, var(--surface-soft) 92%, transparent);
+  background: var(--bg-elevated);
   padding: 0.24rem;
 }
 
@@ -274,78 +317,58 @@
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   padding: 0.4rem 0.7rem;
   font-size: 0.84rem;
   font-weight: 600;
   cursor: pointer;
 }
 
+.tabButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .tabButton[aria-selected='true'] {
-  background: color-mix(in oklab, var(--accent-strong) 16%, var(--surface));
-  color: var(--text-strong);
-  border-color: color-mix(in oklab, var(--accent-strong) 32%, var(--border-subtle));
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--brand-primary);
 }
 
 .tableWrap {
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   overflow: auto;
+  background: var(--bg-surface);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
   min-width: 560px;
+  background: var(--bg-surface);
 }
 
 .table th,
 .table td {
   text-align: left;
   padding: 0.62rem 0.68rem;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-default);
   font-size: 0.9rem;
+}
+
+.table td {
+  color: var(--text-primary);
 }
 
 .table th {
   font-size: 0.74rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
-  background: color-mix(in oklab, var(--surface-soft) 94%, transparent);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
 }
 
 .table tbody tr:hover {
-  background: color-mix(in oklab, var(--accent-soft) 10%, transparent);
-}
-
-.fadeIn {
-  animation: fade-in-up var(--motion-slow) both;
-}
-
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (max-width: 720px) {
-  .pageShell {
-    width: min(1160px, 100% - 1.2rem);
-    padding-top: 1.3rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fadeIn,
-  .button {
-    animation: none;
-    transition: none;
-  }
+  background: var(--bg-hover);
 }
