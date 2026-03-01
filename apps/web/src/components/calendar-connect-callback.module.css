@@ -1,47 +1,40 @@
 .page {
-  width: min(700px, 92vw);
-  margin: 2.2rem auto;
+  width: min(720px, 100% - 2rem);
+  margin: 2.5rem auto;
+  display: grid;
+  gap: 1rem;
 }
 
 .card {
-  border: 1px solid var(--border-subtle);
-  border-radius: 1rem;
-  background: color-mix(in oklab, var(--surface-1) 93%, transparent);
-  box-shadow: var(--shadow-soft);
-  padding: 1.2rem;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  padding: 1.1rem;
+  box-shadow: var(--shadow-md);
   display: grid;
   gap: 0.8rem;
 }
 
-.kicker {
+.title {
   margin: 0;
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-weight: 700;
-  color: var(--accent-1);
+  font-size: clamp(1.25rem, 3vw, 1.9rem);
+  color: var(--text-primary);
 }
 
-.card h1,
-.card p {
+.description {
   margin: 0;
+  color: var(--text-secondary);
 }
 
-.info {
-  border: 1px solid var(--border-subtle);
-  border-radius: 0.75rem;
-  padding: 0.65rem;
-  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
-  display: grid;
-  gap: 0.25rem;
-}
-
-.error {
-  color: var(--error-text);
-}
-
-.success {
-  color: var(--success-text);
+.code {
+  margin: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  padding: 0.7rem 0.75rem;
+  word-break: break-word;
 }
 
 .actions {
@@ -50,27 +43,48 @@
   gap: 0.6rem;
 }
 
-.primaryButton,
-.secondaryButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.button {
   border-radius: 999px;
-  border: 1px solid transparent;
-  text-decoration: none;
-  font: inherit;
-  cursor: pointer;
-  padding: 0.5rem 0.9rem;
-}
-
-.primaryButton {
-  background: linear-gradient(120deg, var(--accent-1), color-mix(in oklab, var(--accent-2) 70%, var(--accent-1)));
-  color: #fff;
+  border: 1px solid var(--brand-primary);
+  background: var(--brand-primary);
+  color: var(--on-brand);
+  padding: 0.56rem 0.9rem;
   font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
 }
 
-.secondaryButton {
+.button:hover {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.buttonSecondary {
   border-color: var(--border-strong);
-  color: var(--text);
-  background: color-mix(in oklab, var(--surface-1) 88%, transparent);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.buttonSecondary:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.message {
+  margin: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  padding: 0.65rem 0.72rem;
+}
+
+.error {
+  border-color: var(--state-error);
+  color: var(--state-error);
+}
+
+.success {
+  border-color: var(--state-success);
+  color: var(--state-success);
 }

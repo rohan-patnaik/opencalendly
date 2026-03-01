@@ -1,59 +1,88 @@
-:root {
+:root,
+:root[data-theme='obsidian-amber'] {
   color-scheme: dark;
   font-family: Sora, 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
 
-  --bg: #070a10;
-  --bg-accent-a: #6d3d24;
-  --bg-accent-b: #20545a;
-  --bg-accent-c: #332a43;
+  /* backgrounds */
+  --bg-base: #11100e;
+  --bg-surface: #1a1815;
+  --bg-elevated: #24211f;
 
-  --surface: #0f141d;
-  --surface-soft: #161e2b;
-  --surface-strong: #1d2738;
+  /* text */
+  --text-primary: #f5f1f2;
+  --text-secondary: #c0b0a8;
+  --text-muted: #8c827b;
 
-  --text-strong: #ede7df;
-  --text-muted: #b8b0a4;
+  /* borders */
+  --border-default: #2a2624;
+  --border-strong: #3a3432;
 
-  --border-subtle: #263247;
-  --border-strong: #4f5d79;
+  /* brand */
+  --brand-primary: #d09050;
+  --brand-primary-hover: #c37d3e;
+  --brand-secondary: #e1b07a;
 
-  --accent-strong: #de9b57;
-  --accent-soft: #4cb8bb;
-  --accent-warm: #f5c48f;
-  --accent-contrast: #111723;
+  /* states */
+  --state-success: #69836c;
+  --state-warning: #e0a24c;
+  --state-error: #b4534a;
+  --state-info: #425b81;
+  --state-error-hover: #9e3e36;
 
-  --danger: #f87171;
-  --danger-strong: #ef4444;
-  --danger-contrast: #fecaca;
-  --danger-soft: color-mix(in oklab, var(--danger) 24%, var(--surface));
-  --success-soft: color-mix(in oklab, #14b8a6 24%, var(--surface));
-  --overlay-strong: color-mix(in oklab, #020617 72%, transparent);
+  /* focus */
+  --focus-ring: #e1b07a;
 
-  --error-text: #fecaca;
-  --success-text: #9ef1dc;
+  /* explicit interaction tokens */
+  --bg-hover: #24211f;
+  --bg-pressed: #1f1c19;
+  --border-hover: #3a3432;
+  --border-focus: #e1b07a;
+  --brand-primary-active: #b96f32;
+  --disabled-bg: #24211f;
+  --disabled-text: #8c827b;
+  --disabled-border: #2a2624;
+  --on-brand: #11100e;
+
+  --white: #ffffff;
 
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 22px;
 
-  --shadow-sm: 0 8px 18px rgba(3, 7, 18, 0.35);
-  --shadow-md: 0 16px 34px rgba(3, 7, 18, 0.56);
-  --shadow-lg: 0 22px 48px rgba(3, 7, 18, 0.72);
+  --shadow-sm: 0 8px 18px rgba(8, 7, 6, 0.35);
+  --shadow-md: 0 16px 34px rgba(8, 7, 6, 0.56);
+  --shadow-lg: 0 22px 48px rgba(8, 7, 6, 0.72);
   --shadow-soft: var(--shadow-md);
+  --overlay-strong: rgba(17, 16, 14, 0.78);
 
-  --ring-focus: 2px solid color-mix(in oklab, var(--accent-strong) 48%, transparent);
+  --ring-focus: 2px solid var(--focus-ring);
 
   --motion-fast: 140ms ease;
   --motion-slow: 260ms ease;
 
   /* Back-compat aliases for existing route styles */
-  --surface-1: var(--surface);
-  --surface-2: var(--surface-soft);
-  --text: var(--text-strong);
-  --muted: var(--text-muted);
-  --accent-1: var(--accent-strong);
-  --accent-2: var(--accent-soft);
-  --accent-3: var(--accent-warm);
+  --bg: var(--bg-base);
+  --surface: var(--bg-surface);
+  --surface-soft: var(--bg-elevated);
+  --surface-strong: var(--bg-elevated);
+  --surface-1: var(--bg-surface);
+  --surface-2: var(--bg-elevated);
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --text-strong: var(--text-primary);
+  --accent-1: var(--brand-primary);
+  --accent-2: var(--brand-secondary);
+  --accent-3: var(--brand-secondary);
+  --accent-strong: var(--brand-primary);
+  --accent-soft: var(--brand-secondary);
+  --accent-warm: var(--brand-secondary);
+  --accent-contrast: var(--on-brand);
+  --danger: var(--state-error);
+  --danger-strong: var(--state-error-hover);
+  --danger-contrast: var(--white);
+  --danger-soft: var(--state-error);
+  --error-text: var(--state-error);
+  --success-text: var(--state-success);
 }
 
 *,
@@ -69,31 +98,19 @@ body {
 }
 
 body {
-  color: var(--text);
-  background:
-    radial-gradient(
-      1000px 640px at 6% -20%,
-      color-mix(in oklab, var(--bg-accent-a) 46%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      880px 680px at 98% -8%,
-      color-mix(in oklab, var(--bg-accent-b) 38%, transparent),
-      transparent 75%
-    ),
-    radial-gradient(
-      720px 600px at 78% 92%,
-      color-mix(in oklab, var(--bg-accent-c) 32%, transparent),
-      transparent 75%
-    ),
-    var(--bg);
+  color: var(--text-primary);
+  background: var(--bg-base);
   transition:
     background var(--motion-slow),
     color var(--motion-fast);
 }
 
 a {
-  color: var(--accent-1);
+  color: var(--brand-primary);
+}
+
+a:hover {
+  color: var(--brand-primary-hover);
 }
 
 h1,
@@ -101,11 +118,11 @@ h2,
 h3,
 h4 {
   margin-top: 0;
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 p {
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 ul {

@@ -7,10 +7,10 @@
 
 .heroCard,
 .card {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 1.15rem;
   padding: 1.15rem;
-  background: color-mix(in oklab, var(--surface-1) 92%, transparent);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
 }
 
@@ -20,7 +20,7 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--accent-1);
+  color: var(--brand-primary);
 }
 
 .heroCard h1,
@@ -68,9 +68,9 @@
 }
 
 .sectionNav {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 1rem;
-  background: color-mix(in oklab, var(--surface-1) 92%, transparent);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
   padding: 0.85rem;
   display: grid;
@@ -79,7 +79,7 @@
 
 .sectionNavTitle {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -87,12 +87,12 @@
 }
 
 .sectionNavLink {
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-2) 84%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
   border-radius: 0.7rem;
   padding: 0.5rem 0.65rem;
   text-decoration: none;
-  color: var(--text);
+  color: var(--text-primary);
   font-size: 0.9rem;
   transition:
     background 120ms ease,
@@ -101,15 +101,15 @@
 }
 
 .sectionNavLink:hover {
-  background: color-mix(in oklab, var(--accent-1) 14%, transparent);
-  border-color: color-mix(in oklab, var(--accent-1) 40%, var(--border-subtle));
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
   transform: translateY(-1px);
 }
 
 .summaryGrid {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 1rem;
-  background: color-mix(in oklab, var(--surface-1) 92%, transparent);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
   padding: 0.85rem;
   display: grid;
@@ -117,15 +117,15 @@
 }
 
 .summaryCard {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 0.75rem;
-  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  background: var(--bg-elevated);
   padding: 0.55rem 0.65rem;
 }
 
 .summaryCard p {
   margin: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.8rem;
 }
 
@@ -159,9 +159,9 @@
 
 .itemCard {
   border-radius: 0.85rem;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   padding: 0.85rem;
-  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
+  background: var(--bg-elevated);
   display: grid;
   gap: 0.4rem;
 }
@@ -183,18 +183,18 @@
   border: 1px solid var(--border-strong);
   padding: 0.15rem 0.55rem;
   font-size: 0.76rem;
-  color: var(--muted);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .form {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 0.9rem;
   padding: 0.9rem;
   display: grid;
   gap: 0.65rem;
   align-content: start;
-  background: color-mix(in oklab, var(--surface-2) 88%, transparent);
+  background: var(--bg-elevated);
 }
 
 .form h3,
@@ -206,14 +206,14 @@
   display: grid;
   gap: 0.35rem;
   font-size: 0.9rem;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .labelCompact {
   display: grid;
   gap: 0.28rem;
   font-size: 0.82rem;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .input,
@@ -221,8 +221,8 @@
 .textarea {
   width: 100%;
   border: 1px solid var(--border-strong);
-  background: var(--surface-1);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   border-radius: 0.62rem;
   padding: 0.56rem 0.62rem;
   font: inherit;
@@ -238,7 +238,7 @@
 .input:focus,
 .select:focus,
 .textarea:focus {
-  outline: 2px solid color-mix(in oklab, var(--accent-2) 45%, transparent);
+  outline: 2px solid var(--brand-secondary);
   outline-offset: 2px;
 }
 
@@ -253,7 +253,7 @@
 
 .checkboxGroup legend {
   padding: 0 0.2rem;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.83rem;
 }
 
@@ -261,7 +261,7 @@
   display: flex;
   align-items: center;
   gap: 0.42rem;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -285,9 +285,20 @@
 }
 
 .primaryButton {
-  background: linear-gradient(120deg, var(--accent-1), color-mix(in oklab, var(--accent-2) 70%, var(--accent-1)));
-  color: #ffffff;
+  background: var(--brand-primary);
+  color: var(--on-brand);
   font-weight: 700;
+  border-color: var(--brand-primary);
+}
+
+.primaryButton:hover {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.primaryButton:active {
+  background: var(--brand-primary-active);
+  border-color: var(--brand-primary-active);
 }
 
 .primaryButton:hover {
@@ -296,50 +307,50 @@
 
 .secondaryButton {
   border-color: var(--border-strong);
-  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 .secondaryButton:hover,
 .ghostButton:hover,
 .linkButton:hover {
-  background: color-mix(in oklab, var(--accent-1) 14%, transparent);
+  background: var(--brand-primary);
 }
 
 .ghostButton {
-  border-color: var(--border-subtle);
+  border-color: var(--border-default);
   background: transparent;
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .linkButton {
   border-color: transparent;
   background: transparent;
-  color: var(--accent-1);
+  color: var(--brand-primary);
   padding: 0;
 }
 
 .inlineActions {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  align-items: flex-end;
   gap: 0.55rem;
 }
 
 .teamPanel {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 0.95rem;
   padding: 0.9rem;
   margin-top: 0.9rem;
   display: grid;
   gap: 0.75rem;
-  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
+  background: var(--bg-elevated);
 }
 
 .tableWrap {
   overflow-x: auto;
   border-radius: 0.75rem;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
 }
 
 .table {
@@ -352,7 +363,7 @@
 .table td {
   text-align: left;
   padding: 0.54rem 0.6rem;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-default);
   font-size: 0.88rem;
 }
 
@@ -360,7 +371,7 @@
   font-size: 0.8rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .statGrid {
@@ -371,10 +382,10 @@
 }
 
 .statGrid > div {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-default);
   border-radius: 0.75rem;
   padding: 0.7rem;
-  background: color-mix(in oklab, var(--surface-2) 92%, transparent);
+  background: var(--bg-elevated);
 }
 
 .statGrid strong {
@@ -383,27 +394,27 @@
 }
 
 .statGrid span {
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.82rem;
 }
 
 .helperText {
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.8rem;
 }
 
 .empty {
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .error {
-  color: var(--error-text);
+  color: var(--state-error);
   margin-top: 0.6rem;
 }
 
 .success {
-  color: var(--success-text);
+  color: var(--state-success);
   margin-top: 0.6rem;
 }
 

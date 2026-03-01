@@ -9,17 +9,14 @@
 .heroCard,
 .card {
   border-radius: 24px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-1) 96%, transparent);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
 }
 
 .heroCard {
   padding: 1.35rem 1.4rem;
-  background:
-    linear-gradient(130deg, color-mix(in oklab, var(--accent-2) 16%, transparent), transparent 55%),
-    linear-gradient(225deg, color-mix(in oklab, var(--accent-1) 18%, transparent), transparent 64%),
-    color-mix(in oklab, var(--surface-1) 96%, transparent);
+  background: var(--bg-surface);
 }
 
 .kicker {
@@ -29,9 +26,9 @@
   letter-spacing: 0.14em;
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--accent-1);
-  border: 1px solid color-mix(in oklab, var(--accent-1) 28%, transparent);
-  background: color-mix(in oklab, var(--accent-1) 10%, transparent);
+  color: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+  background: var(--bg-hover);
   border-radius: 999px;
   padding: 0.24rem 0.46rem;
 }
@@ -72,7 +69,7 @@
 .label {
   font-size: 0.88rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .input,
@@ -80,8 +77,8 @@
   width: 100%;
   border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   padding: 0.62rem 0.7rem;
   font: inherit;
   margin-top: 0.32rem;
@@ -89,7 +86,7 @@
 
 .muted {
   margin: 0.8rem 0 0;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .codeBlock {
@@ -97,9 +94,9 @@
   width: 100%;
   margin-top: 0.35rem;
   border-radius: 12px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in oklab, var(--surface-2) 86%, transparent);
-  color: var(--text);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   padding: 0.68rem 0.75rem;
   overflow-x: auto;
   white-space: pre-wrap;
@@ -126,19 +123,30 @@
 }
 
 .primaryButton {
-  border: 1px solid color-mix(in oklab, var(--accent-1) 70%, transparent);
-  background: linear-gradient(
-    110deg,
-    color-mix(in oklab, var(--accent-1) 86%, white),
-    color-mix(in oklab, var(--accent-2) 76%, white)
-  );
-  color: #081126;
+  border: 1px solid var(--brand-primary);
+  background: var(--brand-primary);
+  color: var(--on-brand);
 }
 
 .secondaryButton {
   border: 1px solid var(--border-strong);
-  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.primaryButton:hover {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.primaryButton:active {
+  background: var(--brand-primary-active);
+  border-color: var(--brand-primary-active);
+}
+
+.secondaryButton:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 .previewHost {
@@ -148,7 +156,7 @@
 
 .success {
   margin: 0.7rem 0 0;
-  color: var(--success-text);
+  color: var(--state-success);
 }
 
 @media (max-width: 960px) {

@@ -7,8 +7,8 @@
 }
 
 .card {
-  background: color-mix(in oklab, var(--surface-1) 92%, transparent);
-  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 18px;
   padding: 1.15rem;
   box-shadow: var(--shadow-soft);
@@ -19,7 +19,7 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: 0.72rem;
-  color: var(--accent-1);
+  color: var(--brand-primary);
   font-weight: 700;
 }
 
@@ -42,8 +42,8 @@
   border-radius: 10px;
   padding: 0.65rem 0.75rem;
   font-size: 0.95rem;
-  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-primary);
 }
 
 .primaryButton,
@@ -59,33 +59,45 @@
 }
 
 .primaryButton {
-  border-color: color-mix(in oklab, var(--accent-1) 64%, transparent);
-  background: linear-gradient(
-    102deg,
-    color-mix(in oklab, var(--accent-1) 88%, white),
-    color-mix(in oklab, var(--accent-2) 72%, white)
-  );
-  color: #0d1224;
+  border-color: var(--brand-primary);
+  background: var(--brand-primary);
+  color: var(--on-brand);
   cursor: pointer;
 }
 
+.primaryButton:hover {
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.primaryButton:active {
+  background: var(--brand-primary-active);
+  border-color: var(--brand-primary-active);
+}
+
 .secondaryButton {
-  background: color-mix(in oklab, var(--surface-1) 90%, transparent);
-  color: var(--text);
+  background: var(--bg-surface);
+  color: var(--text-primary);
   text-decoration: none;
+}
+
+.secondaryButton:hover,
+.linkButton:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 .linkButton {
   cursor: pointer;
-  background: color-mix(in oklab, var(--surface-2) 92%, transparent);
-  color: var(--text);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .primaryButton:hover,
 .secondaryButton:hover,
 .linkButton:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 20px color-mix(in oklab, var(--accent-1) 22%, transparent);
+  box-shadow: var(--shadow-sm);
 }
 
 .primaryButton:disabled {
@@ -109,7 +121,7 @@
 
 .error {
   margin-top: 0.7rem;
-  color: #b91c1c;
+  color: var(--state-error);
   font-weight: 600;
 }
 
@@ -122,7 +134,7 @@
 }
 
 .metaRow span {
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -134,8 +146,8 @@
 }
 
 .statGrid > div {
-  background: color-mix(in oklab, var(--surface-2) 90%, transparent);
-  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
   padding: 0.75rem;
   display: grid;
@@ -148,7 +160,7 @@
 
 .statGrid span {
   font-size: 0.84rem;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
 
 .tableWrap {
@@ -162,7 +174,7 @@
 
 .table th,
 .table td {
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-default);
   text-align: left;
   padding: 0.55rem 0.4rem;
   font-size: 0.9rem;
@@ -172,5 +184,5 @@
   font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted);
+  color: var(--text-secondary);
 }
