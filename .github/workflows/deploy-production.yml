@@ -1,0 +1,55 @@
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'opencalendly-web' }}
+      CLOUDFLARE_PAGES_PRODUCTION_BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy API worker (production)
+        run: npm run deploy:api:production
+
+      - name: Deploy web (Pages production)
+        run: npm run deploy:web:production
+
+      - name: Verify production domains
+        run: |
+          attempts=0
+          until [ "$attempts" -ge 3 ]
+          do
+            if npm run domain:check:production; then
+              exit 0
+            fi
+            attempts=$((attempts+1))
+            sleep 20
+          done
+          echo "Production domain check failed after retries."
+          exit 1

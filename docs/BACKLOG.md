@@ -408,3 +408,22 @@ Acceptance criteria:
   - no `gradient(...)` usage in web CSS
   - no `color-mix(...)` usage in web CSS
   - no hardcoded hex/rgb/hsl in web CSS outside token definitions in `globals.css`
+
+### Feature 21: Production auto-deploy on `main` pushes
+
+Scope:
+- Ensure production deployment is triggered automatically after every push to `main`.
+- Cover both production surfaces:
+  - Cloudflare Pages web (`opencalendly.com`, `www.opencalendly.com`)
+  - Cloudflare Worker API (`api.opencalendly.com`)
+- Document required GitHub repository secrets for unattended deployment.
+
+Acceptance criteria:
+
+- A GitHub Actions workflow deploys production automatically on:
+  - push to `main`
+  - manual `workflow_dispatch`
+- Deploy workflow runs API deploy first, then web deploy.
+- Workflow enforces branch-level concurrency (latest `main` run wins).
+- Deployment docs clearly list required GitHub secrets and expected values.
+- Post-deploy verification includes production domain health checks.
