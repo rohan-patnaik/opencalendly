@@ -1,6 +1,6 @@
 # Cloudflare + Porkbun Domain Setup (opencalendly.com)
 
-Last updated: 28 Feb 2026 (IST)
+Last updated: 01 Mar 2026 (IST)
 
 This runbook wires production traffic so:
 
@@ -49,9 +49,30 @@ Use the DNS values required by Cloudflare Pages + Worker setup. Typical shape:
 
 Keep existing email records (Resend SPF/DKIM/MX/DMARC) unchanged.
 
-## 5) Deploy web
+## 5) Automatic deploy on push to `main`
+
+Production deploys are automated via:
+
+- `.github/workflows/deploy-production.yml`
+- Trigger: after `CI` succeeds for `main` pushes (or manual `workflow_dispatch`)
+- Order: API deploy -> Pages deploy -> domain verification
+
+Required GitHub repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+Optional GitHub repository variables:
+
+- `CLOUDFLARE_PAGES_PROJECT` (default `opencalendly-web`)
+- `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` (default `main`)
+
+Cloudflare Pages `Git Provider` can remain `No` when using this workflow-based direct upload model.
+
+## 6) Manual deploy fallback
 
 ```bash
+npm run deploy:api:production
 npm run deploy:web:production
 ```
 
@@ -60,7 +81,7 @@ Required env vars:
 - `CLOUDFLARE_PAGES_PROJECT`
 - Optional: `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` (defaults to `main`)
 
-## 6) Verify end-to-end
+## 7) Verify end-to-end
 
 ```bash
 npm run domain:check:production
@@ -85,7 +106,7 @@ dig +short www.opencalendly.com CNAME
 dig +short api.opencalendly.com CNAME
 ```
 
-## 7) Rollback
+## 8) Rollback
 
 If deploy is unhealthy:
 

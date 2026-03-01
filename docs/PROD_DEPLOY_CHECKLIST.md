@@ -14,6 +14,14 @@ Last updated: 28 Feb 2026 (IST)
 - [ ] `npm run env:check` passes in deployment environment.
 - [ ] Neon `DATABASE_URL` points to production branch/database.
 - [ ] Required OAuth and email provider env vars are present.
+- [ ] GitHub Actions deploy workflow is enabled:
+  - `.github/workflows/deploy-production.yml`
+- [ ] Required GitHub repository secrets are configured:
+  - `CLOUDFLARE_API_TOKEN`
+  - `CLOUDFLARE_ACCOUNT_ID`
+- [ ] Optional GitHub repository variables reviewed:
+  - `CLOUDFLARE_PAGES_PROJECT` (default: `opencalendly-web`)
+  - `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` (default: `main`)
 - [ ] Porkbun URL forwarding is disabled for `opencalendly.com`/`www`.
 - [ ] Domain wiring doc has been applied: `docs/CLOUDFLARE_DOMAIN_SETUP.md`.
 
@@ -27,7 +35,7 @@ Last updated: 28 Feb 2026 (IST)
 
 ## API deploy (Cloudflare Worker)
 
-- [ ] Deploy API worker with current config/bindings.
+- [ ] Deploy API worker with current config/bindings (automated from GitHub Actions on `main` push, or manually if needed).
 - [ ] Production route is active: `api.opencalendly.com/*`.
 - [ ] Confirm Hyperdrive binding points to production Neon connection.
 - [ ] Confirm secrets are set in Worker environment:
@@ -39,7 +47,7 @@ Last updated: 28 Feb 2026 (IST)
 
 ## Web deploy (Cloudflare Pages)
 
-- [ ] Build/deploy Next.js app to Pages.
+- [ ] Build/deploy Next.js app to Pages (automated from GitHub Actions on `main` push, or manually if needed).
 - [ ] Custom domains are attached in Pages project:
   - `opencalendly.com`
   - `www.opencalendly.com`

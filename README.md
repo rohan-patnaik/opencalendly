@@ -174,25 +174,31 @@ OpenCalendly now uses a single dark theme across app and marketing routes (no ru
 ## Deploy Overview (Cloudflare Pages + Workers)
 
 1. Configure domains and DNS first (Porkbun + Cloudflare): [docs/CLOUDFLARE_DOMAIN_SETUP.md](docs/CLOUDFLARE_DOMAIN_SETUP.md).
-2. Deploy API worker to production route (`api.opencalendly.com/*`):
+2. Configure GitHub Actions production deploy secrets:
+   - Required repository secrets:
+     - `CLOUDFLARE_API_TOKEN` (Cloudflare token with Workers/Pages deploy permissions)
+     - `CLOUDFLARE_ACCOUNT_ID`
+   - Optional repository variables:
+     - `CLOUDFLARE_PAGES_PROJECT` (defaults to `opencalendly-web`)
+     - `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` (defaults to `main`)
+3. Automatic production deploy is handled by:
+   - `.github/workflows/deploy-production.yml`
+   - Trigger: after `CI` succeeds on `main` pushes (plus manual `workflow_dispatch`)
+   - Order: API deploy -> web deploy -> domain verification
+4. Set environment variables in both Worker and Pages projects before any deploy command.
+   - Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`) should be set via `wrangler secret put`.
+5. For manual fallback deploys, run:
 
 ```bash
 npm run deploy:api:production
-```
-
-3. Deploy web app to Cloudflare Pages production:
-
-```bash
 npm run deploy:web:production
 ```
 
-4. Verify production app + API domain wiring:
+6. Verify production app + API domain wiring:
 
 ```bash
 npm run domain:check:production
 ```
-
-5. Set environment variables in both Worker and Pages projects. For Worker secrets (`DATABASE_URL`, `RESEND_API_KEY`, `SESSION_SECRET`, `GOOGLE_CLIENT_SECRET`), use `wrangler secret put`.
 
 Details: [docs/STACK.md](docs/STACK.md), [docs/PROD_DEPLOY_CHECKLIST.md](docs/PROD_DEPLOY_CHECKLIST.md)
 
