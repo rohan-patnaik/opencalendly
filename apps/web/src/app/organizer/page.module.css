@@ -8,24 +8,26 @@
 .heroCard,
 .card {
   border: 1px solid var(--border-default);
-  border-radius: 1.15rem;
-  padding: 1.15rem;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-6);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-sm);
 }
 
 .kicker {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 700;
   color: var(--brand-primary);
+  font-family: var(--font-inter);
 }
 
 .heroCard h1,
 .card h2 {
   margin: 0.35rem 0 0.5rem;
+  font-family: var(--font-space-grotesk);
 }
 
 .heroCard p,
@@ -69,35 +71,36 @@
 
 .sectionNav {
   border: 1px solid var(--border-default);
-  border-radius: 1rem;
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
-  padding: 0.85rem;
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-4);
   display: grid;
-  gap: 0.5rem;
+  gap: var(--spacing-2);
 }
 
 .sectionNavTitle {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
+  font-family: var(--font-inter);
 }
 
 .sectionNavLink {
   border: 1px solid var(--border-default);
   background: var(--bg-elevated);
-  border-radius: 0.7rem;
-  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-2) var(--spacing-3);
   text-decoration: none;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   transition:
-    background 120ms ease,
-    transform 120ms ease,
-    border-color 120ms ease;
+    background var(--motion-fast),
+    transform var(--motion-fast),
+    border-color var(--motion-fast);
 }
 
 .sectionNavLink:hover {
@@ -109,19 +112,19 @@
 
 .summaryGrid {
   border: 1px solid var(--border-default);
-  border-radius: 1rem;
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
-  padding: 0.85rem;
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-4);
   display: grid;
   gap: 0.55rem;
 }
 
 .summaryCard {
   border: 1px solid var(--border-default);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-sm);
   background: var(--bg-elevated);
-  padding: 0.55rem 0.65rem;
+  padding: var(--spacing-3) var(--spacing-4);
 }
 
 .summaryCard p {
@@ -159,9 +162,9 @@
 }
 
 .itemCard {
-  border-radius: 0.85rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-default);
-  padding: 0.85rem;
+  padding: var(--spacing-4);
   background: var(--bg-elevated);
   display: grid;
   gap: 0.4rem;
@@ -190,10 +193,10 @@
 
 .form {
   border: 1px solid var(--border-default);
-  border-radius: 0.9rem;
-  padding: 0.9rem;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-5);
   display: grid;
-  gap: 0.65rem;
+  gap: var(--spacing-4);
   align-content: start;
   background: var(--bg-elevated);
 }
@@ -201,20 +204,23 @@
 .form h3,
 .form h4 {
   margin: 0;
+  font-family: var(--font-space-grotesk);
 }
 
 .label {
   display: grid;
   gap: 0.35rem;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
+  font-family: var(--font-inter);
 }
 
 .labelCompact {
   display: grid;
   gap: 0.28rem;
-  font-size: 0.82rem;
+  font-size: var(--text-xs);
   color: var(--text-secondary);
+  font-family: var(--font-inter);
 }
 
 .input,
@@ -224,9 +230,10 @@
   border: 1px solid var(--border-strong);
   background: var(--bg-surface);
   color: var(--text-primary);
-  border-radius: 0.62rem;
-  padding: 0.56rem 0.62rem;
-  font: inherit;
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-3);
+  font-family: var(--font-inter);
+  font-size: var(--text-sm);
 }
 
 .textarea {
@@ -273,16 +280,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
-  font: inherit;
+  font-family: var(--font-inter);
+  font-size: var(--text-sm);
   text-decoration: none;
   cursor: pointer;
   padding: 0.48rem 0.88rem;
   transition:
-    transform 130ms ease,
-    background 130ms ease,
-    border-color 130ms ease;
+    transform var(--motion-fast),
+    background var(--motion-fast),
+    border-color var(--motion-fast);
 }
 
 .primaryButton {
@@ -347,17 +355,17 @@
 
 .teamPanel {
   border: 1px solid var(--border-default);
-  border-radius: 0.95rem;
-  padding: 0.9rem;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-5);
   margin-top: 0.9rem;
   display: grid;
-  gap: 0.75rem;
+  gap: var(--spacing-3);
   background: var(--bg-elevated);
 }
 
 .tableWrap {
   overflow-x: auto;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-default);
 }
 
@@ -389,7 +397,7 @@
   margin-bottom: 0.8rem;
 }
 
-.statGrid > div {
+.statGrid>div {
   border: 1px solid var(--border-default);
   border-radius: 0.75rem;
   padding: 0.7rem;

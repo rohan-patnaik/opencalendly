@@ -1,64 +1,89 @@
 :root,
 :root[data-theme='obsidian-amber'] {
   color-scheme: dark;
-  font-family: Sora, 'Space Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
+  /* Next.js fonts will be injected via layout.tsx */
+  /* Remove fallback font declarations here so layout fonts apply correctly */
 
-  /* backgrounds */
-  --bg-base: #11100e;
-  --bg-surface: #1a1815;
-  --bg-elevated: #24211f;
+  /* backgrounds: deep, cinematic */
+  --bg-base: #080808;
+  --bg-surface: #121212;
+  --bg-elevated: #1a1a1a;
 
-  /* text */
-  --text-primary: #f5f1f2;
-  --text-secondary: #c0b0a8;
-  --text-muted: #8c827b;
+  /* text: high contrast */
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
 
-  /* borders */
-  --border-default: #2a2624;
-  --border-strong: #3a3432;
+  /* borders: subtle, clean */
+  --border-default: #27272a;
+  --border-strong: #3f3f46;
 
-  /* brand */
-  --brand-primary: #d09050;
-  --brand-primary-hover: #c37d3e;
-  --brand-secondary: #e1b07a;
+  /* brand: vibrant amber */
+  --brand-primary: #f59e0b; /* Amber 500 */
+  --brand-primary-hover: #d97706; /* Amber 600 */
+  --brand-primary-active: #b45309; /* Amber 700 */
+  --brand-secondary: #fcd34d; /* Amber 300 */
 
   /* states */
-  --state-success: #69836c;
-  --state-warning: #e0a24c;
-  --state-error: #b4534a;
-  --state-info: #425b81;
-  --state-error-hover: #9e3e36;
+  --state-success: #10b981;
+  --state-warning: #f59e0b;
+  --state-error: #ef4444;
+  --state-info: #3b82f6;
+  --state-error-hover: #dc2626;
 
   /* focus */
-  --focus-ring: #e1b07a;
+  --focus-ring: #f59e0b;
 
   /* explicit interaction tokens */
-  --bg-hover: #24211f;
-  --bg-pressed: #1f1c19;
-  --border-hover: #3a3432;
-  --border-focus: #e1b07a;
-  --brand-primary-active: #b96f32;
-  --disabled-bg: #24211f;
-  --disabled-text: #8c827b;
-  --disabled-border: #2a2624;
-  --on-brand: #11100e;
+  --bg-hover: #1f1f1f;
+  --bg-pressed: #171717;
+  --border-hover: #3f3f46;
+  --border-focus: #f59e0b;
+  --disabled-bg: #1a1a1a;
+  --disabled-text: #52525b;
+  --disabled-border: #27272a;
+  --on-brand: #000000;
 
   --white: #ffffff;
 
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  /* typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
 
-  --shadow-sm: 0 8px 18px rgba(8, 7, 6, 0.35);
-  --shadow-md: 0 16px 34px rgba(8, 7, 6, 0.56);
-  --shadow-lg: 0 22px 48px rgba(8, 7, 6, 0.72);
-  --shadow-soft: var(--shadow-md);
-  --overlay-strong: rgba(17, 16, 14, 0.78);
+  /* radius scale: sharp, slightly rounded */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* spacing scale */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+
+  /* shadows: sharp, deep */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8);
+  --shadow-soft: 0 24px 64px rgba(0, 0, 0, 0.3);
+  --overlay-strong: rgba(0, 0, 0, 0.85);
 
   --ring-focus: 2px solid var(--focus-ring);
 
-  --motion-fast: 140ms ease;
-  --motion-slow: 260ms ease;
+  /* motion */
+  --motion-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Back-compat aliases for existing route styles */
   --bg: var(--bg-base);
