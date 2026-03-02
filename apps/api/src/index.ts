@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
-import { DateTime } from 'luxon';
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { DateTime } from 'luxon';
 
 import {
   analyticsFunnelEvents,
@@ -100,6 +101,7 @@ import {
   sendBookingConfirmationEmail,
   sendBookingRescheduledEmail,
 } from './lib/email';
+import { resolveAllowedCorsOrigins } from './lib/cors';
 import {
   buildGoogleAuthorizationUrl,
   cancelGoogleCalendarEvent,
@@ -329,6 +331,22 @@ type CalendarWritebackOperation = 'create' | 'cancel' | 'reschedule';
 type EmailDeliveryType = 'booking_confirmation' | 'booking_cancellation' | 'booking_rescheduled';
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+app.use('*', async (context, next) => {
+  const allowedOrigins = resolveAllowedCorsOrigins(context.env.APP_BASE_URL);
+
+  return cors({
+    origin: (origin) => {
+      if (!origin) {
+        return undefined;
+      }
+      return allowedOrigins.has(origin) ? origin : undefined;
+    },
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Idempotency-Key'],
+    maxAge: 86_400,
+  })(context, next);
+});
 
 class BookingActionNotFoundError extends Error {}
 class BookingActionGoneError extends Error {}
