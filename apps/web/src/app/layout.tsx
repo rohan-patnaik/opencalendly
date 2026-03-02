@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" data-theme="obsidian-amber" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body style={{ fontFamily: 'var(--font-inter)' }}>
+      <body style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
         <AppChrome>{children}</AppChrome>
       </body>
     </html>

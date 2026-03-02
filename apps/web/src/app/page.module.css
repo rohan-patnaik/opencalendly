@@ -22,7 +22,7 @@
   height: 30rem;
   border-radius: 50%;
   background: var(--brand-primary);
-  opacity: 0.15;
+  opacity: 0.45;
   filter: blur(80px);
   animation: pulse-orbit 8s ease-in-out infinite;
 }
@@ -393,7 +393,6 @@
 }
 
 @keyframes pulse-orbit {
-
   0%,
   100% {
     transform: translateY(0) scale(1);
@@ -406,8 +405,29 @@
   }
 }
 
-@media (max-width: 1040px) {
+@media (prefers-reduced-motion: reduce) {
+  .heroOrbit {
+    animation: none;
+  }
 
+  .primaryButton,
+  .secondaryButton,
+  .routeCard,
+  .valueCard,
+  .integrationCard,
+  .workflowCard,
+  .footerLinks a {
+    transition: none;
+  }
+
+  .primaryButton:hover,
+  .secondaryButton:hover,
+  .routeCard:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 1040px) {
   .valueGrid,
   .workflowGrid,
   .routeGrid,
