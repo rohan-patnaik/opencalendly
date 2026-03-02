@@ -27,9 +27,15 @@
 .brand {
   color: var(--text-primary);
   text-decoration: none;
-  font-weight: 900;
-  font-size: 1.42rem;
-  letter-spacing: 0.01em;
+  font-family: var(--font-space-grotesk);
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  transition: color var(--motion-fast);
+}
+
+.brand:hover {
+  color: var(--brand-primary);
 }
 
 .mobileMenuButton {
@@ -70,26 +76,22 @@
   color: var(--text-secondary);
   text-decoration: none;
   padding: 0.42rem 0.66rem;
-  border-radius: 999px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  border: 1px solid transparent;
+  font-family: var(--font-inter);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
   transition:
     color var(--motion-fast),
-    background var(--motion-fast),
     border-color var(--motion-fast);
 }
 
 .navLink:hover {
-  background: var(--bg-hover);
   color: var(--text-primary);
-  border-color: var(--border-default);
 }
 
 .navLinkActive {
   color: var(--text-primary);
-  border-color: var(--brand-primary);
-  background: var(--bg-hover);
+  border-bottom-color: var(--brand-primary);
 }
 
 .right {
@@ -116,12 +118,16 @@
   color: var(--text-primary);
   text-decoration: none;
   cursor: pointer;
+  font-family: var(--font-inter);
   font-weight: 600;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  padding: 0.38rem 0.72rem;
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.75rem;
   background: var(--bg-surface);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast);
 }
 
 .actionButton:hover {
@@ -245,6 +251,7 @@
 }
 
 @media (min-width: 921px) {
+
   .mobileOverlay,
   .mobileDrawer {
     display: none;

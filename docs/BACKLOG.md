@@ -441,3 +441,37 @@ Acceptance criteria:
 - CI fallback does not bypass DNS or host validation; only HTTP status handling is relaxed for `403`.
 - Local/manual `npm run domain:check:production` remains strict by default.
 - Deploy workflow uses CI-only opt-in mode for the post-deploy domain verification step.
+
+### Feature 23: Cinematic dark UX overhaul polish
+
+Scope:
+- Apply a premium dark, high-contrast visual pass to key web surfaces without changing API contracts.
+- Update global design tokens, type system, shared primitives, app chrome styling, and route-level CSS modules.
+- Keep interaction behavior intact while improving perceived visual quality and clarity.
+
+Acceptance criteria:
+
+- `apps/web/src/app/globals.css` defines updated cinematic dark tokens:
+  - deep background/surface hierarchy
+  - high-contrast text and border tokens
+  - amber brand accent + hover/active states
+  - tightened radii and denser shadow layers
+  - semantic type and spacing scales
+  - standardized motion timing tokens
+- `apps/web/src/app/layout.tsx` uses `next/font/google` with:
+  - `Space Grotesk` for display typography
+  - `Inter` for primary UI/body typography
+- Shared primitives (`apps/web/src/components/ui/primitives.module.css`) adopt the new tokens for:
+  - cards/modals
+  - buttons and form controls
+  - tabs and table shells
+- App shell styling (`apps/web/src/components/app-chrome.module.css`) aligns nav/brand/action styles with the new visual direction.
+- Route modules are updated for coherent parity with the new system:
+  - `apps/web/src/app/page.module.css`
+  - `apps/web/src/app/dashboard/page.module.css`
+  - `apps/web/src/app/organizer/page.module.css`
+  - `apps/web/src/app/[username]/[eventSlug]/page.module.css`
+- Validation gates pass:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`

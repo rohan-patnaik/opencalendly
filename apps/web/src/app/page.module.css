@@ -21,8 +21,9 @@
   width: 30rem;
   height: 30rem;
   border-radius: 50%;
-  background: var(--bg-hover);
+  background: var(--brand-primary);
   opacity: 0.45;
+  filter: blur(80px);
   animation: pulse-orbit 8s ease-in-out infinite;
 }
 
@@ -49,7 +50,9 @@
 
 .hero h1 {
   margin: 0.85rem 0 0.9rem;
-  font-size: clamp(2.1rem, 3.6vw, 3.25rem);
+  font-family: var(--font-space-grotesk);
+  font-size: clamp(2.5rem, 4vw, 3.8rem);
+  font-weight: 700;
   line-height: 1.08;
   letter-spacing: -0.03em;
   text-wrap: balance;
@@ -57,7 +60,8 @@
 
 .hero p {
   margin: 0;
-  font-size: 1.03rem;
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
   max-width: 38rem;
 }
 
@@ -74,28 +78,31 @@
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  border-radius: 999px;
-  font-weight: 700;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-inter);
+  font-weight: 600;
+  font-size: var(--text-sm);
   letter-spacing: 0.01em;
   transition:
-    transform 140ms ease,
-    box-shadow 140ms ease,
-    background 140ms ease,
-    color 140ms ease;
+    transform var(--motion-fast),
+    box-shadow var(--motion-fast),
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .primaryButton {
   background: var(--brand-primary);
   color: var(--on-brand);
   border: 1px solid var(--brand-primary);
-  padding: 0.66rem 1.12rem;
+  padding: 0.66rem 1.25rem;
 }
 
 .secondaryButton {
   background: var(--bg-surface);
   color: var(--text-primary);
   border: 1px solid var(--border-strong);
-  padding: 0.64rem 1.05rem;
+  padding: 0.66rem 1.25rem;
 }
 
 .primaryButton:hover,
@@ -135,9 +142,11 @@
 
 .proofValue {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 800;
+  font-family: var(--font-space-grotesk);
+  font-size: 1.75rem;
+  font-weight: 700;
   letter-spacing: -0.02em;
+  color: var(--brand-primary);
 }
 
 .proofLabel {
@@ -180,40 +189,53 @@
 .integrationCard,
 .pricingCard,
 .workflowCard {
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.valueCard:hover,
+.integrationCard:hover,
+.workflowCard:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .valueCard,
 .integrationCard,
 .workflowCard {
-  padding: 1rem;
+  padding: var(--spacing-6);
 }
 
 .valueCard h2,
 .integrationCard h3,
 .workflowCard h3 {
   margin: 0;
-  font-size: 1.04rem;
+  font-family: var(--font-space-grotesk);
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 
 .valueCard p,
 .integrationCard p,
 .workflowCard p {
   margin: 0.56rem 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
 .workflowPanel,
 .routePanel,
 .integrationPanel,
 .pricingPanel {
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
-  padding: 1.15rem;
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-8);
 }
 
 .workflowPanel h2,
@@ -221,61 +243,70 @@
 .integrationPanel h2,
 .pricingPanel h2 {
   margin: 0;
+  font-family: var(--font-space-grotesk);
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 .routePanel p {
   margin: 0.5rem 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
 .routeCard {
   text-decoration: none;
   color: var(--text-primary);
-  padding: 0.86rem;
+  padding: var(--spacing-5);
   display: grid;
   gap: 0.34rem;
   transition:
-    transform 120ms ease,
-    border-color 120ms ease,
-    box-shadow 120ms ease;
+    transform var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    background var(--motion-fast);
 }
 
 .routeCard strong {
-  font-size: 0.97rem;
+  font-size: var(--text-base);
+  font-weight: 600;
 }
 
 .routeCard span:last-child {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
 }
 
 .routeCard:hover {
   transform: translateY(-1px);
   border-color: var(--border-hover);
   background: var(--bg-hover);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
 }
 
 .badge {
   width: fit-content;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--brand-primary);
   background: var(--bg-hover);
   color: var(--brand-primary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.66rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   padding: 0.18rem 0.42rem;
 }
 
 .pricingCard {
-  padding: 1rem;
+  padding: var(--spacing-6);
   display: grid;
-  gap: 0.7rem;
+  gap: var(--spacing-4);
 }
 
 .pricingCard h3 {
   margin: 0;
+  font-family: var(--font-space-grotesk);
+  font-size: 1.25rem;
 }
 
 .pricingCard ul {
@@ -287,41 +318,47 @@
 
 .pricingCard li {
   color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
 .ctaBand {
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
-  padding: 1.3rem;
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-8);
   display: grid;
-  gap: 0.9rem;
+  gap: var(--spacing-6);
   grid-template-columns: 1.4fr 1fr;
   align-items: center;
 }
 
 .ctaBand h2 {
   margin: 0;
+  font-family: var(--font-space-grotesk);
+  font-size: 1.75rem;
 }
 
 .ctaBand p {
   margin: 0.4rem 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-base);
 }
 
 .footer {
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
-  padding: 1.1rem;
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-6);
   display: grid;
-  gap: 1rem;
+  gap: var(--spacing-6);
   grid-template-columns: 1fr 2fr;
 }
 
 .footer h3 {
   margin: 0;
+  font-family: var(--font-space-grotesk);
 }
 
 .footer p {
@@ -337,17 +374,22 @@
 
 .footerLinks a {
   text-decoration: none;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   border: 1px solid var(--border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 0.45rem 0.58rem;
   background: var(--bg-elevated);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    color var(--motion-fast);
 }
 
 .footerLinks a:hover {
   background: var(--bg-hover);
   border-color: var(--border-hover);
+  color: var(--text-primary);
 }
 
 @keyframes pulse-orbit {
@@ -360,6 +402,28 @@
   50% {
     transform: translateY(6px) scale(1.05);
     opacity: 0.56;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroOrbit {
+    animation: none;
+  }
+
+  .primaryButton,
+  .secondaryButton,
+  .routeCard,
+  .valueCard,
+  .integrationCard,
+  .workflowCard,
+  .footerLinks a {
+    transition: none;
+  }
+
+  .primaryButton:hover,
+  .secondaryButton:hover,
+  .routeCard:hover {
+    transform: none;
   }
 }
 
