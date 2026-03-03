@@ -795,7 +795,35 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "bookings_event_type_status_starts_at_idx": {
+          "name": "bookings_event_type_status_starts_at_idx",
+          "columns": [
+            {
+              "expression": "event_type_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "starts_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "bookings_event_type_id_event_types_id_fk": {
           "name": "bookings_event_type_id_event_types_id_fk",
@@ -1539,15 +1567,15 @@
       "checkConstraints": {
         "event_types_daily_booking_limit_positive": {
           "name": "event_types_daily_booking_limit_positive",
-          "value": "\"event_types\".\"daily_booking_limit\" is null or \"event_types\".\"daily_booking_limit\" > 0"
+          "value": "\"event_types\".\"daily_booking_limit\" is null or (\"event_types\".\"daily_booking_limit\" > 0 and \"event_types\".\"daily_booking_limit\" <= 1000)"
         },
         "event_types_weekly_booking_limit_positive": {
           "name": "event_types_weekly_booking_limit_positive",
-          "value": "\"event_types\".\"weekly_booking_limit\" is null or \"event_types\".\"weekly_booking_limit\" > 0"
+          "value": "\"event_types\".\"weekly_booking_limit\" is null or (\"event_types\".\"weekly_booking_limit\" > 0 and \"event_types\".\"weekly_booking_limit\" <= 1000)"
         },
         "event_types_monthly_booking_limit_positive": {
           "name": "event_types_monthly_booking_limit_positive",
-          "value": "\"event_types\".\"monthly_booking_limit\" is null or \"event_types\".\"monthly_booking_limit\" > 0"
+          "value": "\"event_types\".\"monthly_booking_limit\" is null or (\"event_types\".\"monthly_booking_limit\" > 0 and \"event_types\".\"monthly_booking_limit\" <= 1000)"
         }
       },
       "isRLSEnabled": false

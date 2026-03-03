@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, lt, lte } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -73,7 +73,7 @@ const buildBookingDataAccess = (options?: {
         countConfirmedEventTypeBookingsInWindow: async ({ startsAt, endsAt }) => {
           return (options?.existingBookings ?? []).filter(
             (booking) =>
-              booking.status === 'confirmed' && booking.startsAt >= startsAt && booking.startsAt <= endsAt,
+              booking.status === 'confirmed' && booking.startsAt >= startsAt && booking.startsAt < endsAt,
           ).length;
         },
         insertBooking: async () => ({
@@ -187,7 +187,7 @@ const buildDbBackedBookingDataAccess = (db: Database): BookingDataAccess => {
                   eq(bookings.eventTypeId, targetEventTypeId),
                   eq(bookings.status, 'confirmed'),
                   gte(bookings.startsAt, startsAt),
-                  lte(bookings.startsAt, endsAt),
+                  lt(bookings.startsAt, endsAt),
                 ),
               );
             return rows.length;

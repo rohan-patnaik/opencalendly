@@ -123,15 +123,15 @@ export const eventTypes = pgTable(
     uniqueSlugPerUser: unique('event_types_user_slug_unique').on(table.userId, table.slug),
     dailyBookingLimitPositive: check(
       'event_types_daily_booking_limit_positive',
-      sql`${table.dailyBookingLimit} is null or ${table.dailyBookingLimit} > 0`,
+      sql`${table.dailyBookingLimit} is null or (${table.dailyBookingLimit} > 0 and ${table.dailyBookingLimit} <= 1000)`,
     ),
     weeklyBookingLimitPositive: check(
       'event_types_weekly_booking_limit_positive',
-      sql`${table.weeklyBookingLimit} is null or ${table.weeklyBookingLimit} > 0`,
+      sql`${table.weeklyBookingLimit} is null or (${table.weeklyBookingLimit} > 0 and ${table.weeklyBookingLimit} <= 1000)`,
     ),
     monthlyBookingLimitPositive: check(
       'event_types_monthly_booking_limit_positive',
-      sql`${table.monthlyBookingLimit} is null or ${table.monthlyBookingLimit} > 0`,
+      sql`${table.monthlyBookingLimit} is null or (${table.monthlyBookingLimit} > 0 and ${table.monthlyBookingLimit} <= 1000)`,
     ),
   }),
 );
@@ -259,6 +259,11 @@ export const bookings = pgTable(
   },
   (table) => ({
     uniqueSlot: unique('bookings_unique_slot').on(table.organizerId, table.startsAt, table.endsAt),
+    eventTypeStatusStartsAtIndex: index('bookings_event_type_status_starts_at_idx').on(
+      table.eventTypeId,
+      table.status,
+      table.startsAt,
+    ),
   }),
 );
 
