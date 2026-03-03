@@ -7,6 +7,7 @@ import {
   type WeeklyAvailabilityRule,
 } from './availability';
 import { createRawToken, hashToken } from './auth';
+import { buildBookingCapWindowsForSlot } from './booking-caps';
 
 export class BookingValidationError extends Error {}
 export class BookingNotFoundError extends Error {}
@@ -23,6 +24,9 @@ export type PublicEventType = {
   slug: string;
   name: string;
   durationMinutes: number;
+  dailyBookingLimit: number | null;
+  weeklyBookingLimit: number | null;
+  monthlyBookingLimit: number | null;
   locationType: string;
   locationValue: string | null;
   questions: Array<{ id: string; label: string; required: boolean; placeholder?: string | undefined }>;
@@ -78,6 +82,11 @@ export type BookingTransaction = {
     rangeStart: Date,
     rangeEnd: Date,
   ): Promise<ExistingBooking[]>;
+  countConfirmedEventTypeBookingsInWindow(input: {
+    eventTypeId: string;
+    startsAt: Date;
+    endsAt: Date;
+  }): Promise<number>;
   insertBooking(input: {
     eventTypeId: string;
     organizerId: string;
@@ -194,6 +203,28 @@ export const commitBooking = async (
 
     if (!matchingSlot) {
       throw new BookingConflictError('Selected slot is no longer available.');
+    }
+
+    const capWindows = buildBookingCapWindowsForSlot({
+      startsAtIso,
+      timezone: eventType.organizerTimezone,
+      caps: {
+        dailyBookingLimit: eventType.dailyBookingLimit,
+        weeklyBookingLimit: eventType.weeklyBookingLimit,
+        monthlyBookingLimit: eventType.monthlyBookingLimit,
+      },
+    });
+
+    for (const window of capWindows) {
+      const existingCount = await transaction.countConfirmedEventTypeBookingsInWindow({
+        eventTypeId: eventType.id,
+        startsAt: window.startsAt,
+        endsAt: window.endsAt,
+      });
+
+      if (existingCount >= window.limit) {
+        throw new BookingConflictError('Booking limit reached for this event window.');
+      }
     }
 
     const metadata = JSON.stringify({

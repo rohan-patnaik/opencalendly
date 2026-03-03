@@ -132,6 +132,9 @@ Success response:
       "slug": "intro-call",
       "name": "Intro Call",
       "durationMinutes": 30,
+      "dailyBookingLimit": null,
+      "weeklyBookingLimit": null,
+      "monthlyBookingLimit": null,
       "locationType": "video",
       "locationValue": "https://meet.example.com/demo",
       "questions": [],
@@ -153,6 +156,9 @@ Request:
   "name": "Intro Call",
   "slug": "intro-call",
   "durationMinutes": 30,
+  "dailyBookingLimit": 5,
+  "weeklyBookingLimit": 20,
+  "monthlyBookingLimit": 80,
   "locationType": "video",
   "locationValue": "https://meet.example.com/demo",
   "questions": [
@@ -175,6 +181,9 @@ Success response:
     "name": "Intro Call",
     "slug": "intro-call",
     "durationMinutes": 30,
+    "dailyBookingLimit": 5,
+    "weeklyBookingLimit": 20,
+    "monthlyBookingLimit": 80,
     "locationType": "video",
     "locationValue": "https://meet.example.com/demo",
     "questions": [],
@@ -190,6 +199,9 @@ Auth required. Supports partial updates for:
 - `name`
 - `slug`
 - `durationMinutes`
+- `dailyBookingLimit` (optional nullable integer > 0)
+- `weeklyBookingLimit` (optional nullable integer > 0)
+- `monthlyBookingLimit` (optional nullable integer > 0)
 - `locationType`
 - `locationValue`
 - `questions`
@@ -286,6 +298,9 @@ Success response:
     "name": "Intro Call",
     "slug": "intro-call",
     "durationMinutes": 30,
+    "dailyBookingLimit": 5,
+    "weeklyBookingLimit": 20,
+    "monthlyBookingLimit": 80,
     "locationType": "video",
     "locationValue": "https://meet.example.com/demo",
     "questions": []
@@ -328,6 +343,7 @@ Behavior:
 - Computes slots from organizer rules + date overrides.
 - Removes conflicts from confirmed bookings.
 - Applies synced external busy windows (Feature 6) as non-available blocks.
+- Applies event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
 - Route is rate-limited per IP + booking link key.
 
 Rate-limit response (`429`):
@@ -368,6 +384,7 @@ Behavior:
 - Re-validates slot availability inside a DB transaction.
 - Includes synced external busy windows in the final write-time conflict check.
 - Uses DB unique slot constraint to avoid duplicate commits.
+- Enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) at commit time.
 - Creates secure cancel/reschedule action tokens (stored hashed server-side).
 - Sends booking confirmation email after successful write.
 - Enqueues and runs immediate calendar writeback for connected providers.
@@ -428,6 +445,15 @@ Conflict response (`409`):
 {
   "ok": false,
   "error": "Selected slot is no longer available."
+}
+```
+
+Additional conflict reason (`409`) when booking caps are configured:
+
+```json
+{
+  "ok": false,
+  "error": "Booking limit reached for this event window."
 }
 ```
 
@@ -700,6 +726,7 @@ Rate-limit response (`429`):
 Behavior:
 
 - Transaction-safe organizer-level conflict checks are required before confirming the new slot.
+- Reschedule commit enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
 - Reschedule sends notification emails to invitee + organizer.
 - Repeated submissions of the same token are idempotent.
 - Reschedule enqueues calendar writeback update for connected providers.
@@ -1118,6 +1145,9 @@ Success response:
         "slug": "team-intro",
         "name": "Team Intro",
         "durationMinutes": 30,
+        "dailyBookingLimit": null,
+        "weeklyBookingLimit": null,
+        "monthlyBookingLimit": null,
         "locationType": "video",
         "locationValue": "https://meet.example.com/team",
         "questions": [],
@@ -1140,6 +1170,9 @@ Request:
   "name": "Team Intro",
   "slug": "team-intro",
   "durationMinutes": 30,
+  "dailyBookingLimit": 8,
+  "weeklyBookingLimit": 30,
+  "monthlyBookingLimit": 120,
   "mode": "round_robin",
   "locationType": "video",
   "locationValue": "https://meet.example.com/team",
@@ -1164,6 +1197,9 @@ Success response:
       "slug": "team-intro",
       "name": "Team Intro",
       "durationMinutes": 30,
+      "dailyBookingLimit": 8,
+      "weeklyBookingLimit": 30,
+      "monthlyBookingLimit": 120,
       "locationType": "video",
       "locationValue": "https://meet.example.com/team",
       "questions": [],
@@ -1192,6 +1228,9 @@ Success response:
     "slug": "team-intro-call",
     "name": "Team Intro Call",
     "durationMinutes": 30,
+    "dailyBookingLimit": null,
+    "weeklyBookingLimit": null,
+    "monthlyBookingLimit": null,
     "locationType": "video",
     "locationValue": "https://meet.example.com/team-demo",
     "questions": []
@@ -1248,6 +1287,7 @@ Behavior:
 - Computes per-member schedules from rules + overrides.
 - Applies confirmed booking conflicts per member.
 - Applies each member's synced external busy windows (Feature 6) before slot assignment.
+- Applies event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
 - Route is rate-limited per IP + team event key.
 
 ### `POST /v0/team-bookings`
@@ -1328,9 +1368,28 @@ Notes:
 - Booking write remains transaction-safe.
 - Team assignment rows enforce per-member slot uniqueness.
 - Member selection and commit checks include synced external busy windows.
+- Team booking commit enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
 - Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.
 - Route is rate-limited per IP + team event key.
 - Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
+
+Conflict response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "Selected slot is no longer available."
+}
+```
+
+Additional conflict reason (`409`) when booking caps are configured:
+
+```json
+{
+  "ok": false,
+  "error": "Booking limit reached for this event window."
+}
+```
 
 Idempotency mismatch response (`409`):
 

@@ -475,3 +475,28 @@ Acceptance criteria:
   - `npm run lint`
   - `npm run typecheck`
   - `npm run test`
+
+### Feature 24: Availability caps parity (daily/weekly/monthly limits)
+
+Scope:
+- Complete booking-cap parity by adding first-class per-event limits for daily, weekly, and monthly confirmed bookings.
+- Apply cap checks at availability-read time and at booking commit time.
+- Keep existing booking correctness guarantees (transaction + unique slot guard) intact.
+
+Acceptance criteria:
+
+- Event types support nullable per-event booking caps:
+  - `dailyBookingLimit`
+  - `weeklyBookingLimit`
+  - `monthlyBookingLimit`
+- Caps are configurable through event type create/update APIs and returned in event type read APIs.
+- Public availability endpoints hide slots that would exceed configured caps:
+  - `GET /v0/users/:username/event-types/:slug/availability`
+  - `GET /v0/teams/:teamSlug/event-types/:eventSlug/availability`
+- Booking write paths enforce caps at commit time and return deterministic conflict errors when exceeded:
+  - `POST /v0/bookings`
+  - `POST /v0/team-bookings`
+  - `POST /v0/bookings/actions/:token/reschedule`
+- Existing out-of-office/holiday behavior remains intact via `availability_overrides` with `isAvailable=false`.
+- Tests cover cap validation and enforcement behavior.
+- `docs/API.md` documents booking-cap request/response fields and enforcement semantics.

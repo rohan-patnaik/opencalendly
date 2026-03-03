@@ -18,6 +18,9 @@ export type OrganizerEventType = {
   slug: string;
   name: string;
   durationMinutes: number;
+  dailyBookingLimit: number | null;
+  weeklyBookingLimit: number | null;
+  monthlyBookingLimit: number | null;
   locationType: 'video' | 'phone' | 'in_person' | 'custom';
   locationValue: string | null;
   questions: OrganizerEventQuestion[];
@@ -96,6 +99,9 @@ export type TeamEventType = {
     slug: string;
     name: string;
     durationMinutes: number;
+    dailyBookingLimit: number | null;
+    weeklyBookingLimit: number | null;
+    monthlyBookingLimit: number | null;
     locationType: 'video' | 'phone' | 'in_person' | 'custom';
     locationValue: string | null;
     questions: OrganizerEventQuestion[];
@@ -189,6 +195,9 @@ export const organizerApi = {
       name: string;
       slug: string;
       durationMinutes: number;
+      dailyBookingLimit?: number | null;
+      weeklyBookingLimit?: number | null;
+      monthlyBookingLimit?: number | null;
       locationType: 'video' | 'phone' | 'in_person' | 'custom';
       locationValue?: string | null;
       questions?: OrganizerEventQuestion[];
@@ -210,6 +219,9 @@ export const organizerApi = {
       name: string;
       slug: string;
       durationMinutes: number;
+      dailyBookingLimit: number | null;
+      weeklyBookingLimit: number | null;
+      monthlyBookingLimit: number | null;
       locationType: 'video' | 'phone' | 'in_person' | 'custom';
       locationValue: string | null;
       questions: OrganizerEventQuestion[];
@@ -355,6 +367,9 @@ export const organizerApi = {
       name: string;
       slug: string;
       durationMinutes: number;
+      dailyBookingLimit?: number | null;
+      weeklyBookingLimit?: number | null;
+      monthlyBookingLimit?: number | null;
       mode: 'round_robin' | 'collective';
       locationType?: 'video' | 'phone' | 'in_person' | 'custom';
       locationValue?: string | null;
