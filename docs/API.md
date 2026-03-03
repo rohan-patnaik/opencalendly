@@ -457,15 +457,6 @@ Additional conflict reason (`409`) when booking caps are configured:
 }
 ```
 
-Additional conflict reason (`409`) when booking caps are configured:
-
-```json
-{
-  "ok": false,
-  "error": "Booking limit reached for this event window."
-}
-```
-
 Idempotency mismatch response (`409`):
 
 ```json
