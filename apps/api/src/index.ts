@@ -23,6 +23,7 @@ import {
   teamEventTypes,
   teamMembers,
   teams,
+  timeOffBlocks,
   users,
   waitlistEntries,
   webhookDeliveries,
@@ -52,6 +53,8 @@ import {
   teamBookingCreateSchema,
   teamCreateSchema,
   teamEventTypeCreateSchema,
+  timeOffCreateSchema,
+  timeOffHolidayImportSchema,
   waitlistJoinSchema,
   webhookEventSchema,
   webhookSubscriptionCreateSchema,
@@ -128,6 +131,7 @@ import {
   fetchMicrosoftUserProfile,
   updateMicrosoftCalendarEvent,
 } from './lib/microsoft-calendar';
+import { buildHolidayTimeOffWindows } from './lib/holidays';
 import {
   buildDemoCreditsStatus,
   consumeDemoCreditFromState,
@@ -2186,6 +2190,27 @@ const listExternalBusyWindowsForUser = async (
     );
 };
 
+const listTimeOffBlocksForUser = async (
+  db: QueryableDb,
+  userId: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+): Promise<Array<{ startAt: Date; endAt: Date }>> => {
+  return db
+    .select({
+      startAt: timeOffBlocks.startAt,
+      endAt: timeOffBlocks.endAt,
+    })
+    .from(timeOffBlocks)
+    .where(
+      and(
+        eq(timeOffBlocks.userId, userId),
+        lt(timeOffBlocks.startAt, rangeEnd),
+        gt(timeOffBlocks.endAt, rangeStart),
+      ),
+    );
+};
+
 const listTeamMemberSchedules = async (
   db: QueryableDb,
   memberIds: string[],
@@ -2216,7 +2241,8 @@ const listTeamMemberSchedules = async (
       continue;
     }
 
-    const [rules, overrides, externalBusyWindows, directBookings, assignedBookings] = await Promise.all([
+    const [rules, overrides, externalBusyWindows, userTimeOffBlocks, directBookings, assignedBookings] =
+      await Promise.all([
       db
         .select({
           dayOfWeek: availabilityRules.dayOfWeek,
@@ -2242,6 +2268,7 @@ const listTeamMemberSchedules = async (
           ),
         ),
       listExternalBusyWindowsForUser(db, userId, rangeStart, rangeEnd),
+      listTimeOffBlocksForUser(db, userId, rangeStart, rangeEnd),
       db
         .select({
           startsAt: bookings.startsAt,
@@ -2292,6 +2319,11 @@ const listTeamMemberSchedules = async (
       rules,
       overrides: [
         ...overrides,
+        ...userTimeOffBlocks.map((block) => ({
+          startAt: block.startAt,
+          endAt: block.endAt,
+          isAvailable: false,
+        })),
         ...externalBusyWindows.map((window) => ({
           startAt: window.startsAt,
           endAt: window.endsAt,
@@ -4672,6 +4704,173 @@ app.get('/v0/me/availability', async (context) => {
   });
 });
 
+app.get('/v0/me/time-off', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const blocks = await db
+      .select({
+        id: timeOffBlocks.id,
+        startAt: timeOffBlocks.startAt,
+        endAt: timeOffBlocks.endAt,
+        reason: timeOffBlocks.reason,
+        source: timeOffBlocks.source,
+        sourceKey: timeOffBlocks.sourceKey,
+        createdAt: timeOffBlocks.createdAt,
+      })
+      .from(timeOffBlocks)
+      .where(eq(timeOffBlocks.userId, authedUser.id))
+      .orderBy(asc(timeOffBlocks.startAt));
+
+    return context.json({
+      ok: true,
+      timeOffBlocks: blocks.map((block) => ({
+        id: block.id,
+        startAt: block.startAt.toISOString(),
+        endAt: block.endAt.toISOString(),
+        reason: block.reason,
+        source: block.source,
+        sourceKey: block.sourceKey,
+        createdAt: block.createdAt.toISOString(),
+      })),
+    });
+  });
+});
+
+app.post('/v0/me/time-off', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = timeOffCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const [inserted] = await db
+      .insert(timeOffBlocks)
+      .values({
+        userId: authedUser.id,
+        startAt: new Date(parsed.data.startAt),
+        endAt: new Date(parsed.data.endAt),
+        reason: parsed.data.reason ?? null,
+        source: 'manual',
+      })
+      .returning({
+        id: timeOffBlocks.id,
+        startAt: timeOffBlocks.startAt,
+        endAt: timeOffBlocks.endAt,
+        reason: timeOffBlocks.reason,
+        source: timeOffBlocks.source,
+        sourceKey: timeOffBlocks.sourceKey,
+        createdAt: timeOffBlocks.createdAt,
+      });
+
+    if (!inserted) {
+      return jsonError(context, 500, 'Unable to create time-off block.');
+    }
+
+    return context.json({
+      ok: true,
+      timeOffBlock: {
+        id: inserted.id,
+        startAt: inserted.startAt.toISOString(),
+        endAt: inserted.endAt.toISOString(),
+        reason: inserted.reason,
+        source: inserted.source,
+        sourceKey: inserted.sourceKey,
+        createdAt: inserted.createdAt.toISOString(),
+      },
+    });
+  });
+});
+
+app.delete('/v0/me/time-off/:id', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const id = context.req.param('id');
+    if (!isUuid(id)) {
+      return jsonError(context, 400, 'Invalid time-off block id.');
+    }
+
+    const [deleted] = await db
+      .delete(timeOffBlocks)
+      .where(and(eq(timeOffBlocks.id, id), eq(timeOffBlocks.userId, authedUser.id)))
+      .returning({ id: timeOffBlocks.id });
+
+    if (!deleted) {
+      return jsonError(context, 404, 'Time-off block not found.');
+    }
+
+    return context.json({
+      ok: true,
+      deletedId: deleted.id,
+    });
+  });
+});
+
+app.post('/v0/me/time-off/import-holidays', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = timeOffHolidayImportSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const windows = buildHolidayTimeOffWindows({
+      locale: parsed.data.locale,
+      year: parsed.data.year,
+      timezone: authedUser.timezone,
+    });
+
+    if (windows.length === 0) {
+      return context.json({
+        ok: true,
+        imported: 0,
+        skipped: 0,
+      });
+    }
+
+    const inserted = await db
+      .insert(timeOffBlocks)
+      .values(
+        windows.map((window) => ({
+          userId: authedUser.id,
+          startAt: window.startAt,
+          endAt: window.endAt,
+          reason: window.reason,
+          source: 'holiday_import',
+          sourceKey: window.sourceKey,
+        })),
+      )
+      .onConflictDoNothing({
+        target: [timeOffBlocks.userId, timeOffBlocks.source, timeOffBlocks.sourceKey],
+      })
+      .returning({ id: timeOffBlocks.id });
+
+    return context.json({
+      ok: true,
+      imported: inserted.length,
+      skipped: windows.length - inserted.length,
+    });
+  });
+});
+
 app.get('/v0/teams', async (context) => {
   return withDatabase(context, async (db) => {
     const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
@@ -5607,7 +5806,7 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
       caps: bookingCaps,
     });
 
-    const [rules, overrides, externalBusyWindows, existingBookings, eventTypeBookingsForCapUsage] =
+    const [rules, overrides, userTimeOffBlocks, externalBusyWindows, existingBookings, eventTypeBookingsForCapUsage] =
       await Promise.all([
         db
           .select({
@@ -5633,6 +5832,7 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
               gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
             ),
           ),
+        listTimeOffBlocksForUser(db, eventType.userId, rangeStart.toJSDate(), rangeEnd.toJSDate()),
         listExternalBusyWindowsForUser(db, eventType.userId, rangeStart.toJSDate(), rangeEnd.toJSDate()),
         db
           .select({
@@ -5667,6 +5867,11 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
       rules,
       overrides: [
         ...overrides,
+        ...userTimeOffBlocks.map((block) => ({
+          startAt: block.startAt,
+          endAt: block.endAt,
+          isAvailable: false,
+        })),
         ...externalBusyWindows.map((window) => ({
           startAt: window.startsAt,
           endAt: window.endsAt,
@@ -6478,20 +6683,32 @@ app.post('/v0/bookings', async (context) => {
                     .where(eq(availabilityRules.userId, userId));
                 },
                 listOverrides: async (userId, rangeStart, rangeEnd) => {
-                  return transaction
-                    .select({
-                      startAt: availabilityOverrides.startAt,
-                      endAt: availabilityOverrides.endAt,
-                      isAvailable: availabilityOverrides.isAvailable,
-                    })
-                    .from(availabilityOverrides)
-                    .where(
-                      and(
-                        eq(availabilityOverrides.userId, userId),
-                        lt(availabilityOverrides.startAt, rangeEnd),
-                        gt(availabilityOverrides.endAt, rangeStart),
+                  const [overrides, userTimeOffBlocks] = await Promise.all([
+                    transaction
+                      .select({
+                        startAt: availabilityOverrides.startAt,
+                        endAt: availabilityOverrides.endAt,
+                        isAvailable: availabilityOverrides.isAvailable,
+                      })
+                      .from(availabilityOverrides)
+                      .where(
+                        and(
+                          eq(availabilityOverrides.userId, userId),
+                          lt(availabilityOverrides.startAt, rangeEnd),
+                          gt(availabilityOverrides.endAt, rangeStart),
+                        ),
                       ),
-                    );
+                    listTimeOffBlocksForUser(transaction, userId, rangeStart, rangeEnd),
+                  ]);
+
+                  return [
+                    ...overrides,
+                    ...userTimeOffBlocks.map((block) => ({
+                      startAt: block.startAt,
+                      endAt: block.endAt,
+                      isAvailable: false,
+                    })),
+                  ];
                 },
                 listExternalBusyWindows: async (userId, rangeStart, rangeEnd) => {
                   return listExternalBusyWindowsForUser(transaction, userId, rangeStart, rangeEnd);
@@ -7392,7 +7609,8 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           null;
 
         if (existingTeamAssignments.length === 0) {
-          const [rules, overrides, externalBusyWindows, existingBookings] = await Promise.all([
+          const [rules, overrides, userTimeOffBlocks, externalBusyWindows, existingBookings] =
+            await Promise.all([
             transaction
               .select({
                 dayOfWeek: availabilityRules.dayOfWeek,
@@ -7417,6 +7635,12 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
                   gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
                 ),
               ),
+            listTimeOffBlocksForUser(
+              transaction,
+              organizerRow.id,
+              rangeStart.toJSDate(),
+              rangeEnd.toJSDate(),
+            ),
             listExternalBusyWindowsForUser(
               transaction,
               organizerRow.id,
@@ -7440,7 +7664,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
                   gt(bookings.endsAt, rangeStart.toJSDate()),
                 ),
               ),
-          ]);
+            ]);
 
           const slotResolution = resolveRequestedRescheduleSlot({
             requestedStartsAtIso,
@@ -7449,6 +7673,11 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             rules,
             overrides: [
               ...overrides,
+              ...userTimeOffBlocks.map((block) => ({
+                startAt: block.startAt,
+                endAt: block.endAt,
+                isAvailable: false,
+              })),
               ...externalBusyWindows.map((window) => ({
                 startAt: window.startsAt,
                 endAt: window.endsAt,

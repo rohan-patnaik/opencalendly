@@ -23,7 +23,7 @@ const readJsonSafely = async <T>(response: Response): Promise<T | null> => {
 const authedJson = async <T>(input: {
   url: string;
   session: AuthSession | null;
-  method: 'GET' | 'POST' | 'PATCH' | 'PUT';
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   fallbackError: string;
 }): Promise<T> => {
@@ -93,5 +93,17 @@ export const authedPutJson = async <T>(input: {
   return authedJson<T>({
     ...input,
     method: 'PUT',
+  });
+};
+
+export const authedDeleteJson = async <T>(input: {
+  url: string;
+  session: AuthSession | null;
+  body?: unknown;
+  fallbackError: string;
+}): Promise<T> => {
+  return authedJson<T>({
+    ...input,
+    method: 'DELETE',
   });
 };

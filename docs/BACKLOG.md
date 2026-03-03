@@ -500,3 +500,34 @@ Acceptance criteria:
 - Existing out-of-office/holiday behavior remains intact via `availability_overrides` with `isAvailable=false`.
 - Tests cover cap validation and enforcement behavior.
 - `docs/API.md` documents booking-cap request/response fields and enforcement semantics.
+
+### Feature 25: Out-of-office + holiday blocking parity completion
+
+Scope:
+- Complete the remaining parity gap for out-of-office/holiday blocking on top of Feature 24 caps.
+- Add first-class time-off blocks and holiday import helpers for organizers.
+- Enforce new blocking sources in both availability-read and booking-commit paths.
+
+Acceptance criteria:
+
+- Organizers can manage explicit time-off blocks via authenticated APIs:
+  - `GET /v0/me/time-off`
+  - `POST /v0/me/time-off`
+  - `DELETE /v0/me/time-off/:id`
+- Organizer APIs support holiday import presets for at least India and US:
+  - `POST /v0/me/time-off/import-holidays`
+  - idempotent import by `(userId, source, sourceKey)`.
+- One-on-one and team availability APIs exclude windows intersecting time-off blocks.
+- Booking commit paths enforce time-off conflicts and return deterministic `409` responses when blocked:
+  - `POST /v0/bookings`
+  - `POST /v0/team-bookings`
+  - `POST /v0/bookings/actions/:token/reschedule`
+- Organizer UI adds a Time off panel for:
+  - listing upcoming blocks
+  - adding/removing manual blocks
+  - importing yearly holiday presets.
+- Tests cover:
+  - holiday import idempotency
+  - availability exclusion from time-off
+  - commit-time conflict handling for one-on-one/team/reschedule.
+- `docs/API.md` is updated with time-off and holiday import contracts.
