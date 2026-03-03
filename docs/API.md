@@ -457,6 +457,15 @@ Additional conflict reason (`409`) when booking caps are configured:
 }
 ```
 
+Additional conflict reason (`409`) when booking caps are configured:
+
+```json
+{
+  "ok": false,
+  "error": "Booking limit reached for this event window."
+}
+```
+
 Idempotency mismatch response (`409`):
 
 ```json
@@ -1372,6 +1381,24 @@ Notes:
 - Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.
 - Route is rate-limited per IP + team event key.
 - Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
+
+Conflict response (`409`):
+
+```json
+{
+  "ok": false,
+  "error": "Selected slot is no longer available."
+}
+```
+
+Additional conflict reason (`409`) when booking caps are configured:
+
+```json
+{
+  "ok": false,
+  "error": "Booking limit reached for this event window."
+}
+```
 
 Idempotency mismatch response (`409`):
 

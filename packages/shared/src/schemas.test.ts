@@ -67,24 +67,29 @@ describe('shared schemas', () => {
       ],
       dailyBookingLimit: 10,
       weeklyBookingLimit: 30,
+      monthlyBookingLimit: 100,
     });
 
     expect(payload.slug).toBe('intro-call');
     expect(payload.dailyBookingLimit).toBe(10);
     expect(payload.weeklyBookingLimit).toBe(30);
+    expect(payload.monthlyBookingLimit).toBe(100);
   });
 
-  it('rejects event type payloads with invalid booking caps', () => {
-    const result = eventTypeCreateSchema.safeParse({
-      name: 'Intro Call',
-      slug: 'intro-call',
-      durationMinutes: 30,
-      locationType: 'video',
-      dailyBookingLimit: 0,
-    });
+  it.each([{ dailyBookingLimit: 0 }, { weeklyBookingLimit: 0 }, { monthlyBookingLimit: 0 }])(
+    'rejects event type payloads with invalid booking caps: %o',
+    (capPatch) => {
+      const result = eventTypeCreateSchema.safeParse({
+        name: 'Intro Call',
+        slug: 'intro-call',
+        durationMinutes: 30,
+        locationType: 'video',
+        ...capPatch,
+      });
 
-    expect(result.success).toBe(false);
-  });
+      expect(result.success).toBe(false);
+    },
+  );
 
   it('rejects invalid availability windows', () => {
     const result = availabilityRuleSchema.safeParse({

@@ -28,19 +28,19 @@ describe('booking cap helpers', () => {
     ).toBe(true);
   });
 
-  it('builds usage maps and enforces per-day cap in local timezone', () => {
+  it('builds usage maps and enforces per-day cap in a non-UTC local timezone', () => {
     const usage = buildBookingCapUsage(
       [
-        { startsAt: new Date('2026-03-02T08:00:00.000Z') },
-        { startsAt: new Date('2026-03-02T09:00:00.000Z') },
+        { startsAt: new Date('2026-03-02T03:30:00.000Z') }, // 2026-03-01 22:30 America/New_York
+        { startsAt: new Date('2026-03-02T04:00:00.000Z') }, // 2026-03-01 23:00 America/New_York
       ],
-      'UTC',
+      'America/New_York',
     );
 
     expect(
       isSlotAllowedByBookingCaps({
-        startsAtIso: '2026-03-02T10:00:00.000Z',
-        timezone: 'UTC',
+        startsAtIso: '2026-03-02T04:30:00.000Z', // 2026-03-01 23:30 America/New_York
+        timezone: 'America/New_York',
         caps: {
           dailyBookingLimit: 2,
           weeklyBookingLimit: null,

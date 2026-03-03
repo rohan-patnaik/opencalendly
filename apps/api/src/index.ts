@@ -7261,19 +7261,21 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
 
         const eventTypeResult = await transaction.execute<EventTypeProfile>(sql`
           select
-            id,
-            user_id as "userId",
-            slug,
-            name,
-            duration_minutes as "durationMinutes",
-            daily_booking_limit as "dailyBookingLimit",
-            weekly_booking_limit as "weeklyBookingLimit",
-            monthly_booking_limit as "monthlyBookingLimit",
-            location_type as "locationType",
-            location_value as "locationValue",
-            is_active as "isActive"
-          from event_types
-          where id = ${booking.eventTypeId}
+            et.id,
+            et.user_id as "userId",
+            et.slug,
+            et.name,
+            et.duration_minutes as "durationMinutes",
+            et.daily_booking_limit as "dailyBookingLimit",
+            et.weekly_booking_limit as "weeklyBookingLimit",
+            et.monthly_booking_limit as "monthlyBookingLimit",
+            et.location_type as "locationType",
+            et.location_value as "locationValue",
+            et.is_active as "isActive",
+            owner.timezone as "organizerTimezone"
+          from event_types et
+          inner join users owner on owner.id = et.user_id
+          where et.id = ${booking.eventTypeId}
           for update
         `);
 
@@ -7528,7 +7530,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
 
         const capWindows = buildBookingCapWindowsForSlot({
           startsAtIso: requestedStartsAtIso,
-          timezone: normalizeTimezone(organizerRow.timezone),
+          timezone: normalizeTimezone(eventTypeRow.organizerTimezone ?? organizerRow.timezone),
           caps: toEventTypeBookingCaps(eventTypeRow),
         });
         for (const window of capWindows) {
