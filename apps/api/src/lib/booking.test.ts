@@ -14,6 +14,9 @@ const publicEventType: PublicEventType = {
   slug: 'intro-call',
   name: 'Intro Call',
   durationMinutes: 30,
+  dailyBookingLimit: null,
+  weeklyBookingLimit: null,
+  monthlyBookingLimit: null,
   locationType: 'video',
   locationValue: 'https://meet.example.com/demo',
   questions: [],
@@ -37,6 +40,7 @@ const buildDataAccess = (options?: {
   existingBookings?: Array<{ startsAt: Date; endsAt: Date; status: string }>;
   externalBusyWindows?: Array<{ startsAt: Date; endsAt: Date }>;
   throwUniqueConflict?: boolean;
+  eventTypeWindowBookingCount?: number;
   eventType?: PublicEventType | null;
 }) => {
   let insertCount = 0;
@@ -53,6 +57,7 @@ const buildDataAccess = (options?: {
         listOverrides: async () => [],
         listExternalBusyWindows: async () => options?.externalBusyWindows ?? [],
         listConfirmedBookings: async () => options?.existingBookings ?? [],
+        countConfirmedEventTypeBookingsInWindow: async () => options?.eventTypeWindowBookingCount ?? 0,
         insertBooking: async () => {
           if (options?.throwUniqueConflict) {
             throw new BookingUniqueConstraintError('duplicate slot');
@@ -152,6 +157,29 @@ describe('commitBooking', () => {
           endsAt: new Date('2026-03-02T09:30:00.000Z'),
         },
       ],
+    });
+
+    await expect(
+      commitBooking(harness.dataAccess, {
+        username: 'demo',
+        eventSlug: 'intro-call',
+        startsAt: '2026-03-02T09:00:00.000Z',
+        timezone: 'UTC',
+        inviteeName: 'Pat Lee',
+        inviteeEmail: 'pat@example.com',
+      }),
+    ).rejects.toBeInstanceOf(BookingConflictError);
+
+    expect(harness.getInsertCount()).toBe(0);
+  });
+
+  it('rejects booking when event-type daily cap is reached', async () => {
+    const harness = buildDataAccess({
+      eventTypeWindowBookingCount: 2,
+      eventType: {
+        ...publicEventType,
+        dailyBookingLimit: 2,
+      },
     });
 
     await expect(

@@ -65,9 +65,25 @@ describe('shared schemas', () => {
           required: false,
         },
       ],
+      dailyBookingLimit: 10,
+      weeklyBookingLimit: 30,
     });
 
     expect(payload.slug).toBe('intro-call');
+    expect(payload.dailyBookingLimit).toBe(10);
+    expect(payload.weeklyBookingLimit).toBe(30);
+  });
+
+  it('rejects event type payloads with invalid booking caps', () => {
+    const result = eventTypeCreateSchema.safeParse({
+      name: 'Intro Call',
+      slug: 'intro-call',
+      durationMinutes: 30,
+      locationType: 'video',
+      dailyBookingLimit: 0,
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('rejects invalid availability windows', () => {

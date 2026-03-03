@@ -37,6 +37,9 @@ const publicEventType: PublicEventType = {
   slug: 'intro-call',
   name: 'Intro Call',
   durationMinutes: 30,
+  dailyBookingLimit: null,
+  weeklyBookingLimit: null,
+  monthlyBookingLimit: null,
   locationType: 'video',
   locationValue: 'https://meet.example.com/demo',
   questions: [],
@@ -67,6 +70,12 @@ const buildBookingDataAccess = (options?: {
         listOverrides: async () => [],
         listExternalBusyWindows: async () => options?.externalBusyWindows ?? [],
         listConfirmedBookings: async () => options?.existingBookings ?? [],
+        countConfirmedEventTypeBookingsInWindow: async ({ startsAt, endsAt }) => {
+          return (options?.existingBookings ?? []).filter(
+            (booking) =>
+              booking.status === 'confirmed' && booking.startsAt >= startsAt && booking.startsAt <= endsAt,
+          ).length;
+        },
         insertBooking: async () => ({
           id: 'booking-1',
           eventTypeId: 'event-1',
@@ -96,6 +105,9 @@ const buildDbBackedBookingDataAccess = (db: Database): BookingDataAccess => {
           slug: eventTypes.slug,
           name: eventTypes.name,
           durationMinutes: eventTypes.durationMinutes,
+          dailyBookingLimit: eventTypes.dailyBookingLimit,
+          weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+          monthlyBookingLimit: eventTypes.monthlyBookingLimit,
           locationType: eventTypes.locationType,
           locationValue: eventTypes.locationValue,
           questions: eventTypes.questions,
@@ -165,6 +177,20 @@ const buildDbBackedBookingDataAccess = (db: Database): BookingDataAccess => {
                   gte(bookings.endsAt, rangeStart),
                 ),
               );
+          },
+          countConfirmedEventTypeBookingsInWindow: async ({ eventTypeId: targetEventTypeId, startsAt, endsAt }) => {
+            const rows = await transaction
+              .select({ id: bookings.id })
+              .from(bookings)
+              .where(
+                and(
+                  eq(bookings.eventTypeId, targetEventTypeId),
+                  eq(bookings.status, 'confirmed'),
+                  gte(bookings.startsAt, startsAt),
+                  lte(bookings.startsAt, endsAt),
+                ),
+              );
+            return rows.length;
           },
           insertBooking: async (input) => {
             try {

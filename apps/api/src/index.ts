@@ -72,6 +72,14 @@ import {
   hashToken,
 } from './lib/auth';
 import { computeAvailabilitySlots } from './lib/availability';
+import {
+  buildBookingCapUsage,
+  buildBookingCapWindowsForSlot,
+  filterSlotsByBookingCaps,
+  hasBookingCaps,
+  resolveBookingCapUsageRange,
+  type EventTypeBookingCaps,
+} from './lib/booking-caps';
 import { encryptSecret } from './lib/calendar-crypto';
 import { createCalendarOAuthState, verifyCalendarOAuthState } from './lib/calendar-oauth-state';
 import {
@@ -222,9 +230,13 @@ type EventTypeProfile = {
   slug: string;
   name: string;
   durationMinutes: number;
+  dailyBookingLimit: number | null;
+  weeklyBookingLimit: number | null;
+  monthlyBookingLimit: number | null;
   locationType: string;
   locationValue: string | null;
   questions?: EventQuestion[];
+  organizerTimezone?: string;
   isActive: boolean;
 };
 
@@ -261,6 +273,9 @@ type PublicEventView = {
     slug: string;
     name: string;
     durationMinutes: number;
+    dailyBookingLimit: number | null;
+    weeklyBookingLimit: number | null;
+    monthlyBookingLimit: number | null;
     locationType: string;
     locationValue: string | null;
     questions: EventQuestion[];
@@ -1890,6 +1905,9 @@ const findPublicEventType = async (
       eventTypeSlug: eventTypes.slug,
       eventTypeName: eventTypes.name,
       durationMinutes: eventTypes.durationMinutes,
+      dailyBookingLimit: eventTypes.dailyBookingLimit,
+      weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+      monthlyBookingLimit: eventTypes.monthlyBookingLimit,
       locationType: eventTypes.locationType,
       locationValue: eventTypes.locationValue,
       questions: eventTypes.questions,
@@ -1915,6 +1933,9 @@ const findPublicEventType = async (
     slug: row.eventTypeSlug,
     name: row.eventTypeName,
     durationMinutes: row.durationMinutes,
+    dailyBookingLimit: row.dailyBookingLimit,
+    weeklyBookingLimit: row.weeklyBookingLimit,
+    monthlyBookingLimit: row.monthlyBookingLimit,
     locationType: row.locationType,
     locationValue: row.locationValue,
     questions: toEventQuestions(row.questions),
@@ -1958,6 +1979,9 @@ const findPublicEventView = async (
       slug: eventType.slug,
       name: eventType.name,
       durationMinutes: eventType.durationMinutes,
+      dailyBookingLimit: eventType.dailyBookingLimit,
+      weeklyBookingLimit: eventType.weeklyBookingLimit,
+      monthlyBookingLimit: eventType.monthlyBookingLimit,
       locationType: eventType.locationType,
       locationValue: eventType.locationValue,
       questions: eventType.questions,
@@ -1979,6 +2003,68 @@ const resolveTeamMode = (rawMode: string): TeamSchedulingMode | null => {
   return null;
 };
 
+const toEventTypeBookingCaps = (eventType: {
+  dailyBookingLimit?: number | null;
+  weeklyBookingLimit?: number | null;
+  monthlyBookingLimit?: number | null;
+}): EventTypeBookingCaps => {
+  return {
+    dailyBookingLimit: eventType.dailyBookingLimit ?? null,
+    weeklyBookingLimit: eventType.weeklyBookingLimit ?? null,
+    monthlyBookingLimit: eventType.monthlyBookingLimit ?? null,
+  };
+};
+
+const countConfirmedBookingsForEventTypeWindow = async (
+  db: QueryableDb,
+  input: {
+    eventTypeId: string;
+    startsAt: Date;
+    endsAt: Date;
+    excludeBookingId?: string;
+  },
+): Promise<number> => {
+  const [row] = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+    })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.eventTypeId, input.eventTypeId),
+        eq(bookings.status, 'confirmed'),
+        gte(bookings.startsAt, input.startsAt),
+        lt(bookings.startsAt, input.endsAt),
+        ...(input.excludeBookingId ? [sql`${bookings.id} <> ${input.excludeBookingId}`] : []),
+      ),
+    );
+
+  return row?.count ?? 0;
+};
+
+const listConfirmedBookingStartsForEventType = async (
+  db: QueryableDb,
+  input: {
+    eventTypeId: string;
+    startsAt: Date;
+    endsAt: Date;
+  },
+): Promise<Array<{ startsAt: Date }>> => {
+  return db
+    .select({
+      startsAt: bookings.startsAt,
+    })
+    .from(bookings)
+    .where(
+      and(
+        eq(bookings.eventTypeId, input.eventTypeId),
+        eq(bookings.status, 'confirmed'),
+        gte(bookings.startsAt, input.startsAt),
+        lt(bookings.startsAt, input.endsAt),
+      ),
+    );
+};
+
 const findTeamEventTypeContext = async (
   db: Database,
   teamSlug: string,
@@ -1998,14 +2084,19 @@ const findTeamEventTypeContext = async (
       eventTypeSlug: eventTypes.slug,
       eventTypeName: eventTypes.name,
       durationMinutes: eventTypes.durationMinutes,
+      dailyBookingLimit: eventTypes.dailyBookingLimit,
+      weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+      monthlyBookingLimit: eventTypes.monthlyBookingLimit,
       locationType: eventTypes.locationType,
       locationValue: eventTypes.locationValue,
       questions: eventTypes.questions,
+      organizerTimezone: users.timezone,
       isActive: eventTypes.isActive,
     })
     .from(teamEventTypes)
     .innerJoin(teams, eq(teams.id, teamEventTypes.teamId))
     .innerJoin(eventTypes, eq(eventTypes.id, teamEventTypes.eventTypeId))
+    .innerJoin(users, eq(users.id, eventTypes.userId))
     .where(and(eq(teams.slug, teamSlug), eq(eventTypes.slug, eventSlug)))
     .limit(1);
 
@@ -2056,9 +2147,13 @@ const findTeamEventTypeContext = async (
       slug: row.eventTypeSlug,
       name: row.eventTypeName,
       durationMinutes: row.durationMinutes,
+      dailyBookingLimit: row.dailyBookingLimit,
+      weeklyBookingLimit: row.weeklyBookingLimit,
+      monthlyBookingLimit: row.monthlyBookingLimit,
       locationType: row.locationType,
       locationValue: row.locationValue,
       questions: toEventQuestions(row.questions),
+      organizerTimezone: normalizeTimezone(row.organizerTimezone),
       isActive: row.isActive,
     },
     mode,
@@ -4486,6 +4581,9 @@ app.get('/v0/event-types', async (context) => {
         slug: eventTypes.slug,
         name: eventTypes.name,
         durationMinutes: eventTypes.durationMinutes,
+        dailyBookingLimit: eventTypes.dailyBookingLimit,
+        weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+        monthlyBookingLimit: eventTypes.monthlyBookingLimit,
         locationType: eventTypes.locationType,
         locationValue: eventTypes.locationValue,
         questions: eventTypes.questions,
@@ -4503,6 +4601,9 @@ app.get('/v0/event-types', async (context) => {
         slug: row.slug,
         name: row.name,
         durationMinutes: row.durationMinutes,
+        dailyBookingLimit: row.dailyBookingLimit,
+        weeklyBookingLimit: row.weeklyBookingLimit,
+        monthlyBookingLimit: row.monthlyBookingLimit,
         locationType: row.locationType,
         locationValue: row.locationValue,
         questions: toEventQuestions(row.questions),
@@ -4742,6 +4843,9 @@ app.get('/v0/teams/:teamId/event-types', async (context) => {
         slug: eventTypes.slug,
         name: eventTypes.name,
         durationMinutes: eventTypes.durationMinutes,
+        dailyBookingLimit: eventTypes.dailyBookingLimit,
+        weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+        monthlyBookingLimit: eventTypes.monthlyBookingLimit,
         locationType: eventTypes.locationType,
         locationValue: eventTypes.locationValue,
         questions: eventTypes.questions,
@@ -4836,6 +4940,9 @@ app.get('/v0/teams/:teamId/event-types', async (context) => {
             slug: row.slug,
             name: row.name,
             durationMinutes: row.durationMinutes,
+            dailyBookingLimit: row.dailyBookingLimit,
+            weeklyBookingLimit: row.weeklyBookingLimit,
+            monthlyBookingLimit: row.monthlyBookingLimit,
             locationType: row.locationType,
             locationValue: row.locationValue,
             questions: toEventQuestions(row.questions),
@@ -4878,6 +4985,9 @@ app.post('/v0/event-types', async (context) => {
           name: payload.name,
           slug: payload.slug,
           durationMinutes: payload.durationMinutes,
+          dailyBookingLimit: payload.dailyBookingLimit ?? null,
+          weeklyBookingLimit: payload.weeklyBookingLimit ?? null,
+          monthlyBookingLimit: payload.monthlyBookingLimit ?? null,
           locationType: payload.locationType,
           locationValue: payload.locationValue ?? null,
           questions: payload.questions,
@@ -4887,6 +4997,9 @@ app.post('/v0/event-types', async (context) => {
           slug: eventTypes.slug,
           name: eventTypes.name,
           durationMinutes: eventTypes.durationMinutes,
+          dailyBookingLimit: eventTypes.dailyBookingLimit,
+          weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+          monthlyBookingLimit: eventTypes.monthlyBookingLimit,
           locationType: eventTypes.locationType,
           locationValue: eventTypes.locationValue,
           questions: eventTypes.questions,
@@ -4946,6 +5059,15 @@ app.patch('/v0/event-types/:id', async (context) => {
     if (payload.durationMinutes !== undefined) {
       updateValues.durationMinutes = payload.durationMinutes;
     }
+    if (payload.dailyBookingLimit !== undefined) {
+      updateValues.dailyBookingLimit = payload.dailyBookingLimit ?? null;
+    }
+    if (payload.weeklyBookingLimit !== undefined) {
+      updateValues.weeklyBookingLimit = payload.weeklyBookingLimit ?? null;
+    }
+    if (payload.monthlyBookingLimit !== undefined) {
+      updateValues.monthlyBookingLimit = payload.monthlyBookingLimit ?? null;
+    }
     if (payload.locationType !== undefined) {
       updateValues.locationType = payload.locationType;
     }
@@ -4969,6 +5091,9 @@ app.patch('/v0/event-types/:id', async (context) => {
           slug: eventTypes.slug,
           name: eventTypes.name,
           durationMinutes: eventTypes.durationMinutes,
+          dailyBookingLimit: eventTypes.dailyBookingLimit,
+          weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+          monthlyBookingLimit: eventTypes.monthlyBookingLimit,
           locationType: eventTypes.locationType,
           locationValue: eventTypes.locationValue,
           questions: eventTypes.questions,
@@ -5205,6 +5330,9 @@ app.post('/v0/team-event-types', async (context) => {
             name: payload.name,
             slug: payload.slug,
             durationMinutes: payload.durationMinutes,
+            dailyBookingLimit: payload.dailyBookingLimit ?? null,
+            weeklyBookingLimit: payload.weeklyBookingLimit ?? null,
+            monthlyBookingLimit: payload.monthlyBookingLimit ?? null,
             locationType: payload.locationType,
             locationValue: payload.locationValue ?? null,
             questions: payload.questions,
@@ -5215,6 +5343,9 @@ app.post('/v0/team-event-types', async (context) => {
             slug: eventTypes.slug,
             name: eventTypes.name,
             durationMinutes: eventTypes.durationMinutes,
+            dailyBookingLimit: eventTypes.dailyBookingLimit,
+            weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+            monthlyBookingLimit: eventTypes.monthlyBookingLimit,
             locationType: eventTypes.locationType,
             locationValue: eventTypes.locationValue,
             questions: eventTypes.questions,
@@ -5468,50 +5599,65 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
 
     const days = query.data.days ?? 7;
     const rangeEnd = rangeStart.plus({ days });
+    const bookingCaps = toEventTypeBookingCaps(eventType);
+    const capUsageRange = resolveBookingCapUsageRange({
+      rangeStartIso: startIso,
+      days,
+      timezone: eventType.organizerTimezone,
+      caps: bookingCaps,
+    });
 
-    const [rules, overrides, externalBusyWindows, existingBookings] = await Promise.all([
-      db
-        .select({
-          dayOfWeek: availabilityRules.dayOfWeek,
-          startMinute: availabilityRules.startMinute,
-          endMinute: availabilityRules.endMinute,
-          bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
-          bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
-        })
-        .from(availabilityRules)
-        .where(eq(availabilityRules.userId, eventType.userId)),
-      db
-        .select({
-          startAt: availabilityOverrides.startAt,
-          endAt: availabilityOverrides.endAt,
-          isAvailable: availabilityOverrides.isAvailable,
-        })
-        .from(availabilityOverrides)
-        .where(
-          and(
-            eq(availabilityOverrides.userId, eventType.userId),
-            lt(availabilityOverrides.startAt, rangeEnd.toJSDate()),
-            gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
+    const [rules, overrides, externalBusyWindows, existingBookings, eventTypeBookingsForCapUsage] =
+      await Promise.all([
+        db
+          .select({
+            dayOfWeek: availabilityRules.dayOfWeek,
+            startMinute: availabilityRules.startMinute,
+            endMinute: availabilityRules.endMinute,
+            bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
+            bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
+          })
+          .from(availabilityRules)
+          .where(eq(availabilityRules.userId, eventType.userId)),
+        db
+          .select({
+            startAt: availabilityOverrides.startAt,
+            endAt: availabilityOverrides.endAt,
+            isAvailable: availabilityOverrides.isAvailable,
+          })
+          .from(availabilityOverrides)
+          .where(
+            and(
+              eq(availabilityOverrides.userId, eventType.userId),
+              lt(availabilityOverrides.startAt, rangeEnd.toJSDate()),
+              gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
+            ),
           ),
-        ),
-      listExternalBusyWindowsForUser(db, eventType.userId, rangeStart.toJSDate(), rangeEnd.toJSDate()),
-      db
-        .select({
-          startsAt: bookings.startsAt,
-          endsAt: bookings.endsAt,
-          status: bookings.status,
-          metadata: bookings.metadata,
-        })
-        .from(bookings)
-        .where(
-          and(
-            eq(bookings.organizerId, eventType.userId),
-            eq(bookings.status, 'confirmed'),
-            lt(bookings.startsAt, rangeEnd.toJSDate()),
-            gt(bookings.endsAt, rangeStart.toJSDate()),
+        listExternalBusyWindowsForUser(db, eventType.userId, rangeStart.toJSDate(), rangeEnd.toJSDate()),
+        db
+          .select({
+            startsAt: bookings.startsAt,
+            endsAt: bookings.endsAt,
+            status: bookings.status,
+            metadata: bookings.metadata,
+          })
+          .from(bookings)
+          .where(
+            and(
+              eq(bookings.organizerId, eventType.userId),
+              eq(bookings.status, 'confirmed'),
+              lt(bookings.startsAt, rangeEnd.toJSDate()),
+              gt(bookings.endsAt, rangeStart.toJSDate()),
+            ),
           ),
-        ),
-    ]);
+        capUsageRange
+          ? listConfirmedBookingStartsForEventType(db, {
+              eventTypeId: eventType.id,
+              startsAt: capUsageRange.startsAt,
+              endsAt: capUsageRange.endsAt,
+            })
+          : Promise.resolve([]),
+      ]);
 
     const slots = computeAvailabilitySlots({
       organizerTimezone: eventType.organizerTimezone,
@@ -5530,10 +5676,19 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
       bookings: existingBookings,
     });
 
+    const slotsWithBookingCaps = hasBookingCaps(bookingCaps)
+      ? filterSlotsByBookingCaps({
+          slots,
+          timezone: eventType.organizerTimezone,
+          caps: bookingCaps,
+          usage: buildBookingCapUsage(eventTypeBookingsForCapUsage, eventType.organizerTimezone),
+        })
+      : slots;
+
     return context.json({
       ok: true,
       timezone: normalizeTimezone(query.data.timezone),
-      slots: slots.map((slot) => ({
+      slots: slotsWithBookingCaps.map((slot) => ({
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
       })),
@@ -5582,6 +5737,14 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (contex
 
     const days = query.data.days ?? 7;
     const rangeEnd = rangeStart.plus({ days });
+    const organizerTimezone = teamEventContext.eventType.organizerTimezone ?? 'UTC';
+    const bookingCaps = toEventTypeBookingCaps(teamEventContext.eventType);
+    const capUsageRange = resolveBookingCapUsageRange({
+      rangeStartIso: startIso,
+      days,
+      timezone: organizerTimezone,
+      caps: bookingCaps,
+    });
     const memberSchedules = await listTeamMemberSchedules(
       db,
       teamEventContext.members.map((member) => member.userId),
@@ -5598,11 +5761,27 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (contex
       roundRobinCursor: teamEventContext.roundRobinCursor,
     });
 
+    const eventTypeBookingsForCapUsage = capUsageRange
+      ? await listConfirmedBookingStartsForEventType(db, {
+          eventTypeId: teamEventContext.eventType.id,
+          startsAt: capUsageRange.startsAt,
+          endsAt: capUsageRange.endsAt,
+        })
+      : [];
+    const slotsWithBookingCaps = hasBookingCaps(bookingCaps)
+      ? filterSlotsByBookingCaps({
+          slots: availability.slots,
+          timezone: organizerTimezone,
+          caps: bookingCaps,
+          usage: buildBookingCapUsage(eventTypeBookingsForCapUsage, organizerTimezone),
+        })
+      : availability.slots;
+
     return context.json({
       ok: true,
       mode: teamEventContext.mode,
       timezone: normalizeTimezone(query.data.timezone),
-      slots: availability.slots.map((slot) => ({
+      slots: slotsWithBookingCaps.map((slot) => ({
         startsAt: slot.startsAt,
         endsAt: slot.endsAt,
         assignmentUserIds: slot.assignmentUserIds,
@@ -5658,6 +5837,9 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug', async (context) => {
         slug: teamEventContext.eventType.slug,
         name: teamEventContext.eventType.name,
         durationMinutes: teamEventContext.eventType.durationMinutes,
+        dailyBookingLimit: teamEventContext.eventType.dailyBookingLimit,
+        weeklyBookingLimit: teamEventContext.eventType.weeklyBookingLimit,
+        monthlyBookingLimit: teamEventContext.eventType.monthlyBookingLimit,
         locationType: teamEventContext.eventType.locationType,
         locationValue: teamEventContext.eventType.locationValue,
         questions: teamEventContext.eventType.questions ?? [],
@@ -5774,8 +5956,12 @@ app.post('/v0/team-bookings', async (context) => {
           eventTypeId: string;
           eventTypeName: string;
           durationMinutes: number;
+          dailyBookingLimit: number | null;
+          weeklyBookingLimit: number | null;
+          monthlyBookingLimit: number | null;
           locationType: string;
           locationValue: string | null;
+          organizerTimezone: string;
           isActive: boolean;
         }>(sql`
           select
@@ -5787,12 +5973,17 @@ app.post('/v0/team-bookings', async (context) => {
             et.id as "eventTypeId",
             et.name as "eventTypeName",
             et.duration_minutes as "durationMinutes",
+            et.daily_booking_limit as "dailyBookingLimit",
+            et.weekly_booking_limit as "weeklyBookingLimit",
+            et.monthly_booking_limit as "monthlyBookingLimit",
             et.location_type as "locationType",
             et.location_value as "locationValue",
+            u.timezone as "organizerTimezone",
             et.is_active as "isActive"
           from team_event_types tet
           inner join teams t on t.id = tet.team_id
           inner join event_types et on et.id = tet.event_type_id
+          inner join users u on u.id = et.user_id
           where t.slug = ${payload.teamSlug} and et.slug = ${payload.eventSlug}
           for update
         `);
@@ -5850,6 +6041,22 @@ app.post('/v0/team-bookings', async (context) => {
         });
         if (!slotResolution) {
           throw new BookingConflictError('Selected slot is no longer available.');
+        }
+
+        const capWindows = buildBookingCapWindowsForSlot({
+          startsAtIso: requestedStartsAtIso,
+          timezone: normalizeTimezone(teamEventRow.organizerTimezone),
+          caps: toEventTypeBookingCaps(teamEventRow),
+        });
+        for (const window of capWindows) {
+          const existingCount = await countConfirmedBookingsForEventTypeWindow(transaction, {
+            eventTypeId: teamEventRow.eventTypeId,
+            startsAt: window.startsAt,
+            endsAt: window.endsAt,
+          });
+          if (existingCount >= window.limit) {
+            throw new BookingConflictError('Booking limit reached for this event window.');
+          }
         }
 
         // Organizer for a team booking is deterministically the first assigned member.
@@ -6307,6 +6514,13 @@ app.post('/v0/bookings', async (context) => {
                         gt(bookings.endsAt, rangeStart),
                       ),
                     );
+                },
+                countConfirmedEventTypeBookingsInWindow: async (input) => {
+                  return countConfirmedBookingsForEventTypeWindow(transaction, {
+                    eventTypeId: input.eventTypeId,
+                    startsAt: input.startsAt,
+                    endsAt: input.endsAt,
+                  });
                 },
                 insertActionTokens: async (bookingId, tokens) => {
                   if (tokens.length === 0) {
@@ -7052,6 +7266,9 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             slug,
             name,
             duration_minutes as "durationMinutes",
+            daily_booking_limit as "dailyBookingLimit",
+            weekly_booking_limit as "weeklyBookingLimit",
+            monthly_booking_limit as "monthlyBookingLimit",
             location_type as "locationType",
             location_value as "locationValue",
             is_active as "isActive"
@@ -7307,6 +7524,23 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             userIds: teamSlotResolution.assignmentUserIds,
             mode: teamMode,
           };
+        }
+
+        const capWindows = buildBookingCapWindowsForSlot({
+          startsAtIso: requestedStartsAtIso,
+          timezone: normalizeTimezone(organizerRow.timezone),
+          caps: toEventTypeBookingCaps(eventTypeRow),
+        });
+        for (const window of capWindows) {
+          const existingCount = await countConfirmedBookingsForEventTypeWindow(transaction, {
+            eventTypeId: booking.eventTypeId,
+            startsAt: window.startsAt,
+            endsAt: window.endsAt,
+            excludeBookingId: booking.id,
+          });
+          if (existingCount >= window.limit) {
+            throw new BookingConflictError('Booking limit reached for this event window.');
+          }
         }
 
         const metadata = JSON.stringify({

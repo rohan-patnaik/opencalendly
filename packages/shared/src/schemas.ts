@@ -42,6 +42,7 @@ export const eventQuestionsSchema = z.array(eventQuestionSchema).max(20);
 export const locationTypeSchema = z.enum(['video', 'phone', 'in_person', 'custom']);
 export const teamMemberRoleSchema = z.enum(['owner', 'member']);
 export const teamSchedulingModeSchema = z.enum(['round_robin', 'collective']);
+export const bookingLimitSchema = z.number().int().min(1).max(1000);
 
 export const magicLinkRequestSchema = z.object({
   email: emailSchema,
@@ -64,6 +65,9 @@ export const eventTypeCreateSchema = z.object({
   locationType: locationTypeSchema,
   locationValue: z.string().max(500).nullish(),
   questions: eventQuestionsSchema.default([]),
+  dailyBookingLimit: bookingLimitSchema.nullish(),
+  weeklyBookingLimit: bookingLimitSchema.nullish(),
+  monthlyBookingLimit: bookingLimitSchema.nullish(),
 });
 
 export const eventTypeUpdateSchema = eventTypeCreateSchema
@@ -94,6 +98,9 @@ export const teamEventTypeCreateSchema = z.object({
   locationType: locationTypeSchema.default('video'),
   locationValue: z.string().max(500).nullish(),
   questions: eventQuestionsSchema.default([]),
+  dailyBookingLimit: bookingLimitSchema.nullish(),
+  weeklyBookingLimit: bookingLimitSchema.nullish(),
+  monthlyBookingLimit: bookingLimitSchema.nullish(),
   requiredMemberUserIds: z.array(z.string().uuid()).min(1).max(100).optional(),
 });
 
