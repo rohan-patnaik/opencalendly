@@ -139,6 +139,16 @@
   padding-bottom: 2rem;
 }
 
+.signOutError {
+  margin: 0.75rem 1rem 0;
+  border: 1px solid var(--state-error);
+  background: var(--bg-surface);
+  color: var(--state-error);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  font-size: var(--text-sm);
+}
+
 .mobileOverlay {
   position: fixed;
   inset: 0;

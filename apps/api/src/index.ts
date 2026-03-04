@@ -3031,29 +3031,59 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     }
 
     const clerkClient = createClerkClient({ secretKey: clerkSecretKey });
-    let clerkUser:
-      | Awaited<ReturnType<(typeof clerkClient.users)['getUser']>>
-      | null = null;
-    try {
-      clerkUser = await clerkClient.users.getUser(clerkUserId);
-    } catch (error) {
-      const status =
+    const CLERK_USER_LOOKUP_MAX_ATTEMPTS = 3;
+    const CLERK_USER_LOOKUP_RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+    const resolveLookupErrorStatus = (error: unknown): number | null => {
+      if (
         typeof error === 'object' &&
         error &&
         'status' in error &&
         typeof (error as { status?: unknown }).status === 'number'
-          ? ((error as { status: number }).status as number)
-          : null;
-      if (status === 404) {
-        return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
+      ) {
+        return (error as { status: number }).status;
       }
+      return null;
+    };
+
+    let clerkUser:
+      | Awaited<ReturnType<(typeof clerkClient.users)['getUser']>>
+      | null = null;
+    let clerkLookupError: unknown = null;
+    for (let attempt = 1; attempt <= CLERK_USER_LOOKUP_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        clerkUser = await clerkClient.users.getUser(clerkUserId);
+        break;
+      } catch (error) {
+        clerkLookupError = error;
+        const status = resolveLookupErrorStatus(error);
+        if (status === 404) {
+          return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
+        }
+
+        const retryable = status ? CLERK_USER_LOOKUP_RETRYABLE_STATUS_CODES.has(status) : true;
+        if (!retryable || attempt >= CLERK_USER_LOOKUP_MAX_ATTEMPTS) {
+          break;
+        }
+
+        const baseDelayMs = 200;
+        const maxDelayMs = 1_600;
+        const backoffDelayMs = Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1));
+        const jitterMs = Math.floor(Math.random() * 120);
+        await new Promise<void>((resolve) => setTimeout(resolve, backoffDelayMs + jitterMs));
+      }
+    }
+
+    if (!clerkUser && clerkLookupError) {
+      const status = resolveLookupErrorStatus(clerkLookupError);
       console.error('clerk_user_lookup_failed', {
         clerkUserId,
+        attempts: CLERK_USER_LOOKUP_MAX_ATTEMPTS,
         status,
-        error: error instanceof Error ? error.message : 'unknown',
+        error: clerkLookupError instanceof Error ? clerkLookupError.message : 'unknown',
       });
       return jsonError(context, 502, 'Upstream dependency error contacting Clerk.');
     }
+
     if (!clerkUser) {
       return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
     }

@@ -34,8 +34,10 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const { session, ready, clear } = useAuthSession();
   const { signOut } = useClerk();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const handleSignOut = useCallback(async () => {
+    setSignOutError(null);
     clear();
     try {
       await signOut({ redirectUrl: '/auth/sign-in' });
@@ -43,9 +45,11 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
         console.error('Clerk sign-out failed:', detail ?? 'unknown clerk error');
+        setSignOutError(detail ?? 'Unable to sign out right now. Please retry.');
         return;
       }
       console.error('Clerk sign-out failed:', error);
+      setSignOutError('Unable to sign out right now. Please retry.');
     }
   }, [clear, signOut]);
 
@@ -184,6 +188,12 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
       </aside>
+
+      {signOutError ? (
+        <div className={styles.signOutError} role="alert">
+          {signOutError}
+        </div>
+      ) : null}
 
       <div className={styles.content}>{children}</div>
     </div>
