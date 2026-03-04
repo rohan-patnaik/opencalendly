@@ -3026,64 +3026,68 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
         timezone: normalizeTimezone(nextTimezone),
       };
     } else {
-      const username = await resolveUniqueUsername({
-        preferredCandidate: preferredUsername,
-        email,
-        isUsernameTaken: async (candidate) => {
-          const [existingWithUsername] = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(eq(users.username, candidate))
-            .limit(1);
-          return Boolean(existingWithUsername);
-        },
-      });
       const timezone = requestedTimezone ?? 'UTC';
 
-      try {
-        const [inserted] = await db
-          .insert(users)
-          .values({
-            email,
-            username,
-            displayName: resolvedDisplayName,
-            timezone,
-          })
-          .returning({
-            id: users.id,
-            email: users.email,
-            username: users.username,
-            displayName: users.displayName,
-            timezone: users.timezone,
-          });
+      for (let attempt = 0; attempt < 5 && !userRecord; attempt += 1) {
+        const candidateSeed = attempt === 0 ? preferredUsername : `${preferredUsername}-${attempt}`;
+        const username = await resolveUniqueUsername({
+          preferredCandidate: candidateSeed,
+          email,
+          isUsernameTaken: async (candidate) => {
+            const [existingWithUsername] = await db
+              .select({ id: users.id })
+              .from(users)
+              .where(eq(users.username, candidate))
+              .limit(1);
+            return Boolean(existingWithUsername);
+          },
+        });
 
-        if (inserted) {
-          userRecord = {
-            ...inserted,
-            timezone: normalizeTimezone(inserted.timezone),
-          };
-        }
-      } catch (error) {
-        if (!isUniqueViolation(error)) {
-          throw error;
-        }
+        try {
+          const [inserted] = await db
+            .insert(users)
+            .values({
+              email,
+              username,
+              displayName: resolvedDisplayName,
+              timezone,
+            })
+            .returning({
+              id: users.id,
+              email: users.email,
+              username: users.username,
+              displayName: users.displayName,
+              timezone: users.timezone,
+            });
 
-        const [retried] = await db
-          .select({
-            id: users.id,
-            email: users.email,
-            username: users.username,
-            displayName: users.displayName,
-            timezone: users.timezone,
-          })
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1);
-        if (retried) {
-          userRecord = {
-            ...retried,
-            timezone: normalizeTimezone(retried.timezone),
-          };
+          if (inserted) {
+            userRecord = {
+              ...inserted,
+              timezone: normalizeTimezone(inserted.timezone),
+            };
+          }
+        } catch (error) {
+          if (!isUniqueViolation(error)) {
+            throw error;
+          }
+
+          const [retried] = await db
+            .select({
+              id: users.id,
+              email: users.email,
+              username: users.username,
+              displayName: users.displayName,
+              timezone: users.timezone,
+            })
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
+          if (retried) {
+            userRecord = {
+              ...retried,
+              timezone: normalizeTimezone(retried.timezone),
+            };
+          }
         }
       }
     }
