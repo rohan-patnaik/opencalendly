@@ -148,7 +148,7 @@ h3,
 h4 {
   margin-top: 0;
   color: var(--text-primary);
-  font-family: var(--font-space-grotesk), 'Inter', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-space-grotesk), Inter, 'Helvetica Neue', sans-serif;
   line-height: 1.2;
 }
 
