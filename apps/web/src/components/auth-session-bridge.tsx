@@ -22,12 +22,15 @@ type ClerkExchangeResponse = {
 };
 
 const apiBaseUrl = resolveApiBaseUrl('Clerk session exchange');
+const MAX_SESSION_EXCHANGE_RETRIES = 5;
+const RETRYABLE_EXCHANGE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 export default function AuthSessionBridge() {
   const { isLoaded, isSignedIn, getToken, sessionId } = useAuth();
   const { user } = useUser();
   const lastSyncKeyRef = useRef('');
   const inFlightSyncKeyRef = useRef<string | null>(null);
+  const retryStateRef = useRef<{ syncKey: string; attempts: number }>({ syncKey: '', attempts: 0 });
   const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
@@ -39,6 +42,7 @@ export default function AuthSessionBridge() {
     if (!isSignedIn) {
       lastSyncKeyRef.current = '';
       inFlightSyncKeyRef.current = null;
+      retryStateRef.current = { syncKey: '', attempts: 0 };
       if (!existingSession || existingSession.issuer !== 'legacy') {
         clearAuthSession();
       }
@@ -68,6 +72,9 @@ export default function AuthSessionBridge() {
 
     let cancelled = false;
     const syncKey = exchangeDecision.syncKey;
+    if (retryStateRef.current.syncKey !== syncKey) {
+      retryStateRef.current = { syncKey, attempts: 0 };
+    }
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const exchangeSession = async () => {
       const clerkToken = await getToken();
@@ -94,7 +101,13 @@ export default function AuthSessionBridge() {
 
       const payload = (await response.json().catch(() => null)) as ClerkExchangeResponse | null;
       if (!response.ok || !payload || !payload.ok) {
-        throw new Error(payload?.error || 'Unable to exchange Clerk session.');
+        const error = new Error(payload?.error || 'Unable to exchange Clerk session.') as Error & {
+          status?: number;
+          retryable?: boolean;
+        };
+        error.status = response.status;
+        error.retryable = RETRYABLE_EXCHANGE_STATUS_CODES.has(response.status);
+        throw error;
       }
 
       if (cancelled) {
@@ -108,20 +121,48 @@ export default function AuthSessionBridge() {
         user: payload.user,
       });
       lastSyncKeyRef.current = syncKey;
+      retryStateRef.current = { syncKey: '', attempts: 0 };
     };
 
-    void exchangeSession().catch((error) => {
-      console.error('Clerk session exchange failed:', error);
-      if (!cancelled) {
-        retryTimer = setTimeout(() => {
-          setRetryNonce((current) => current + 1);
-        }, 2_000);
-      }
-    }).finally(() => {
-      if (inFlightSyncKeyRef.current === syncKey) {
-        inFlightSyncKeyRef.current = null;
-      }
-    });
+    void exchangeSession()
+      .catch((error) => {
+        const retryable =
+          typeof error === 'object' &&
+          error !== null &&
+          'retryable' in error &&
+          typeof (error as { retryable?: unknown }).retryable === 'boolean'
+            ? ((error as { retryable: boolean }).retryable as boolean)
+            : true;
+        const status =
+          typeof error === 'object' &&
+          error !== null &&
+          'status' in error &&
+          typeof (error as { status?: unknown }).status === 'number'
+            ? ((error as { status: number }).status as number)
+            : null;
+        console.error('Clerk session exchange failed:', {
+          status,
+          retryable,
+          attempts: retryStateRef.current.attempts,
+          error: error instanceof Error ? error.message : 'unknown',
+        });
+
+        if (!cancelled && retryable && retryStateRef.current.attempts < MAX_SESSION_EXCHANGE_RETRIES) {
+          retryStateRef.current = {
+            syncKey,
+            attempts: retryStateRef.current.attempts + 1,
+          };
+          const delayMs = Math.min(8_000, 2_000 * retryStateRef.current.attempts);
+          retryTimer = setTimeout(() => {
+            setRetryNonce((current) => current + 1);
+          }, delayMs);
+        }
+      })
+      .finally(() => {
+        if (inFlightSyncKeyRef.current === syncKey) {
+          inFlightSyncKeyRef.current = null;
+        }
+      });
 
     return () => {
       cancelled = true;

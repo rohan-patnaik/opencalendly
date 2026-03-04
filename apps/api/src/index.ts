@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import { createClerkClient, verifyToken } from '@clerk/backend';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -3144,7 +3144,7 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
         } catch (error) {
           console.error('clerk_username_resolution_failed', {
             preferredUsername,
-            email,
+            emailDomain: email.split('@')[1] ?? 'unknown',
             attempt,
             error: error instanceof Error ? error.message : 'unknown',
           });
@@ -3215,11 +3215,23 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     const sessionToken = createRawToken();
     const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
 
-    await db.insert(sessions).values({
-      userId: userRecord.id,
-      tokenHash: hashToken(sessionToken),
-      expiresAt,
-    });
+    const [insertedSession] = await db
+      .insert(sessions)
+      .values({
+        userId: userRecord.id,
+        tokenHash: hashToken(sessionToken),
+        expiresAt,
+      })
+      .returning({
+        id: sessions.id,
+      });
+
+    if (insertedSession) {
+      // Keep a single active API session per user for Clerk exchange flows.
+      await db
+        .delete(sessions)
+        .where(and(eq(sessions.userId, userRecord.id), ne(sessions.id, insertedSession.id)));
+    }
 
     return context.json({
       ok: true,
