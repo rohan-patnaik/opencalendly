@@ -5,6 +5,9 @@ import SignInPageClient from './page.client';
 function SignInPageFallback() {
   return (
     <section
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       style={{
         margin: '4rem auto',
         maxWidth: 680,
