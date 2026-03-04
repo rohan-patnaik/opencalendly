@@ -498,7 +498,7 @@ const resolveClerkAuthorizedParties = (env: Bindings, request: Request): string[
     try {
       values.add(new URL(configured).origin);
     } catch {
-      // Ignore invalid APP_BASE_URL here; request handlers already validate URL where required.
+      throw new Error('APP_BASE_URL must be a valid absolute URL when Clerk auth is enabled.');
     }
   }
 
@@ -3006,9 +3006,20 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     }
 
     let clerkUserId = '';
+    let authorizedParties: string[] = [];
+    try {
+      authorizedParties = resolveClerkAuthorizedParties(context.env, context.req.raw);
+    } catch (error) {
+      return jsonError(
+        context,
+        500,
+        error instanceof Error
+          ? error.message
+          : 'APP_BASE_URL must be a valid absolute URL when Clerk auth is enabled.',
+      );
+    }
     try {
       const audiences = resolveClerkAllowedAudiences(context.env);
-      const authorizedParties = resolveClerkAuthorizedParties(context.env, context.req.raw);
       const tokenPayload = await verifyToken(parsed.data.clerkToken, {
         secretKey: clerkSecretKey,
         ...(audiences.length > 0 ? { audience: audiences } : {}),

@@ -102,9 +102,10 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
   const handleSignOut = useCallback(async () => {
     try {
       await signOut();
-      clear();
     } catch (error) {
       console.error('Clerk sign-out failed:', error);
+    } finally {
+      clear();
     }
   }, [clear, signOut]);
 

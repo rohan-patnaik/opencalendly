@@ -67,6 +67,7 @@ export default function SignInPageClient() {
       save({
         sessionToken: payload.sessionToken,
         expiresAt: payload.expiresAt,
+        issuer: 'legacy',
         user: payload.user,
       });
       router.replace('/dashboard');

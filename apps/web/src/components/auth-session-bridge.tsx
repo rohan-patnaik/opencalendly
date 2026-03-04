@@ -39,7 +39,7 @@ export default function AuthSessionBridge() {
     if (!isSignedIn) {
       lastSyncKeyRef.current = '';
       inFlightSyncKeyRef.current = null;
-      if (!existingSession) {
+      if (!existingSession || existingSession.issuer !== 'legacy') {
         clearAuthSession();
       }
       return;
@@ -104,6 +104,7 @@ export default function AuthSessionBridge() {
       writeAuthSession({
         sessionToken: payload.sessionToken,
         expiresAt: payload.expiresAt,
+        issuer: 'clerk',
         user: payload.user,
       });
       lastSyncKeyRef.current = syncKey;

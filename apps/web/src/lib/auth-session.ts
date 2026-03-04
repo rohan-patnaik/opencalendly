@@ -9,6 +9,7 @@ export type AuthUser = {
 export type AuthSession = {
   sessionToken: string;
   expiresAt: string;
+  issuer?: 'legacy' | 'clerk';
   user: AuthUser;
 };
 

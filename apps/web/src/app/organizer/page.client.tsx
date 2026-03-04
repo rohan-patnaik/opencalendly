@@ -284,9 +284,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const handleSignOut = useCallback(async () => {
     try {
       await signOut();
-      clear();
     } catch (error) {
       console.error('Clerk sign-out failed:', error);
+    } finally {
+      clear();
     }
   }, [clear, signOut]);
 
