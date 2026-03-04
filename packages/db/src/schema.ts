@@ -29,7 +29,14 @@ type CalendarProviderRecord = 'google' | 'microsoft';
 type CalendarWritebackOperationRecord = 'create' | 'cancel' | 'reschedule';
 type CalendarWritebackStatusRecord = 'pending' | 'succeeded' | 'failed';
 type AnalyticsFunnelStageRecord = 'page_view' | 'slot_selection' | 'booking_confirmed';
-type EmailDeliveryTypeRecord = 'booking_confirmation' | 'booking_cancellation' | 'booking_rescheduled';
+type NotificationRuleTypeRecord = 'reminder' | 'follow_up';
+type ScheduledNotificationStatusRecord = 'pending' | 'sent' | 'failed' | 'canceled';
+type EmailDeliveryTypeRecord =
+  | 'booking_confirmation'
+  | 'booking_cancellation'
+  | 'booking_rescheduled'
+  | 'booking_reminder'
+  | 'booking_follow_up';
 type EmailDeliveryStatusRecord = 'succeeded' | 'failed';
 type IdempotencyRequestStatusRecord = 'in_progress' | 'completed';
 type WebhookEventPayloadRecord = {
@@ -66,10 +73,19 @@ export const analyticsFunnelStageEnum = pgEnum('analytics_funnel_stage', [
   'slot_selection',
   'booking_confirmed',
 ]);
+export const notificationRuleTypeEnum = pgEnum('notification_rule_type', ['reminder', 'follow_up']);
+export const scheduledNotificationStatusEnum = pgEnum('scheduled_notification_status', [
+  'pending',
+  'sent',
+  'failed',
+  'canceled',
+]);
 export const emailDeliveryTypeEnum = pgEnum('email_delivery_type', [
   'booking_confirmation',
   'booking_cancellation',
   'booking_rescheduled',
+  'booking_reminder',
+  'booking_follow_up',
 ]);
 export const emailDeliveryStatusEnum = pgEnum('email_delivery_status', ['succeeded', 'failed']);
 export const idempotencyRequestStatusEnum = pgEnum('idempotency_request_status', [
@@ -297,6 +313,121 @@ export const bookings = pgTable(
       table.eventTypeId,
       table.status,
       table.startsAt,
+    ),
+  }),
+);
+
+export const notificationRules = pgTable(
+  'notification_rules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    eventTypeId: uuid('event_type_id')
+      .notNull()
+      .references(() => eventTypes.id, { onDelete: 'cascade' }),
+    notificationType: notificationRuleTypeEnum('notification_type')
+      .$type<NotificationRuleTypeRecord>()
+      .notNull(),
+    offsetMinutes: integer('offset_minutes').notNull(),
+    isEnabled: boolean('is_enabled').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    idTypeUnique: unique('notification_rules_id_type_unique').on(
+      table.id,
+      table.notificationType,
+    ),
+    uniquePerEventTypeTypeOffset: unique('notification_rules_event_type_type_offset_unique').on(
+      table.eventTypeId,
+      table.notificationType,
+      table.offsetMinutes,
+    ),
+    eventTypeIndex: index('notification_rules_event_type_idx').on(table.eventTypeId),
+    offsetRange: check(
+      'notification_rules_offset_range',
+      sql`${table.offsetMinutes} > 0 and ${table.offsetMinutes} <= 10080`,
+    ),
+  }),
+);
+
+export const scheduledNotifications = pgTable(
+  'scheduled_notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizerId: uuid('organizer_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bookingId: uuid('booking_id')
+      .notNull()
+      .references(() => bookings.id, { onDelete: 'cascade' }),
+    eventTypeId: uuid('event_type_id')
+      .notNull()
+      .references(() => eventTypes.id, { onDelete: 'cascade' }),
+    notificationRuleId: uuid('notification_rule_id').notNull(),
+    notificationType: notificationRuleTypeEnum('notification_type')
+      .$type<NotificationRuleTypeRecord>()
+      .notNull(),
+    recipientEmail: varchar('recipient_email', { length: 320 }).notNull(),
+    recipientName: varchar('recipient_name', { length: 120 }).notNull(),
+    bookingStartsAt: timestamp('booking_starts_at', { withTimezone: true }).notNull(),
+    bookingEndsAt: timestamp('booking_ends_at', { withTimezone: true }).notNull(),
+    sendAt: timestamp('send_at', { withTimezone: true }).notNull(),
+    leasedUntil: timestamp('leased_until', { withTimezone: true }),
+    status: scheduledNotificationStatusEnum('status')
+      .$type<ScheduledNotificationStatusRecord>()
+      .notNull()
+      .default('pending'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    lastError: text('last_error'),
+    provider: varchar('provider', { length: 32 }).notNull().default('none'),
+    providerMessageId: varchar('provider_message_id', { length: 255 }),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    canceledAt: timestamp('canceled_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    ruleTypeFk: foreignKey({
+      columns: [table.notificationRuleId, table.notificationType],
+      foreignColumns: [notificationRules.id, notificationRules.notificationType],
+      name: 'scheduled_notifications_rule_type_fk',
+    }).onDelete('cascade'),
+    uniqueBookingRuleRecipient: unique('scheduled_notifications_booking_rule_recipient_unique').on(
+      table.bookingId,
+      table.notificationRuleId,
+      table.recipientEmail,
+    ),
+    organizerStatusSendAtIndex: index('scheduled_notifications_organizer_status_send_at_idx').on(
+      table.organizerId,
+      table.status,
+      table.sendAt,
+    ),
+    bookingStatusSendAtIndex: index('scheduled_notifications_booking_status_send_at_idx').on(
+      table.bookingId,
+      table.status,
+      table.sendAt,
+    ),
+    sendAtIndex: index('scheduled_notifications_send_at_idx').on(table.sendAt),
+    leasedUntilIndex: index('scheduled_notifications_leased_until_idx').on(table.leasedUntil),
+    attemptCountRange: check(
+      'scheduled_notifications_attempt_count_range',
+      sql`${table.attemptCount} >= 0 and ${table.attemptCount} <= 100`,
+    ),
+    terminalStateConsistencyCheck: check(
+      'scheduled_notifications_terminal_state_consistency_check',
+      sql`(
+        ${table.status} = 'sent'
+        AND ${table.sentAt} is not null
+        AND ${table.canceledAt} is null
+      ) OR (
+        ${table.status} = 'canceled'
+        AND ${table.canceledAt} is not null
+        AND ${table.sentAt} is null
+      ) OR (
+        ${table.status} in ('pending', 'failed')
+        AND ${table.sentAt} is null
+        AND ${table.canceledAt} is null
+      )`,
     ),
   }),
 );

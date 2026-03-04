@@ -12,6 +12,8 @@ import {
   analyticsTrackFunnelEventSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
+  setNotificationRulesSchema,
+  notificationsRunSchema,
   demoCreditsConsumeSchema,
   eventTypeCreateSchema,
   healthCheckSchema,
@@ -166,6 +168,36 @@ describe('shared schemas', () => {
     });
 
     expect(payload.timezone).toBe('Asia/Kolkata');
+  });
+
+  it('accepts notification rules payloads', () => {
+    const payload = setNotificationRulesSchema.parse({
+      rules: [
+        { notificationType: 'reminder', offsetMinutes: 60, isEnabled: true },
+        { notificationType: 'follow_up', offsetMinutes: 120, isEnabled: true },
+      ],
+    });
+
+    expect(payload.rules).toHaveLength(2);
+  });
+
+  it('rejects duplicate notification rules payloads', () => {
+    const result = setNotificationRulesSchema.safeParse({
+      rules: [
+        { notificationType: 'reminder', offsetMinutes: 60, isEnabled: true },
+        { notificationType: 'reminder', offsetMinutes: 60, isEnabled: false },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts notifications runner payloads', () => {
+    const payload = notificationsRunSchema.parse({
+      limit: 25,
+    });
+
+    expect(payload.limit).toBe(25);
   });
 
   it('accepts demo credits consume payloads', () => {

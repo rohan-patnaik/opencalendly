@@ -531,3 +531,36 @@ Acceptance criteria:
   - availability exclusion from time-off
   - commit-time conflict handling for one-on-one/team/reschedule.
 - `docs/API.md` is updated with time-off and holiday import contracts.
+
+### Feature 26: Automated reminders + follow-up workflows parity completion
+
+Scope:
+- Complete reminders/follow-up parity by adding configurable per-event notification rules.
+- Persist scheduled notification jobs on booking create/reschedule/cancel lifecycle transitions.
+- Add a deterministic runner endpoint to send due reminders/follow-ups through Resend.
+- Keep existing confirmation/cancellation/reschedule emails unchanged while adding scheduled workflow emails.
+
+Acceptance criteria:
+
+- Event types support authenticated notification rule CRUD with explicit offsets:
+  - `GET /v0/event-types/:eventTypeId/notification-rules`
+  - `PUT /v0/event-types/:eventTypeId/notification-rules`
+- Supported rule kinds are:
+  - `reminder` (before start)
+  - `follow_up` (after end)
+- Booking lifecycle behavior is deterministic:
+  - create booking => schedule enabled reminder/follow-up rows
+  - reschedule booking => cancel pending rows for old booking and schedule rows for new booking
+  - cancel booking => cancel pending reminder/follow-up rows for that booking
+- Due scheduled rows are processed through authenticated runner endpoint:
+  - `POST /v0/notifications/run`
+  - bounded batch processing
+  - retry attempts with persisted status/error metadata
+- Email send telemetry includes new `emailType` values for reminder/follow-up deliveries.
+- Organizer UI includes a Notification rules panel in event type management for editing rule offsets.
+- Tests cover:
+  - rule validation
+  - scheduling on create/reschedule/cancel
+  - runner success/failure/retry behavior
+  - idempotent processing of already-sent rows.
+- `docs/API.md` is updated with notification rule + runner contracts.

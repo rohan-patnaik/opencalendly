@@ -97,6 +97,7 @@ export type BookingTransaction = {
     metadata: string | null;
   }): Promise<InsertedBooking>;
   insertActionTokens(bookingId: string, tokens: BookingActionTokenWrite[]): Promise<void>;
+  afterInsertBooking?(booking: InsertedBooking): Promise<void>;
 };
 
 export type BookingDataAccess = {
@@ -248,6 +249,7 @@ export const commitBooking = async (
       });
 
       await transaction.insertActionTokens(booking.id, actionTokenSet.tokenWrites);
+      await transaction.afterInsertBooking?.(booking);
 
       return {
         booking,

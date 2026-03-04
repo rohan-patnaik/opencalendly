@@ -29,6 +29,15 @@ export type OrganizerEventType = {
   createdAt: string;
 };
 
+export type NotificationRule = {
+  id: string;
+  notificationType: 'reminder' | 'follow_up';
+  offsetMinutes: number;
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AvailabilityRule = {
   id: string;
   dayOfWeek: number;
@@ -164,6 +173,9 @@ const fallback = {
   eventTypesList: 'Unable to load event types.',
   eventTypeCreate: 'Unable to create event type.',
   eventTypeUpdate: 'Unable to update event type.',
+  notificationRulesGet: 'Unable to load notification rules.',
+  notificationRulesPut: 'Unable to save notification rules.',
+  notificationsRun: 'Unable to run notification workflows.',
   availabilityGet: 'Unable to load availability.',
   availabilityRulesPut: 'Unable to update availability rules.',
   availabilityOverridesPut: 'Unable to update availability overrides.',
@@ -248,6 +260,62 @@ export const organizerApi = {
       session,
       body,
       fallbackError: fallback.eventTypeUpdate,
+    });
+  },
+
+  getNotificationRules: async (
+    apiBaseUrl: string,
+    session: AuthSession | null,
+    eventTypeId: string,
+  ) => {
+    return authedGetJson<{
+      ok: true;
+      eventTypeId: string;
+      rules: NotificationRule[];
+    }>({
+      url: `${apiBaseUrl}/v0/event-types/${encodeURIComponent(eventTypeId)}/notification-rules`,
+      session,
+      fallbackError: fallback.notificationRulesGet,
+    });
+  },
+
+  replaceNotificationRules: async (
+    apiBaseUrl: string,
+    session: AuthSession | null,
+    eventTypeId: string,
+    rules: Array<{
+      notificationType: 'reminder' | 'follow_up';
+      offsetMinutes: number;
+      isEnabled?: boolean;
+    }>,
+  ) => {
+    return authedPutJson<{
+      ok: true;
+      eventTypeId: string;
+      count: number;
+      rules: NotificationRule[];
+    }>({
+      url: `${apiBaseUrl}/v0/event-types/${encodeURIComponent(eventTypeId)}/notification-rules`,
+      session,
+      body: { rules },
+      fallbackError: fallback.notificationRulesPut,
+    });
+  },
+
+  runNotificationWorkflows: async (apiBaseUrl: string, session: AuthSession | null, limit?: number) => {
+    return authedPostJson<{
+      ok: true;
+      limit: number;
+      maxAttempts: number;
+      processed: number;
+      succeeded: number;
+      failed: number;
+      skipped: number;
+    }>({
+      url: `${apiBaseUrl}/v0/notifications/run${typeof limit === 'number' ? `?limit=${encodeURIComponent(String(limit))}` : ''}`,
+      session,
+      body: {},
+      fallbackError: fallback.notificationsRun,
     });
   },
 
