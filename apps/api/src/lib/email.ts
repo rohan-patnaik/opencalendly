@@ -80,6 +80,20 @@ const formatDateForTimezone = (isoDate: string, timezone: string): string => {
   return date.toLocaleString(DateTime.DATETIME_FULL);
 };
 
+const formatLocationForEmail = (locationType: string, locationValue: string | null): string => {
+  const explicitLocation = locationValue?.trim();
+  if (explicitLocation) {
+    return explicitLocation;
+  }
+
+  const normalizedType = locationType.replace(/[_-]/g, ' ').trim();
+  if (!normalizedType) {
+    return 'TBD';
+  }
+
+  return normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1);
+};
+
 const sendTextEmail = async (
   env: EmailBindings,
   input: {
@@ -256,7 +270,7 @@ export const sendBookingReminderEmail = async (
   input: BookingReminderEmailInput,
 ): Promise<EmailSendResult> => {
   const when = formatDateForTimezone(input.startsAt, input.timezone);
-  const location = input.locationValue?.trim() || input.locationType;
+  const location = formatLocationForEmail(input.locationType, input.locationValue);
   const subject = `Reminder: ${input.eventName}`;
   const text = [
     `Hi ${input.recipientName},`,

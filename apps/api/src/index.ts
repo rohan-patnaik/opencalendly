@@ -4385,6 +4385,38 @@ app.post('/v0/notifications/run', async (context) => {
     let skipped = 0;
 
     for (const row of dueRows) {
+      const currentRowState = await db
+        .select({
+          status: scheduledNotifications.status,
+          attemptCount: scheduledNotifications.attemptCount,
+          leasedUntil: scheduledNotifications.leasedUntil,
+        })
+        .from(scheduledNotifications)
+        .where(eq(scheduledNotifications.id, row.id))
+        .limit(1);
+      const current = currentRowState[0];
+
+      if (
+        !current ||
+        !current.leasedUntil ||
+        (current.status !== 'pending' && current.status !== 'failed')
+      ) {
+        await db
+          .update(scheduledNotifications)
+          .set({
+            leasedUntil: null,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(scheduledNotifications.id, row.id),
+              inArray(scheduledNotifications.status, ['pending', 'failed']),
+            ),
+          );
+        skipped += 1;
+        continue;
+      }
+
       const sendResult =
         row.notificationType === 'reminder'
           ? await sendBookingReminderEmail(context.env, {
@@ -4409,8 +4441,8 @@ app.post('/v0/notifications/run', async (context) => {
             });
 
       const outcome = resolveRunnerOutcome({
-        currentStatus: row.status,
-        attemptCount: row.attemptCount,
+        currentStatus: current.status,
+        attemptCount: current.attemptCount,
         now: new Date(),
         sendResult,
       });
@@ -4422,7 +4454,12 @@ app.post('/v0/notifications/run', async (context) => {
             leasedUntil: null,
             updatedAt: new Date(),
           })
-          .where(eq(scheduledNotifications.id, row.id));
+          .where(
+            and(
+              eq(scheduledNotifications.id, row.id),
+              inArray(scheduledNotifications.status, ['pending', 'failed']),
+            ),
+          );
         skipped += 1;
         continue;
       }
@@ -4430,7 +4467,12 @@ app.post('/v0/notifications/run', async (context) => {
       await db
         .update(scheduledNotifications)
         .set(outcome.values)
-        .where(eq(scheduledNotifications.id, row.id));
+        .where(
+          and(
+            eq(scheduledNotifications.id, row.id),
+            inArray(scheduledNotifications.status, ['pending', 'failed']),
+          ),
+        );
 
       const emailStatus = sendResult.sent ? 'succeeded' : 'failed';
       if (sendResult.sent) {

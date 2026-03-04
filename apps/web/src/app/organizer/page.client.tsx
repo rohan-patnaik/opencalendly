@@ -167,7 +167,10 @@ const isNotificationRuleInput = (value: unknown): value is NotificationRuleInput
 
   const validType = notificationType === 'reminder' || notificationType === 'follow_up';
   const validOffset =
-    typeof offsetMinutes === 'number' && Number.isInteger(offsetMinutes) && offsetMinutes > 0;
+    typeof offsetMinutes === 'number' &&
+    Number.isInteger(offsetMinutes) &&
+    offsetMinutes > 0 &&
+    offsetMinutes <= 10080;
   const validEnabled = typeof isEnabled === 'undefined' || typeof isEnabled === 'boolean';
 
   return validType && validOffset && validEnabled;
@@ -484,6 +487,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     }
 
     if (!session) {
+      notificationRulesRequestIdRef.current += 1;
       setAuthedUser(null);
       setAuthChecking(false);
       setAuthError(null);
@@ -603,6 +607,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
 
   useEffect(() => {
     if (!notificationRulesEventTypeId || !session) {
+      notificationRulesRequestIdRef.current += 1;
       setNotificationRules([]);
       setNotificationRulesDraft('[]');
       setNotificationRulesError(null);
