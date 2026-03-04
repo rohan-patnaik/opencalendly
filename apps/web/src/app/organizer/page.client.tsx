@@ -727,9 +727,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     setPanelError(null);
     setPanelMessage(null);
 
-    const year = Number.parseInt(holidayImportForm.year, 10);
-    if (!Number.isInteger(year)) {
-      setPanelError('Holiday year must be a valid number.');
+    const year = Number(holidayImportForm.year);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      setPanelError('Holiday year must be between 2000 and 2100.');
       return;
     }
 
