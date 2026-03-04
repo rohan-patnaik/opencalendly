@@ -1,8 +1,8 @@
 'use client';
 
-import { SignUp, useAuth } from '@clerk/nextjs';
+import { SignUp, useAuth, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Card, LinkButton, PageShell, Toast } from '../../../../components/ui';
 import { useAuthSession } from '../../../../lib/use-auth-session';
@@ -12,14 +12,31 @@ import styles from '../../shared.module.css';
 export default function SignUpPageClient() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
+  const { signOut } = useClerk();
   const { ready: sessionReady, session } = useAuthSession();
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
+  const [sessionBridgeTimedOut, setSessionBridgeTimedOut] = useState(false);
 
   useEffect(() => {
     if (isLoaded && isSignedIn && sessionReady && session) {
       router.replace('/dashboard');
     }
   }, [isLoaded, isSignedIn, router, session, sessionReady]);
+
+  useEffect(() => {
+    if (!(isLoaded && isSignedIn && sessionReady && !session)) {
+      setSessionBridgeTimedOut(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setSessionBridgeTimedOut(true);
+    }, 20_000);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isLoaded, isSignedIn, session, sessionReady]);
 
   if (!clerkPublishableKey) {
     return (
@@ -55,7 +72,32 @@ export default function SignUpPageClient() {
           />
         </div>
         {isLoaded && isSignedIn && sessionReady && !session ? (
-          <Toast variant="info">Finalizing your OpenCalendly session…</Toast>
+          sessionBridgeTimedOut ? (
+            <Toast variant="error">
+              Session setup is taking longer than expected.
+              <button
+                type="button"
+                className={uiStyles.inlineActionButton}
+                onClick={() => {
+                  setSessionBridgeTimedOut(false);
+                  router.refresh();
+                }}
+              >
+                Retry
+              </button>{' '}
+              <button
+                type="button"
+                className={uiStyles.inlineActionButton}
+                onClick={() => {
+                  void signOut();
+                }}
+              >
+                Sign out
+              </button>
+            </Toast>
+          ) : (
+            <Toast variant="info">Finalizing your OpenCalendly session…</Toast>
+          )
         ) : null}
         <div className={uiStyles.actions}>
           <LinkButton href="/auth/sign-in" variant="secondary">
