@@ -491,7 +491,7 @@ const resolveClerkSecretKey = (env: Bindings): string | null => {
   return secretKey ? secretKey : null;
 };
 
-const resolveClerkAuthorizedParties = (env: Bindings, request: Request): string[] => {
+const resolveClerkAuthorizedParties = (env: Bindings): string[] => {
   const values = new Set<string>();
   const configured = env.APP_BASE_URL?.trim();
   if (configured) {
@@ -500,15 +500,6 @@ const resolveClerkAuthorizedParties = (env: Bindings, request: Request): string[
     } catch {
       throw new Error('APP_BASE_URL must be a valid absolute URL when Clerk auth is enabled.');
     }
-  }
-
-  try {
-    const origin = new URL(request.url).origin;
-    if (origin) {
-      values.add(origin);
-    }
-  } catch {
-    // Ignore malformed request URL.
   }
 
   const shouldAllowLocalOrigins = Array.from(values).some((origin) => {
@@ -522,6 +513,10 @@ const resolveClerkAuthorizedParties = (env: Bindings, request: Request): string[
   if (shouldAllowLocalOrigins) {
     values.add('http://localhost:3000');
     values.add('http://127.0.0.1:3000');
+  }
+
+  if (values.size === 0) {
+    throw new Error('APP_BASE_URL must be configured for Clerk token verification.');
   }
 
   return Array.from(values);
@@ -3008,7 +3003,7 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     let clerkUserId = '';
     let authorizedParties: string[] = [];
     try {
-      authorizedParties = resolveClerkAuthorizedParties(context.env, context.req.raw);
+      authorizedParties = resolveClerkAuthorizedParties(context.env);
     } catch (error) {
       return jsonError(
         context,
@@ -3023,7 +3018,7 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
       const tokenPayload = await verifyToken(parsed.data.clerkToken, {
         secretKey: clerkSecretKey,
         ...(audiences.length > 0 ? { audience: audiences } : {}),
-        ...(authorizedParties.length > 0 ? { authorizedParties } : {}),
+        authorizedParties,
       });
       clerkUserId = tokenPayload.sub ?? '';
     } catch {
@@ -3132,18 +3127,29 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
       for (let attempt = 0; attempt < 20 && !userRecord; attempt += 1) {
         const candidateSeed =
           attempt === 0 ? preferredUsername : `${preferredUsername}-${createRawToken().slice(0, 4)}`;
-        const username = await resolveUniqueUsername({
-          preferredCandidate: candidateSeed,
-          email,
-          isUsernameTaken: async (candidate) => {
-            const [existingWithUsername] = await db
-              .select({ id: users.id })
-              .from(users)
-              .where(eq(users.username, candidate))
-              .limit(1);
-            return Boolean(existingWithUsername);
-          },
-        });
+        let username = '';
+        try {
+          username = await resolveUniqueUsername({
+            preferredCandidate: candidateSeed,
+            email,
+            isUsernameTaken: async (candidate) => {
+              const [existingWithUsername] = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.username, candidate))
+                .limit(1);
+              return Boolean(existingWithUsername);
+            },
+          });
+        } catch (error) {
+          console.error('clerk_username_resolution_failed', {
+            preferredUsername,
+            email,
+            attempt,
+            error: error instanceof Error ? error.message : 'unknown',
+          });
+          return jsonError(context, 503, 'Unable to provision account username. Please retry.');
+        }
 
         try {
           const [inserted] = await db

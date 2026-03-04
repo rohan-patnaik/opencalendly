@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useClerk } from '@clerk/nextjs';
+import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 
 import { Button, Card, LinkButton, PageShell, Toast } from '../../components/ui';
 import { authedGetJson } from '../../lib/api-client';
@@ -282,12 +283,18 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const notificationRulesRequestIdRef = useRef(0);
 
   const handleSignOut = useCallback(async () => {
+    setPanelError(null);
     try {
-      await signOut();
-    } catch (error) {
-      console.error('Clerk sign-out failed:', error);
-    } finally {
+      await signOut({ redirectUrl: '/auth/sign-in' });
       clear();
+    } catch (error) {
+      if (isClerkAPIResponseError(error)) {
+        const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
+        setPanelError(detail ?? 'Unable to sign out right now. Please try again.');
+        return;
+      }
+      console.error('Clerk sign-out failed:', error);
+      setPanelError('Unable to sign out right now. Please try again.');
     }
   }, [clear, signOut]);
 

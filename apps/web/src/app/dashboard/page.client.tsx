@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useClerk } from '@clerk/nextjs';
+import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 
 import { Button, Card, LinkButton, PageShell, Toast } from '../../components/ui';
 import { authedGetJson } from '../../lib/api-client';
@@ -99,13 +100,20 @@ const toIsoDate = (date: Date): string => {
 export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientProps) {
   const { session, ready, clear } = useAuthSession();
   const { signOut } = useClerk();
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const handleSignOut = useCallback(async () => {
+    setSignOutError(null);
     try {
-      await signOut();
+      await signOut({ redirectUrl: '/auth/sign-in' });
+      clear();
     } catch (error) {
       console.error('Clerk sign-out failed:', error);
-    } finally {
-      clear();
+      if (isClerkAPIResponseError(error)) {
+        const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
+        setSignOutError(detail ?? 'Unable to sign out right now. Please try again.');
+        return;
+      }
+      setSignOutError('Unable to sign out right now. Please try again.');
     }
   }, [clear, signOut]);
 
@@ -290,6 +298,7 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
             Sign out
           </Button>
         </div>
+        {signOutError ? <Toast variant="error">{signOutError}</Toast> : null}
       </section>
 
       <section className={styles.card}>

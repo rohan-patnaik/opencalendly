@@ -1,6 +1,7 @@
 'use client';
 
 import { useClerk } from '@clerk/nextjs';
+import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -36,11 +37,15 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const handleSignOut = useCallback(async () => {
     try {
-      await signOut();
-    } catch (error) {
-      console.error('Clerk sign-out failed:', error);
-    } finally {
+      await signOut({ redirectUrl: '/auth/sign-in' });
       clear();
+    } catch (error) {
+      if (isClerkAPIResponseError(error)) {
+        const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
+        console.error('Clerk sign-out failed:', detail ?? 'unknown clerk error');
+        return;
+      }
+      console.error('Clerk sign-out failed:', error);
     }
   }, [clear, signOut]);
 
