@@ -413,22 +413,20 @@ export const scheduledNotifications = pgTable(
       'scheduled_notifications_attempt_count_range',
       sql`${table.attemptCount} >= 0 and ${table.attemptCount} <= 100`,
     ),
-    sentStateCheck: check(
-      'scheduled_notifications_sent_state_check',
+    terminalStateConsistencyCheck: check(
+      'scheduled_notifications_terminal_state_consistency_check',
       sql`(
-        ${table.status} != 'sent'
-      ) OR (
         ${table.status} = 'sent'
         AND ${table.sentAt} is not null
-      )`,
-    ),
-    canceledStateCheck: check(
-      'scheduled_notifications_canceled_state_check',
-      sql`(
-        ${table.status} != 'canceled'
+        AND ${table.canceledAt} is null
       ) OR (
         ${table.status} = 'canceled'
         AND ${table.canceledAt} is not null
+        AND ${table.sentAt} is null
+      ) OR (
+        ${table.status} in ('pending', 'failed')
+        AND ${table.sentAt} is null
+        AND ${table.canceledAt} is null
       )`,
     ),
   }),
