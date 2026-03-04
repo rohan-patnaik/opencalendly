@@ -605,3 +605,20 @@ Acceptance criteria:
 - Production web remains reachable on:
   - `https://opencalendly.com`
   - `https://www.opencalendly.com`
+
+### Feature 29: Production web deploy env parity for Clerk/API base URLs
+
+Scope:
+- Ensure GitHub production web deploy passes required public web env values into the `next-on-pages` build step.
+- Prevent silent deploys that render the “Clerk configuration required” fallback in production due to missing build-time env.
+- Keep change scoped to workflow/docs only (no API/schema changes).
+
+Acceptance criteria:
+
+- GitHub `Deploy Production` workflow validates required web build vars before deploying Pages:
+  - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+  - `NEXT_PUBLIC_API_BASE_URL`
+  - `API_BASE_URL`
+- `Deploy web (Pages production)` step explicitly passes those vars to `npm run deploy:web:production`.
+- Production deploy from `main` completes successfully with updated workflow.
+- `https://opencalendly.com/auth/sign-in` no longer renders the “Clerk configuration required” fallback when vars are configured in repo settings.
