@@ -207,6 +207,102 @@ Auth required. Supports partial updates for:
 - `questions`
 - `isActive`
 
+### `GET /v0/event-types/:eventTypeId/notification-rules`
+
+Auth required.
+
+Returns reminder/follow-up workflow rules configured for an event type owned by the authenticated organizer.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "eventTypeId": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+  "rules": [
+    {
+      "id": "2a9007fb-b8e2-45f5-b06b-86206d4c0b78",
+      "notificationType": "reminder",
+      "offsetMinutes": 60,
+      "isEnabled": true,
+      "createdAt": "2026-03-04T10:00:00.000Z",
+      "updatedAt": "2026-03-04T10:00:00.000Z"
+    },
+    {
+      "id": "92ad7f1f-5f6d-49a9-a062-83d1419986e2",
+      "notificationType": "follow_up",
+      "offsetMinutes": 120,
+      "isEnabled": true,
+      "createdAt": "2026-03-04T10:00:00.000Z",
+      "updatedAt": "2026-03-04T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+Not-found response (`404`):
+
+```json
+{
+  "ok": false,
+  "error": "Event type not found."
+}
+```
+
+### `PUT /v0/event-types/:eventTypeId/notification-rules`
+
+Auth required.
+
+Replaces all notification rules for the event type owned by the authenticated organizer.
+
+Request:
+
+```json
+{
+  "rules": [
+    {
+      "notificationType": "reminder",
+      "offsetMinutes": 60,
+      "isEnabled": true
+    },
+    {
+      "notificationType": "follow_up",
+      "offsetMinutes": 120,
+      "isEnabled": true
+    }
+  ]
+}
+```
+
+Behavior:
+
+- `notificationType` supports only:
+  - `reminder` (before booking start)
+  - `follow_up` (after booking end)
+- `offsetMinutes` must be between `1` and `10080`.
+- Duplicate `(notificationType, offsetMinutes)` pairs are rejected.
+- Sending an empty `rules` array clears all rules.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "eventTypeId": "38fef2f8-70f0-4078-b76e-33d8a773047f",
+  "count": 2,
+  "rules": [
+    {
+      "id": "2a9007fb-b8e2-45f5-b06b-86206d4c0b78",
+      "notificationType": "reminder",
+      "offsetMinutes": 60,
+      "isEnabled": true,
+      "createdAt": "2026-03-04T10:00:00.000Z",
+      "updatedAt": "2026-03-04T10:00:00.000Z"
+    }
+  ]
+}
+```
+
 ### `GET /v0/me/availability`
 
 Auth required.
@@ -487,6 +583,7 @@ Behavior:
 - Enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) at commit time.
 - Creates secure cancel/reschedule action tokens (stored hashed server-side).
 - Sends booking confirmation email after successful write.
+- Schedules enabled reminder/follow-up notification rows for this booking.
 - Enqueues and runs immediate calendar writeback for connected providers.
 - Route is rate-limited per IP + booking link key.
 - Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
@@ -525,6 +622,9 @@ Success response:
     "sent": true,
     "provider": "resend",
     "messageId": "re_123"
+  },
+  "notifications": {
+    "queued": 2
   },
   "webhooks": {
     "queued": 1
@@ -666,6 +766,9 @@ Success response:
       "provider": "resend"
     }
   ],
+  "notifications": {
+    "canceled": 2
+  },
   "webhooks": {
     "queued": 1
   },
@@ -710,6 +813,7 @@ Behavior:
 
 - Idempotent if the same cancel token is submitted repeatedly.
 - Emits cancellation email notifications to invitee and organizer.
+- Cancels pending reminder/follow-up rows for the canceled booking.
 
 ### `POST /v0/bookings/actions/:token/reschedule`
 
@@ -770,6 +874,10 @@ Success response:
       "provider": "resend"
     }
   ],
+  "notifications": {
+    "canceledForOldBooking": 2,
+    "queuedForNewBooking": 2
+  },
   "webhooks": {
     "queued": 1
   },
@@ -829,6 +937,7 @@ Behavior:
 - Reschedule commit checks organizer time-off blocks as hard conflicts.
 - Reschedule commit enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
 - Reschedule sends notification emails to invitee + organizer.
+- Reschedule cancels pending reminder/follow-up rows for old booking and schedules rows for new booking.
 - Repeated submissions of the same token are idempotent.
 - Reschedule enqueues calendar writeback update for connected providers.
 - Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
@@ -1452,6 +1561,9 @@ Success response:
     "sent": true,
     "provider": "resend"
   },
+  "notifications": {
+    "queued": 2
+  },
   "webhooks": {
     "queued": 1
   },
@@ -1472,6 +1584,7 @@ Notes:
 - Member selection and commit checks include member time-off blocks.
 - Member selection and commit checks include synced external busy windows.
 - Team booking commit enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
+- Team booking commit schedules enabled reminder/follow-up notification rows.
 - Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.
 - Route is rate-limited per IP + team event key.
 - Replays the stored response when the same `Idempotency-Key` is retried with the same payload.
@@ -1737,6 +1850,53 @@ Notes:
 - Writeback operations are `create`, `cancel`, and `reschedule`.
 - Retries use bounded exponential backoff.
 - Final failures are visible through `GET /v0/calendar/writeback/status`.
+
+## Feature 26 Endpoints (Automated Reminders + Follow-up Workflows)
+
+### `POST /v0/notifications/run`
+
+Auth required. Processes due reminder/follow-up rows for the authenticated organizer.
+
+Request body (optional):
+
+```json
+{
+  "limit": 25
+}
+```
+
+Behavior:
+
+- Accepts optional `limit` from request body or query param.
+- `limit` is clamped to `1..100` (default: `25`).
+- Processes only rows where:
+  - `status` is `pending` or `failed`
+  - `attemptCount` is below max retry threshold (`5`)
+  - `sendAt` is due (`<= now`)
+- Sends:
+  - `reminder` rows using reminder email template
+  - `follow_up` rows using follow-up email template
+- Updates each processed row status to `sent` or `failed`, increments `attemptCount`, and stores provider metadata/errors.
+- Already `sent` or `canceled` rows are skipped for idempotent behavior.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "limit": 25,
+  "maxAttempts": 5,
+  "processed": 3,
+  "succeeded": 2,
+  "failed": 1,
+  "skipped": 0
+}
+```
+
+Error responses:
+
+- `400` malformed JSON or invalid `limit`.
+- `401` unauthorized.
 
 ## Feature 8 Endpoints (Analytics + Operator Dashboard v1)
 

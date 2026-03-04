@@ -185,6 +185,36 @@ export const bookingRescheduleSchema = z.object({
   timezone: timezoneSchema.optional(),
 });
 
+export const notificationRuleTypeSchema = z.enum(['reminder', 'follow_up']);
+export const notificationRuleSchema = z.object({
+  notificationType: notificationRuleTypeSchema,
+  offsetMinutes: z.number().int().min(1).max(10080),
+  isEnabled: z.boolean().default(true),
+});
+
+export const setNotificationRulesSchema = z
+  .object({
+    rules: z.array(notificationRuleSchema).max(20),
+  })
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+    value.rules.forEach((rule, index) => {
+      const key = `${rule.notificationType}:${rule.offsetMinutes}`;
+      if (seen.has(key)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Duplicate notification rules are not allowed.',
+          path: ['rules', index],
+        });
+      }
+      seen.add(key);
+    });
+  });
+
+export const notificationsRunSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional(),
+});
+
 export const demoCreditsConsumeSchema = z.object({
   email: emailSchema,
 });
@@ -318,6 +348,10 @@ export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
 export type TeamBookingCreateInput = z.infer<typeof teamBookingCreateSchema>;
 export type BookingCancelInput = z.infer<typeof bookingCancelSchema>;
 export type BookingRescheduleInput = z.infer<typeof bookingRescheduleSchema>;
+export type NotificationRuleType = z.infer<typeof notificationRuleTypeSchema>;
+export type NotificationRuleInput = z.infer<typeof notificationRuleSchema>;
+export type SetNotificationRulesInput = z.infer<typeof setNotificationRulesSchema>;
+export type NotificationsRunInput = z.infer<typeof notificationsRunSchema>;
 export type DemoCreditsConsumeInput = z.infer<typeof demoCreditsConsumeSchema>;
 export type WaitlistJoinInput = z.infer<typeof waitlistJoinSchema>;
 export type WebhookEventType = z.infer<typeof webhookEventTypeSchema>;

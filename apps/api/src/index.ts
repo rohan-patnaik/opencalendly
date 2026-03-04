@@ -17,6 +17,8 @@ import {
   emailDeliveries,
   eventTypes,
   idempotencyRequests,
+  notificationRules,
+  scheduledNotifications,
   sessions,
   teamBookingAssignments,
   teamEventTypeMembers,
@@ -47,8 +49,10 @@ import {
   eventTypeUpdateSchema,
   healthCheckSchema,
   magicLinkRequestSchema,
+  notificationsRunSchema,
   setAvailabilityOverridesSchema,
   setAvailabilityRulesSchema,
+  setNotificationRulesSchema,
   teamAddMemberSchema,
   teamBookingCreateSchema,
   teamCreateSchema,
@@ -108,10 +112,18 @@ import {
   type PublicEventType,
 } from './lib/booking';
 import {
+  sendBookingFollowUpEmail,
   sendBookingCancellationEmail,
   sendBookingConfirmationEmail,
+  sendBookingReminderEmail,
   sendBookingRescheduledEmail,
 } from './lib/email';
+import {
+  buildScheduledNotificationsForBooking,
+  resolveRunnerOutcome,
+  toEmailDeliveryTypeForNotification,
+  type NotificationRuleType,
+} from './lib/notification-workflows';
 import { resolveAllowedCorsOrigins } from './lib/cors';
 import {
   buildGoogleAuthorizationUrl,
@@ -347,7 +359,12 @@ type CalendarConnectionStatus = {
 };
 
 type CalendarWritebackOperation = 'create' | 'cancel' | 'reschedule';
-type EmailDeliveryType = 'booking_confirmation' | 'booking_cancellation' | 'booking_rescheduled';
+type EmailDeliveryType =
+  | 'booking_confirmation'
+  | 'booking_cancellation'
+  | 'booking_rescheduled'
+  | 'booking_reminder'
+  | 'booking_follow_up';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -487,6 +504,9 @@ const CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS = 5;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT = 25;
 const CALENDAR_WRITEBACK_BATCH_LIMIT_MAX = 100;
 const CALENDAR_WRITEBACK_LEASE_MINUTES = 3;
+const NOTIFICATION_RUN_BATCH_LIMIT_DEFAULT = 20;
+const NOTIFICATION_RUN_BATCH_LIMIT_MAX = 100;
+const NOTIFICATION_RUN_MAX_ATTEMPTS = 5;
 const IDEMPOTENCY_KEY_HEADER = 'Idempotency-Key';
 const IDEMPOTENCY_KEY_MIN_LENGTH = 16;
 const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
@@ -537,6 +557,19 @@ const clampCalendarWritebackBatchLimit = (rawLimit: number | string | undefined)
     return CALENDAR_WRITEBACK_BATCH_LIMIT_DEFAULT;
   }
   return Math.max(1, Math.min(CALENDAR_WRITEBACK_BATCH_LIMIT_MAX, parsed));
+};
+
+const clampNotificationRunBatchLimit = (rawLimit: number | string | undefined): number => {
+  const parsed =
+    typeof rawLimit === 'number'
+      ? rawLimit
+      : rawLimit
+        ? Number.parseInt(rawLimit, 10)
+        : Number.NaN;
+  if (!Number.isFinite(parsed)) {
+    return NOTIFICATION_RUN_BATCH_LIMIT_DEFAULT;
+  }
+  return Math.max(1, Math.min(NOTIFICATION_RUN_BATCH_LIMIT_MAX, parsed));
 };
 
 const resolveClientIp = (request: Request): string => {
@@ -962,6 +995,127 @@ const enqueueWebhookDeliveries = async (
     });
 
   return matchingSubscriptions.length;
+};
+
+type NotificationRuleRow = {
+  id: string;
+  notificationType: NotificationRuleType;
+  offsetMinutes: number;
+  isEnabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+const listEventTypeNotificationRules = async (
+  db: Database,
+  input: {
+    eventTypeId: string;
+    organizerId: string;
+  },
+): Promise<NotificationRuleRow[] | null> => {
+  const [eventType] = await db
+    .select({
+      id: eventTypes.id,
+    })
+    .from(eventTypes)
+    .where(and(eq(eventTypes.id, input.eventTypeId), eq(eventTypes.userId, input.organizerId)))
+    .limit(1);
+
+  if (!eventType) {
+    return null;
+  }
+
+  return db
+    .select({
+      id: notificationRules.id,
+      notificationType: notificationRules.notificationType,
+      offsetMinutes: notificationRules.offsetMinutes,
+      isEnabled: notificationRules.isEnabled,
+      createdAt: notificationRules.createdAt,
+      updatedAt: notificationRules.updatedAt,
+    })
+    .from(notificationRules)
+    .where(eq(notificationRules.eventTypeId, input.eventTypeId))
+    .orderBy(asc(notificationRules.notificationType), asc(notificationRules.offsetMinutes));
+};
+
+const enqueueScheduledNotificationsForBooking = async (
+  db: Database,
+  input: {
+    bookingId: string;
+    organizerId: string;
+    eventTypeId: string;
+    inviteeEmail: string;
+    inviteeName: string;
+    startsAt: Date;
+    endsAt: Date;
+  },
+): Promise<number> => {
+  const rules = await db
+    .select({
+      id: notificationRules.id,
+      notificationType: notificationRules.notificationType,
+      offsetMinutes: notificationRules.offsetMinutes,
+      isEnabled: notificationRules.isEnabled,
+    })
+    .from(notificationRules)
+    .where(eq(notificationRules.eventTypeId, input.eventTypeId));
+
+  const rows = buildScheduledNotificationsForBooking({
+    booking: {
+      bookingId: input.bookingId,
+      organizerId: input.organizerId,
+      eventTypeId: input.eventTypeId,
+      inviteeEmail: input.inviteeEmail,
+      inviteeName: input.inviteeName,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+    },
+    rules,
+  });
+
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  const inserted = await db
+    .insert(scheduledNotifications)
+    .values(rows)
+    .onConflictDoNothing({
+      target: [
+        scheduledNotifications.bookingId,
+        scheduledNotifications.notificationRuleId,
+        scheduledNotifications.recipientEmail,
+      ],
+    })
+    .returning({ id: scheduledNotifications.id });
+
+  return inserted.length;
+};
+
+const cancelPendingScheduledNotificationsForBooking = async (
+  db: Database,
+  input: {
+    bookingId: string;
+  },
+): Promise<number> => {
+  const now = new Date();
+  const updated = await db
+    .update(scheduledNotifications)
+    .set({
+      status: 'canceled',
+      canceledAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(scheduledNotifications.bookingId, input.bookingId),
+        inArray(scheduledNotifications.status, ['pending', 'failed']),
+      ),
+    )
+    .returning({ id: scheduledNotifications.id });
+
+  return updated.length;
 };
 
 const executeWebhookDelivery = async (
@@ -4121,6 +4275,140 @@ app.post('/v0/calendar/writeback/run', async (context) => {
   });
 });
 
+app.post('/v0/notifications/run', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    let body: unknown = {};
+    const rawBody = await context.req.text();
+    if (rawBody.trim().length > 0) {
+      try {
+        body = JSON.parse(rawBody) as unknown;
+      } catch {
+        return jsonError(context, 400, 'Malformed JSON body.');
+      }
+    }
+
+    const parsed = notificationsRunSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const limit = clampNotificationRunBatchLimit(parsed.data.limit ?? context.req.query('limit'));
+    const now = new Date();
+
+    const dueRows = await db
+      .select({
+        id: scheduledNotifications.id,
+        organizerId: scheduledNotifications.organizerId,
+        bookingId: scheduledNotifications.bookingId,
+        eventTypeId: scheduledNotifications.eventTypeId,
+        notificationType: scheduledNotifications.notificationType,
+        recipientEmail: scheduledNotifications.recipientEmail,
+        recipientName: scheduledNotifications.recipientName,
+        bookingStartsAt: scheduledNotifications.bookingStartsAt,
+        status: scheduledNotifications.status,
+        attemptCount: scheduledNotifications.attemptCount,
+        eventTypeName: eventTypes.name,
+        eventTypeLocationType: eventTypes.locationType,
+        eventTypeLocationValue: eventTypes.locationValue,
+        organizerDisplayName: users.displayName,
+        organizerTimezone: users.timezone,
+      })
+      .from(scheduledNotifications)
+      .innerJoin(eventTypes, eq(eventTypes.id, scheduledNotifications.eventTypeId))
+      .innerJoin(users, eq(users.id, scheduledNotifications.organizerId))
+      .where(
+        and(
+          eq(scheduledNotifications.organizerId, authedUser.id),
+          inArray(scheduledNotifications.status, ['pending', 'failed']),
+          lt(scheduledNotifications.attemptCount, NOTIFICATION_RUN_MAX_ATTEMPTS),
+          lte(scheduledNotifications.sendAt, now),
+        ),
+      )
+      .orderBy(asc(scheduledNotifications.sendAt))
+      .limit(limit);
+
+    let succeeded = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (const row of dueRows) {
+      const sendResult =
+        row.notificationType === 'reminder'
+          ? await sendBookingReminderEmail(context.env, {
+              recipientEmail: row.recipientEmail,
+              recipientName: row.recipientName,
+              organizerDisplayName: row.organizerDisplayName,
+              eventName: row.eventTypeName,
+              startsAt: row.bookingStartsAt.toISOString(),
+              timezone: normalizeTimezone(row.organizerTimezone),
+              locationType: row.eventTypeLocationType,
+              locationValue: row.eventTypeLocationValue,
+              idempotencyKey: `scheduled-notification:${row.id}`,
+            })
+          : await sendBookingFollowUpEmail(context.env, {
+              recipientEmail: row.recipientEmail,
+              recipientName: row.recipientName,
+              organizerDisplayName: row.organizerDisplayName,
+              eventName: row.eventTypeName,
+              startsAt: row.bookingStartsAt.toISOString(),
+              timezone: normalizeTimezone(row.organizerTimezone),
+              idempotencyKey: `scheduled-notification:${row.id}`,
+            });
+
+      const outcome = resolveRunnerOutcome({
+        currentStatus: row.status,
+        attemptCount: row.attemptCount,
+        now: new Date(),
+        sendResult,
+      });
+
+      if (outcome.action === 'skip') {
+        skipped += 1;
+        continue;
+      }
+
+      await db
+        .update(scheduledNotifications)
+        .set(outcome.values)
+        .where(eq(scheduledNotifications.id, row.id));
+
+      const emailStatus = sendResult.sent ? 'succeeded' : 'failed';
+      if (sendResult.sent) {
+        succeeded += 1;
+      } else {
+        failed += 1;
+      }
+
+      await tryRecordEmailDelivery(context.env, db, {
+        organizerId: row.organizerId,
+        bookingId: row.bookingId,
+        eventTypeId: row.eventTypeId,
+        recipientEmail: row.recipientEmail,
+        emailType: toEmailDeliveryTypeForNotification(row.notificationType),
+        provider: sendResult.provider,
+        status: emailStatus,
+        ...(sendResult.messageId ? { providerMessageId: sendResult.messageId } : {}),
+        ...(sendResult.error ? { error: sendResult.error } : {}),
+      });
+    }
+
+    return context.json({
+      ok: true,
+      limit,
+      maxAttempts: NOTIFICATION_RUN_MAX_ATTEMPTS,
+      processed: dueRows.length,
+      succeeded,
+      failed,
+      skipped,
+    });
+  });
+});
+
 app.get('/v0/embed/widget.js', async (context) => {
   return withDatabase(context, async (db) => {
     const username = context.req.query('username')?.trim().toLowerCase();
@@ -4642,6 +4930,104 @@ app.get('/v0/event-types', async (context) => {
         isActive: row.isActive,
         createdAt: row.createdAt.toISOString(),
       })),
+    });
+  });
+});
+
+app.get('/v0/event-types/:eventTypeId/notification-rules', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const eventTypeId = context.req.param('eventTypeId');
+    const rules = await listEventTypeNotificationRules(db, {
+      eventTypeId,
+      organizerId: authedUser.id,
+    });
+    if (!rules) {
+      return jsonError(context, 404, 'Event type not found.');
+    }
+
+    return context.json({
+      ok: true,
+      eventTypeId,
+      rules: rules.map((rule) => ({
+        id: rule.id,
+        notificationType: rule.notificationType,
+        offsetMinutes: rule.offsetMinutes,
+        isEnabled: rule.isEnabled,
+        createdAt: rule.createdAt.toISOString(),
+        updatedAt: rule.updatedAt.toISOString(),
+      })),
+    });
+  });
+});
+
+app.put('/v0/event-types/:eventTypeId/notification-rules', async (context) => {
+  return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    if (!authedUser) {
+      return jsonError(context, 401, 'Unauthorized.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = setNotificationRulesSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const eventTypeId = context.req.param('eventTypeId');
+    const [eventType] = await db
+      .select({
+        id: eventTypes.id,
+      })
+      .from(eventTypes)
+      .where(and(eq(eventTypes.id, eventTypeId), eq(eventTypes.userId, authedUser.id)))
+      .limit(1);
+
+    if (!eventType) {
+      return jsonError(context, 404, 'Event type not found.');
+    }
+
+    const now = new Date();
+    await db.transaction(async (transaction) => {
+      await transaction.delete(notificationRules).where(eq(notificationRules.eventTypeId, eventTypeId));
+
+      if (parsed.data.rules.length === 0) {
+        return;
+      }
+
+      await transaction.insert(notificationRules).values(
+        parsed.data.rules.map((rule) => ({
+          eventTypeId,
+          notificationType: rule.notificationType,
+          offsetMinutes: rule.offsetMinutes,
+          isEnabled: rule.isEnabled,
+          updatedAt: now,
+        })),
+      );
+    });
+
+    const rules = await listEventTypeNotificationRules(db, {
+      eventTypeId,
+      organizerId: authedUser.id,
+    });
+
+    return context.json({
+      ok: true,
+      eventTypeId,
+      count: rules?.length ?? 0,
+      rules:
+        rules?.map((rule) => ({
+          id: rule.id,
+          notificationType: rule.notificationType,
+          offsetMinutes: rule.offsetMinutes,
+          isEnabled: rule.isEnabled,
+          createdAt: rule.createdAt.toISOString(),
+          updatedAt: rule.updatedAt.toISOString(),
+        })) ?? [],
     });
   });
 });
@@ -6438,6 +6824,16 @@ app.post('/v0/team-bookings', async (context) => {
         ...(email.error ? { error: email.error } : {}),
       });
 
+      const queuedNotifications = await enqueueScheduledNotificationsForBooking(db, {
+        bookingId: result.booking.id,
+        organizerId: result.booking.organizerId,
+        eventTypeId: result.booking.eventTypeId,
+        inviteeEmail: result.booking.inviteeEmail,
+        inviteeName: result.booking.inviteeName,
+        startsAt: result.booking.startsAt,
+        endsAt: result.booking.endsAt,
+      });
+
       const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
         organizerId: result.booking.organizerId,
         type: 'booking.created',
@@ -6510,6 +6906,9 @@ app.post('/v0/team-bookings', async (context) => {
           },
         },
         email,
+        notifications: {
+          queued: queuedNotifications,
+        },
         webhooks: {
           queued: queuedWebhookDeliveries,
         },
@@ -6842,6 +7241,16 @@ app.post('/v0/bookings', async (context) => {
         ...(email.error ? { error: email.error } : {}),
       });
 
+      const queuedNotifications = await enqueueScheduledNotificationsForBooking(db, {
+        bookingId: result.booking.id,
+        organizerId: result.booking.organizerId,
+        eventTypeId: result.booking.eventTypeId,
+        inviteeEmail: result.booking.inviteeEmail,
+        inviteeName: result.booking.inviteeName,
+        startsAt: result.booking.startsAt,
+        endsAt: result.booking.endsAt,
+      });
+
       const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
         organizerId: result.booking.organizerId,
         type: 'booking.created',
@@ -6908,6 +7317,9 @@ app.post('/v0/bookings', async (context) => {
           },
         },
         email,
+        notifications: {
+          queued: queuedNotifications,
+        },
         webhooks: {
           queued: queuedWebhookDeliveries,
         },
@@ -7316,6 +7728,10 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
         }
       }
 
+      const canceledNotifications = await cancelPendingScheduledNotificationsForBooking(db, {
+        bookingId: result.booking.id,
+      });
+
       const queuedWebhookDeliveries = result.alreadyProcessed
         ? 0
         : await enqueueWebhookDeliveries(db, {
@@ -7363,6 +7779,9 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
           status: result.booking.status,
         },
         email,
+        notifications: {
+          canceled: canceledNotifications,
+        },
         webhooks: {
           queued: queuedWebhookDeliveries,
         },
@@ -7968,6 +8387,23 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         }
       }
 
+      const canceledNotificationsForOldBooking = result.alreadyProcessed
+        ? 0
+        : await cancelPendingScheduledNotificationsForBooking(db, {
+            bookingId: result.oldBooking.id,
+          });
+      const queuedNotificationsForNewBooking = result.alreadyProcessed
+        ? 0
+        : await enqueueScheduledNotificationsForBooking(db, {
+            bookingId: result.newBooking.id,
+            organizerId: result.newBooking.organizerId,
+            eventTypeId: result.newBooking.eventTypeId,
+            inviteeEmail: result.newBooking.inviteeEmail,
+            inviteeName: result.newBooking.inviteeName,
+            startsAt: result.newBooking.startsAt,
+            endsAt: result.newBooking.endsAt,
+          });
+
       const queuedWebhookDeliveries = result.alreadyProcessed
         ? 0
         : await enqueueWebhookDeliveries(db, {
@@ -8057,6 +8493,10 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         },
         actions,
         email,
+        notifications: {
+          canceledForOldBooking: canceledNotificationsForOldBooking,
+          queuedForNewBooking: queuedNotificationsForNewBooking,
+        },
         webhooks: {
           queued: queuedWebhookDeliveries,
         },

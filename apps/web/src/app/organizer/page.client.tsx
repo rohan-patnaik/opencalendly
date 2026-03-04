@@ -10,6 +10,7 @@ import {
   type AvailabilityOverride,
   type AvailabilityRule,
   type CalendarProviderStatus,
+  type NotificationRule,
   type OrganizerEventType,
   type OrganizerWebhook,
   type TeamEventType,
@@ -149,6 +150,29 @@ const isAvailabilityOverrideInput = (value: unknown): value is AvailabilityOverr
   );
 };
 
+type NotificationRuleInput = {
+  notificationType: 'reminder' | 'follow_up';
+  offsetMinutes: number;
+  isEnabled?: boolean;
+};
+
+const isNotificationRuleInput = (value: unknown): value is NotificationRuleInput => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const notificationType = value.notificationType;
+  const offsetMinutes = value.offsetMinutes;
+  const isEnabled = value.isEnabled;
+
+  const validType = notificationType === 'reminder' || notificationType === 'follow_up';
+  const validOffset =
+    typeof offsetMinutes === 'number' && Number.isInteger(offsetMinutes) && offsetMinutes > 0;
+  const validEnabled = typeof isEnabled === 'undefined' || typeof isEnabled === 'boolean';
+
+  return validType && validOffset && validEnabled;
+};
+
 const formatDateTime = (value: string): string => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -177,6 +201,11 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const [globalError, setGlobalError] = useState<string | null>(null);
 
   const [eventTypes, setEventTypes] = useState<OrganizerEventType[]>([]);
+  const [notificationRulesEventTypeId, setNotificationRulesEventTypeId] = useState('');
+  const [notificationRules, setNotificationRules] = useState<NotificationRule[]>([]);
+  const [notificationRulesDraft, setNotificationRulesDraft] = useState('[]');
+  const [notificationRulesError, setNotificationRulesError] = useState<string | null>(null);
+  const [notificationRulesLoading, setNotificationRulesLoading] = useState(false);
   const [availabilityRules, setAvailabilityRules] = useState<AvailabilityRule[]>([]);
   const [availabilityOverrides, setAvailabilityOverrides] = useState<AvailabilityOverride[]>([]);
   const [timeOffBlocks, setTimeOffBlocks] = useState<TimeOffBlock[]>([]);
@@ -237,6 +266,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   });
 
   const [webhookRunLimit, setWebhookRunLimit] = useState('20');
+  const [notificationRunLimit, setNotificationRunLimit] = useState('20');
   const [writebackRunLimit, setWritebackRunLimit] = useState('20');
 
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
@@ -404,6 +434,41 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     [apiBaseUrl, session, teamDetailsRequestIdRef],
   );
 
+  const refreshNotificationRules = useCallback(
+    async (eventTypeId: string) => {
+      if (!session || !eventTypeId) {
+        return;
+      }
+
+      setNotificationRulesLoading(true);
+      setNotificationRulesError(null);
+      try {
+        const payload = await organizerApi.getNotificationRules(apiBaseUrl, session, eventTypeId);
+        setNotificationRules(payload.rules);
+        setNotificationRulesDraft(
+          JSON.stringify(
+            payload.rules.map((rule) => ({
+              notificationType: rule.notificationType,
+              offsetMinutes: rule.offsetMinutes,
+              isEnabled: rule.isEnabled,
+            })),
+            null,
+            2,
+          ),
+        );
+      } catch (caught) {
+        setNotificationRules([]);
+        setNotificationRulesDraft('[]');
+        setNotificationRulesError(
+          caught instanceof Error ? caught.message : 'Unable to load notification rules.',
+        );
+      } finally {
+        setNotificationRulesLoading(false);
+      }
+    },
+    [apiBaseUrl, session],
+  );
+
   useEffect(() => {
     if (!ready) {
       return;
@@ -415,6 +480,11 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       setAuthError(null);
       setGlobalError(null);
       setEventTypes([]);
+      setNotificationRulesEventTypeId('');
+      setNotificationRules([]);
+      setNotificationRulesDraft('[]');
+      setNotificationRulesError(null);
+      setNotificationRulesLoading(false);
       setAvailabilityRules([]);
       setAvailabilityOverrides([]);
       setTimeOffBlocks([]);
@@ -495,6 +565,24 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   }, [eventTypeUpdateId, eventTypes]);
 
   useEffect(() => {
+    if (!notificationRulesEventTypeId) {
+      const first = eventTypes[0];
+      if (first) {
+        setNotificationRulesEventTypeId(first.id);
+      }
+      return;
+    }
+
+    const selectedEventType = eventTypes.find(
+      (eventType) => eventType.id === notificationRulesEventTypeId,
+    );
+    if (!selectedEventType) {
+      const first = eventTypes[0];
+      setNotificationRulesEventTypeId(first?.id ?? '');
+    }
+  }, [eventTypes, notificationRulesEventTypeId]);
+
+  useEffect(() => {
     if (!selectedTeamId) {
       setTeamMembers([]);
       setTeamEventTypes([]);
@@ -503,6 +591,18 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     }
     void refreshTeamDetails(selectedTeamId);
   }, [refreshTeamDetails, selectedTeamId]);
+
+  useEffect(() => {
+    if (!notificationRulesEventTypeId || !session) {
+      setNotificationRules([]);
+      setNotificationRulesDraft('[]');
+      setNotificationRulesError(null);
+      setNotificationRulesLoading(false);
+      return;
+    }
+
+    void refreshNotificationRules(notificationRulesEventTypeId);
+  }, [notificationRulesEventTypeId, refreshNotificationRules, session]);
 
   const handleCreateEventType = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -595,6 +695,97 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     },
     [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session],
   );
+
+  const handleSaveNotificationRules = useCallback(async () => {
+    if (!session || !notificationRulesEventTypeId) {
+      return;
+    }
+
+    const action = 'notificationRulesSave';
+    beginBusy(action);
+    setPanelError(null);
+    setPanelMessage(null);
+
+    try {
+      const parsedRules = parseJsonArray<NotificationRuleInput>(
+        notificationRulesDraft,
+        'Notification rules payload',
+        isNotificationRuleInput,
+      );
+
+      const payload = await organizerApi.replaceNotificationRules(
+        apiBaseUrl,
+        session,
+        notificationRulesEventTypeId,
+        parsedRules.map((rule) => ({
+          notificationType: rule.notificationType,
+          offsetMinutes: rule.offsetMinutes,
+          isEnabled: rule.isEnabled ?? true,
+        })),
+      );
+
+      setNotificationRules(payload.rules);
+      setNotificationRulesDraft(
+        JSON.stringify(
+          payload.rules.map((rule) => ({
+            notificationType: rule.notificationType,
+            offsetMinutes: rule.offsetMinutes,
+            isEnabled: rule.isEnabled,
+          })),
+          null,
+          2,
+        ),
+      );
+      setPanelMessage('Notification rules updated.');
+      setNotificationRulesError(null);
+    } catch (caught) {
+      setPanelError(caught instanceof Error ? caught.message : 'Unable to save notification rules.');
+    } finally {
+      endBusy(action);
+    }
+  }, [
+    apiBaseUrl,
+    beginBusy,
+    endBusy,
+    notificationRulesDraft,
+    notificationRulesEventTypeId,
+    session,
+  ]);
+
+  const handleRunNotificationWorkflows = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+
+    const action = 'notificationRun';
+    beginBusy(action);
+    setPanelError(null);
+    setPanelMessage(null);
+
+    try {
+      const payload = await organizerApi.runNotificationWorkflows(
+        apiBaseUrl,
+        session,
+        parseIntegerOrUndefined(notificationRunLimit),
+      );
+      setPanelMessage(
+        `Notification run complete: processed=${payload.processed}, succeeded=${payload.succeeded}, failed=${payload.failed}, skipped=${payload.skipped}.`,
+      );
+      await refreshNotificationRules(notificationRulesEventTypeId);
+    } catch (caught) {
+      setPanelError(caught instanceof Error ? caught.message : 'Unable to run notification workflows.');
+    } finally {
+      endBusy(action);
+    }
+  }, [
+    apiBaseUrl,
+    beginBusy,
+    endBusy,
+    notificationRunLimit,
+    notificationRulesEventTypeId,
+    refreshNotificationRules,
+    session,
+  ]);
 
   const handleSaveRules = useCallback(async () => {
     if (!session) {
@@ -1410,6 +1601,89 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
               {isBusy('eventTypeUpdate') ? 'Saving…' : 'Save event type'}
             </button>
           </form>
+        </div>
+
+        <div className={styles.form}>
+          <h3>Notification rules (reminders + follow-up)</h3>
+          <p className={styles.helperText}>
+            Configure event-type reminder/follow-up offsets, then run the due workflow batch.
+          </p>
+
+          <label className={styles.label}>
+            Event type
+            <select
+              className={styles.select}
+              value={notificationRulesEventTypeId}
+              onChange={(event) => setNotificationRulesEventTypeId(event.target.value)}
+              disabled={eventTypes.length === 0}
+            >
+              {eventTypes.length === 0 ? (
+                <option value="">No event types available</option>
+              ) : (
+                eventTypes.map((eventType) => (
+                  <option key={eventType.id} value={eventType.id}>
+                    {eventType.name} ({eventType.slug})
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
+
+          {notificationRulesError ? <p className={styles.error}>{notificationRulesError}</p> : null}
+          {notificationRulesLoading ? (
+            <p>Loading notification rules…</p>
+          ) : notificationRules.length === 0 ? (
+            <p className={styles.empty}>No notification rules configured for this event type.</p>
+          ) : (
+            <ul>
+              {notificationRules.map((rule) => (
+                <li key={rule.id}>
+                  {rule.notificationType} · {rule.offsetMinutes} minute(s) ·{' '}
+                  {rule.isEnabled ? 'enabled' : 'disabled'}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <label className={styles.label}>
+            Notification rules JSON
+            <textarea
+              className={styles.textarea}
+              value={notificationRulesDraft}
+              onChange={(event) => setNotificationRulesDraft(event.target.value)}
+              spellCheck={false}
+            />
+          </label>
+
+          <div className={styles.rowActions}>
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={() => void handleSaveNotificationRules()}
+              disabled={isBusy('notificationRulesSave') || !notificationRulesEventTypeId}
+            >
+              {isBusy('notificationRulesSave') ? 'Saving…' : 'Save notification rules'}
+            </button>
+            <label className={styles.label}>
+              Runner limit
+              <input
+                className={styles.input}
+                type="number"
+                min={1}
+                max={100}
+                value={notificationRunLimit}
+                onChange={(event) => setNotificationRunLimit(event.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => void handleRunNotificationWorkflows()}
+              disabled={isBusy('notificationRun')}
+            >
+              {isBusy('notificationRun') ? 'Running…' : 'Run due notifications'}
+            </button>
+          </div>
         </div>
           </section>
 

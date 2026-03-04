@@ -43,6 +43,28 @@ export type BookingRescheduledEmailInput = {
   idempotencyKey?: string;
 };
 
+export type BookingReminderEmailInput = {
+  recipientEmail: string;
+  recipientName: string;
+  organizerDisplayName: string;
+  eventName: string;
+  startsAt: string;
+  timezone: string;
+  locationType: string;
+  locationValue: string | null;
+  idempotencyKey?: string;
+};
+
+export type BookingFollowUpEmailInput = {
+  recipientEmail: string;
+  recipientName: string;
+  organizerDisplayName: string;
+  eventName: string;
+  startsAt: string;
+  timezone: string;
+  idempotencyKey?: string;
+};
+
 export type EmailSendResult = {
   sent: boolean;
   provider: 'resend' | 'none';
@@ -219,6 +241,53 @@ export const sendBookingRescheduledEmail = async (
     `Event: ${input.eventName}`,
     `Previous time: ${oldWhen} (${input.timezone})`,
     `New time: ${newWhen} (${input.timezone})`,
+  ].join('\n');
+
+  return sendTextEmail(env, {
+    to: input.recipientEmail,
+    subject,
+    text,
+    ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+  });
+};
+
+export const sendBookingReminderEmail = async (
+  env: EmailBindings,
+  input: BookingReminderEmailInput,
+): Promise<EmailSendResult> => {
+  const when = formatDateForTimezone(input.startsAt, input.timezone);
+  const location = input.locationValue?.trim() || input.locationType;
+  const subject = `Reminder: ${input.eventName}`;
+  const text = [
+    `Hi ${input.recipientName},`,
+    '',
+    `This is a reminder for your upcoming booking with ${input.organizerDisplayName}.`,
+    `Event: ${input.eventName}`,
+    `When: ${when} (${input.timezone})`,
+    `Location: ${location}`,
+  ].join('\n');
+
+  return sendTextEmail(env, {
+    to: input.recipientEmail,
+    subject,
+    text,
+    ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+  });
+};
+
+export const sendBookingFollowUpEmail = async (
+  env: EmailBindings,
+  input: BookingFollowUpEmailInput,
+): Promise<EmailSendResult> => {
+  const when = formatDateForTimezone(input.startsAt, input.timezone);
+  const subject = `Follow-up: ${input.eventName}`;
+  const text = [
+    `Hi ${input.recipientName},`,
+    '',
+    `Thanks for meeting with ${input.organizerDisplayName}.`,
+    `Event: ${input.eventName}`,
+    `Scheduled time: ${when} (${input.timezone})`,
+    'If you need another slot, you can book again using the organizer booking link.',
   ].join('\n');
 
   return sendTextEmail(env, {
