@@ -284,9 +284,9 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
 
   const handleSignOut = useCallback(async () => {
     setPanelError(null);
+    clear();
     try {
       await signOut({ redirectUrl: '/auth/sign-in' });
-      clear();
     } catch (error) {
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;

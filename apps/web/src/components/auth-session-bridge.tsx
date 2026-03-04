@@ -143,15 +143,23 @@ export default function AuthSessionBridge() {
         typeof maybeUser.displayName === 'string' &&
         typeof maybeUser.timezone === 'string';
 
-      if (!response.ok || !hasValidPayload) {
+      if (!response.ok) {
         const error = new Error(payload?.error || 'Unable to exchange Clerk session.') as Error & {
           status?: number;
           retryable?: boolean;
         };
         error.status = response.status;
-        error.retryable = hasValidPayload
-          ? RETRYABLE_EXCHANGE_STATUS_CODES.has(response.status)
-          : false;
+        error.retryable = RETRYABLE_EXCHANGE_STATUS_CODES.has(response.status);
+        throw error;
+      }
+
+      if (!hasValidPayload) {
+        const error = new Error('Invalid Clerk session exchange payload.') as Error & {
+          status?: number;
+          retryable?: boolean;
+        };
+        error.status = response.status;
+        error.retryable = false;
         throw error;
       }
 
@@ -206,7 +214,11 @@ export default function AuthSessionBridge() {
           retryTimer = setTimeout(() => {
             setRetryNonce((current) => current + 1);
           }, delayMs);
+          return;
         }
+
+        lastSyncKeyRef.current = syncKey;
+        retryStateRef.current = { syncKey: '', attempts: 0 };
       })
       .finally(() => {
         if (inFlightSyncKeyRef.current === syncKey) {

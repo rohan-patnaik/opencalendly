@@ -3022,8 +3022,47 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
         authorizedParties,
       });
       clerkUserId = tokenPayload.sub ?? '';
-    } catch {
-      return jsonError(context, 401, 'Invalid or expired Clerk token.');
+    } catch (error) {
+      const reason =
+        typeof error === 'object' &&
+        error !== null &&
+        'reason' in error &&
+        typeof (error as { reason?: unknown }).reason === 'string'
+          ? (error as { reason: string }).reason
+          : null;
+      const authFailureReasons = new Set([
+        'TokenExpired',
+        'TokenInvalid',
+        'TokenInvalidAlgorithm',
+        'TokenInvalidAuthorizedParties',
+        'TokenInvalidSignature',
+        'TokenNotActiveYet',
+        'TokenIatInTheFuture',
+      ]);
+      const upstreamFailureReasons = new Set([
+        'InvalidSecretKey',
+        'RemoteJWKFailedToLoad',
+        'RemoteJWKInvalid',
+        'RemoteJWKMissing',
+        'LocalJWKMissing',
+        'JWKFailedToResolve',
+        'JWKKidMismatch',
+        'TokenVerificationFailed',
+      ]);
+
+      if (reason && upstreamFailureReasons.has(reason)) {
+        console.error('clerk_token_verification_failed', {
+          reason,
+          error: error instanceof Error ? error.message : 'unknown',
+        });
+        return jsonError(context, 502, 'Unable to verify Clerk token due to upstream dependency error.');
+      }
+
+      if (!reason || authFailureReasons.has(reason)) {
+        return jsonError(context, 401, 'Invalid or expired Clerk token.');
+      }
+
+      return jsonError(context, 401, 'Invalid Clerk token.');
     }
 
     if (!clerkUserId) {
@@ -3076,7 +3115,7 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     if (!clerkUser && clerkLookupError) {
       const status = resolveLookupErrorStatus(clerkLookupError);
       console.error('clerk_user_lookup_failed', {
-        clerkUserId,
+        clerkUserIdHash: hashToken(clerkUserId),
         attempts: CLERK_USER_LOOKUP_MAX_ATTEMPTS,
         status,
         error: clerkLookupError instanceof Error ? clerkLookupError.message : 'unknown',

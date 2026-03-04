@@ -49,21 +49,57 @@ export default function SignInPageClient() {
     setLegacyError(null);
 
     let cancelled = false;
+    const abortController = new AbortController();
+    let requestTimeout: ReturnType<typeof setTimeout> | null = null;
     const verifyLegacyToken = async () => {
       if (isLoaded && isSignedIn) {
         await signOut();
       }
-      const response = await fetch(`${apiBaseUrl}/v0/auth/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-        body: JSON.stringify({ token: legacyToken }),
-      });
+
+      let response: Response;
+      try {
+        requestTimeout = setTimeout(() => {
+          abortController.abort();
+        }, 15_000);
+        response = await fetch(`${apiBaseUrl}/v0/auth/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          cache: 'no-store',
+          signal: abortController.signal,
+          body: JSON.stringify({ token: legacyToken }),
+        });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw new Error('Legacy sign-in request timed out. Please retry.');
+        }
+        throw error;
+      } finally {
+        if (requestTimeout) {
+          clearTimeout(requestTimeout);
+          requestTimeout = null;
+        }
+      }
 
       const payload = (await response.json().catch(() => null)) as LegacyVerifyResponse | null;
-      if (!response.ok || !payload || !payload.ok) {
+      const maybeUser = payload?.user;
+      const hasValidPayload =
+        Boolean(payload) &&
+        payload?.ok === true &&
+        typeof payload.sessionToken === 'string' &&
+        payload.sessionToken.length > 0 &&
+        typeof payload.expiresAt === 'string' &&
+        !Number.isNaN(new Date(payload.expiresAt).getTime()) &&
+        maybeUser !== null &&
+        typeof maybeUser === 'object' &&
+        typeof maybeUser.id === 'string' &&
+        typeof maybeUser.email === 'string' &&
+        typeof maybeUser.username === 'string' &&
+        typeof maybeUser.displayName === 'string' &&
+        typeof maybeUser.timezone === 'string';
+
+      if (!response.ok || !hasValidPayload) {
         throw new Error(payload?.error || 'Legacy sign-in token is invalid or expired.');
       }
 
@@ -95,6 +131,10 @@ export default function SignInPageClient() {
 
     return () => {
       cancelled = true;
+      abortController.abort();
+      if (requestTimeout) {
+        clearTimeout(requestTimeout);
+      }
     };
   }, [apiBaseUrl, isLoaded, isSignedIn, legacyToken, router, save, session, sessionReady, signOut]);
 

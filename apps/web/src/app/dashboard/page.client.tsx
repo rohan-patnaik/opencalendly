@@ -103,9 +103,9 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const handleSignOut = useCallback(async () => {
     setSignOutError(null);
+    clear();
     try {
       await signOut({ redirectUrl: '/auth/sign-in' });
-      clear();
     } catch (error) {
       console.error('Clerk sign-out failed:', error);
       if (isClerkAPIResponseError(error)) {
