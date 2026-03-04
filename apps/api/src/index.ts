@@ -578,10 +578,16 @@ const PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE = 30;
 const PUBLIC_BOOKING_RATE_LIMIT_MAX_REQUESTS_PER_IP = 180;
 const PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS = 8_000;
 const PUBLIC_BOOKING_RATE_LIMIT_CLEANUP_INTERVAL = 50;
+const CLERK_EXCHANGE_RATE_LIMIT_WINDOW_MS = 60_000;
+const CLERK_EXCHANGE_RATE_LIMIT_MAX_REQUESTS_PER_IP = 40;
+const CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS = 4_000;
+const CLERK_EXCHANGE_RATE_LIMIT_CLEANUP_INTERVAL = 50;
 const publicAnalyticsRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
 let publicAnalyticsRateLimitRequestCounter = 0;
 const publicBookingRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
 let publicBookingRateLimitRequestCounter = 0;
+const clerkExchangeRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
+let clerkExchangeRateLimitRequestCounter = 0;
 let idempotencyCleanupRequestCounter = 0;
 let sessionCleanupRequestCounter = 0;
 
@@ -760,6 +766,55 @@ const isPublicBookingRateLimited = (input: {
 
   const scopedKey = `scope:${input.ip}|${input.scope}`;
   return consumeRateLimitKey(scopedKey, input.perScopeLimit);
+};
+
+const isClerkExchangeRateLimited = (input: {
+  ip: string;
+  nowMs?: number;
+}): boolean => {
+  const nowMs = input.nowMs ?? Date.now();
+  const cutoffMs = nowMs - CLERK_EXCHANGE_RATE_LIMIT_WINDOW_MS;
+
+  const shouldCleanup =
+    clerkExchangeRateLimitState.size > CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS ||
+    clerkExchangeRateLimitRequestCounter % CLERK_EXCHANGE_RATE_LIMIT_CLEANUP_INTERVAL === 0;
+  if (shouldCleanup) {
+    for (const [key, state] of clerkExchangeRateLimitState) {
+      if (state.windowStartMs < cutoffMs) {
+        clerkExchangeRateLimitState.delete(key);
+      }
+    }
+
+    if (clerkExchangeRateLimitState.size > CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS) {
+      const overflow = clerkExchangeRateLimitState.size - CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS;
+      let removed = 0;
+      for (const key of clerkExchangeRateLimitState.keys()) {
+        clerkExchangeRateLimitState.delete(key);
+        removed += 1;
+        if (removed >= overflow) {
+          break;
+        }
+      }
+    }
+  }
+
+  clerkExchangeRateLimitRequestCounter += 1;
+  const key = `ip:${input.ip}`;
+  const existing = clerkExchangeRateLimitState.get(key);
+  if (!existing || existing.windowStartMs < cutoffMs) {
+    clerkExchangeRateLimitState.set(key, {
+      windowStartMs: nowMs,
+      count: 1,
+    });
+    return false;
+  }
+
+  if (existing.count >= CLERK_EXCHANGE_RATE_LIMIT_MAX_REQUESTS_PER_IP) {
+    return true;
+  }
+
+  existing.count += 1;
+  return false;
 };
 
 const parseIdempotencyKey = (request: Request): { key: string } | { error: string } => {
@@ -2988,6 +3043,14 @@ app.post('/v0/auth/verify', async (context) => {
 });
 
 app.post('/v0/auth/clerk/exchange', async (context) => {
+  const requestIp = resolveClientIp(context.req.raw);
+  if (isClerkExchangeRateLimited({ ip: requestIp })) {
+    console.warn('clerk_exchange_rate_limited', {
+      ipHash: hashToken(requestIp),
+    });
+    return jsonError(context, 429, 'Too many requests. Please retry shortly.');
+  }
+
   return withDatabase(context, async (db) => {
     const clerkSecretKey = resolveClerkSecretKey(context.env);
     if (!clerkSecretKey) {

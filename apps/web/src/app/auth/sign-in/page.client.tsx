@@ -34,6 +34,7 @@ export default function SignInPageClient() {
   const apiBaseUrl = resolveApiBaseUrl('Auth sign-in page');
   const legacyToken = searchParams.get('token')?.trim() ?? '';
   const handledLegacyTokenRef = useRef('');
+  const [legacyRetryNonce, setLegacyRetryNonce] = useState(0);
   const [legacyVerifying, setLegacyVerifying] = useState(false);
   const [legacyError, setLegacyError] = useState<string | null>(null);
 
@@ -41,10 +42,11 @@ export default function SignInPageClient() {
     if (!sessionReady) {
       return;
     }
-    if (!legacyToken || session || handledLegacyTokenRef.current === legacyToken) {
+    const verificationKey = `${legacyToken}:${legacyRetryNonce}`;
+    if (!legacyToken || session || handledLegacyTokenRef.current === verificationKey) {
       return;
     }
-    handledLegacyTokenRef.current = legacyToken;
+    handledLegacyTokenRef.current = verificationKey;
     setLegacyVerifying(true);
     setLegacyError(null);
 
@@ -136,7 +138,18 @@ export default function SignInPageClient() {
         clearTimeout(requestTimeout);
       }
     };
-  }, [apiBaseUrl, isLoaded, isSignedIn, legacyToken, router, save, session, sessionReady, signOut]);
+  }, [
+    apiBaseUrl,
+    isLoaded,
+    isSignedIn,
+    legacyRetryNonce,
+    legacyToken,
+    router,
+    save,
+    session,
+    sessionReady,
+    signOut,
+  ]);
 
   useEffect(() => {
     if (isLoaded && isSignedIn && sessionReady && session) {
@@ -169,7 +182,21 @@ export default function SignInPageClient() {
     >
       <Card>
         {legacyVerifying ? <Toast variant="info">Verifying legacy sign-in token…</Toast> : null}
-        {legacyError ? <Toast variant="error">{legacyError}</Toast> : null}
+        {legacyError ? (
+          <Toast variant="error">
+            {legacyError}{' '}
+            <button
+              type="button"
+              className={uiStyles.inlineActionButton}
+              onClick={() => {
+                setLegacyError(null);
+                setLegacyRetryNonce((current) => current + 1);
+              }}
+            >
+              Retry
+            </button>
+          </Toast>
+        ) : null}
         <div className={styles.clerkContainer}>
           <SignIn
             path="/auth/sign-in"
