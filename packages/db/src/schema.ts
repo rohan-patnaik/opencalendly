@@ -333,6 +333,10 @@ export const notificationRules = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
+    idTypeUnique: unique('notification_rules_id_type_unique').on(
+      table.id,
+      table.notificationType,
+    ),
     uniquePerEventTypeTypeOffset: unique('notification_rules_event_type_type_offset_unique').on(
       table.eventTypeId,
       table.notificationType,
@@ -359,9 +363,7 @@ export const scheduledNotifications = pgTable(
     eventTypeId: uuid('event_type_id')
       .notNull()
       .references(() => eventTypes.id, { onDelete: 'cascade' }),
-    notificationRuleId: uuid('notification_rule_id')
-      .notNull()
-      .references(() => notificationRules.id, { onDelete: 'cascade' }),
+    notificationRuleId: uuid('notification_rule_id').notNull(),
     notificationType: notificationRuleTypeEnum('notification_type')
       .$type<NotificationRuleTypeRecord>()
       .notNull(),
@@ -385,6 +387,11 @@ export const scheduledNotifications = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
+    ruleTypeFk: foreignKey({
+      columns: [table.notificationRuleId, table.notificationType],
+      foreignColumns: [notificationRules.id, notificationRules.notificationType],
+      name: 'scheduled_notifications_rule_type_fk',
+    }).onDelete('cascade'),
     uniqueBookingRuleRecipient: unique('scheduled_notifications_booking_rule_recipient_unique').on(
       table.bookingId,
       table.notificationRuleId,

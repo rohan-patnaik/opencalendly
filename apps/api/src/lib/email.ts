@@ -287,7 +287,7 @@ export const sendBookingFollowUpEmail = async (
     `Thanks for meeting with ${input.organizerDisplayName}.`,
     `Event: ${input.eventName}`,
     `Scheduled time: ${when} (${input.timezone})`,
-    'If you need another slot, you can book again using the organizer booking link.',
+    'If you need another slot, please book again from the organizer booking page.',
   ].join('\n');
 
   return sendTextEmail(env, {

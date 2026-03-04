@@ -274,6 +274,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
 
   const [busyActions, setBusyActions] = useState<Set<string>>(new Set());
   const teamDetailsRequestIdRef = useRef(0);
+  const notificationRulesRequestIdRef = useRef(0);
 
   const beginBusy = useCallback((action: string) => {
     setBusyActions((previous) => {
@@ -440,30 +441,38 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         return;
       }
 
+      const requestId = notificationRulesRequestIdRef.current + 1;
+      notificationRulesRequestIdRef.current = requestId;
       setNotificationRulesLoading(true);
       setNotificationRulesError(null);
       try {
         const payload = await organizerApi.getNotificationRules(apiBaseUrl, session, eventTypeId);
-        setNotificationRules(payload.rules);
-        setNotificationRulesDraft(
-          JSON.stringify(
-            payload.rules.map((rule) => ({
-              notificationType: rule.notificationType,
-              offsetMinutes: rule.offsetMinutes,
-              isEnabled: rule.isEnabled,
-            })),
-            null,
-            2,
-          ),
-        );
+        if (requestId === notificationRulesRequestIdRef.current) {
+          setNotificationRules(payload.rules);
+          setNotificationRulesDraft(
+            JSON.stringify(
+              payload.rules.map((rule) => ({
+                notificationType: rule.notificationType,
+                offsetMinutes: rule.offsetMinutes,
+                isEnabled: rule.isEnabled,
+              })),
+              null,
+              2,
+            ),
+          );
+        }
       } catch (caught) {
-        setNotificationRules([]);
-        setNotificationRulesDraft('[]');
-        setNotificationRulesError(
-          caught instanceof Error ? caught.message : 'Unable to load notification rules.',
-        );
+        if (requestId === notificationRulesRequestIdRef.current) {
+          setNotificationRules([]);
+          setNotificationRulesDraft('[]');
+          setNotificationRulesError(
+            caught instanceof Error ? caught.message : 'Unable to load notification rules.',
+          );
+        }
       } finally {
-        setNotificationRulesLoading(false);
+        if (requestId === notificationRulesRequestIdRef.current) {
+          setNotificationRulesLoading(false);
+        }
       }
     },
     [apiBaseUrl, session],

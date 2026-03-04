@@ -4997,6 +4997,9 @@ app.get('/v0/event-types/:eventTypeId/notification-rules', async (context) => {
     }
 
     const eventTypeId = context.req.param('eventTypeId');
+    if (!isUuid(eventTypeId)) {
+      return jsonError(context, 400, 'Invalid eventTypeId.');
+    }
     const rules = await listEventTypeNotificationRules(db, {
       eventTypeId,
       organizerId: authedUser.id,
@@ -5034,6 +5037,9 @@ app.put('/v0/event-types/:eventTypeId/notification-rules', async (context) => {
     }
 
     const eventTypeId = context.req.param('eventTypeId');
+    if (!isUuid(eventTypeId)) {
+      return jsonError(context, 400, 'Invalid eventTypeId.');
+    }
     const [eventType] = await db
       .select({
         id: eventTypes.id,
@@ -5048,21 +5054,40 @@ app.put('/v0/event-types/:eventTypeId/notification-rules', async (context) => {
 
     const now = new Date();
     await db.transaction(async (transaction) => {
-      await transaction.delete(notificationRules).where(eq(notificationRules.eventTypeId, eventTypeId));
+      await transaction
+        .update(notificationRules)
+        .set({
+          isEnabled: false,
+          updatedAt: now,
+        })
+        .where(eq(notificationRules.eventTypeId, eventTypeId));
 
       if (parsed.data.rules.length === 0) {
         return;
       }
 
-      await transaction.insert(notificationRules).values(
-        parsed.data.rules.map((rule) => ({
-          eventTypeId,
-          notificationType: rule.notificationType,
-          offsetMinutes: rule.offsetMinutes,
-          isEnabled: rule.isEnabled,
-          updatedAt: now,
-        })),
-      );
+      await transaction
+        .insert(notificationRules)
+        .values(
+          parsed.data.rules.map((rule) => ({
+            eventTypeId,
+            notificationType: rule.notificationType,
+            offsetMinutes: rule.offsetMinutes,
+            isEnabled: rule.isEnabled,
+            updatedAt: now,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [
+            notificationRules.eventTypeId,
+            notificationRules.notificationType,
+            notificationRules.offsetMinutes,
+          ],
+          set: {
+            isEnabled: sql`excluded.is_enabled`,
+            updatedAt: now,
+          },
+        });
     });
 
     const rules = await listEventTypeNotificationRules(db, {
