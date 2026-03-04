@@ -245,6 +245,14 @@ export const timeOffBlocks = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
+    sourceAllowed: check(
+      'time_off_blocks_source_allowed',
+      sql`${table.source} in ('manual', 'holiday_import')`,
+    ),
+    sourceKeyStateCheck: check(
+      'time_off_blocks_source_key_state_check',
+      sql`(${table.source} = 'manual' and ${table.sourceKey} is null) or (${table.source} = 'holiday_import' and ${table.sourceKey} is not null)`,
+    ),
     endAfterStart: check('time_off_blocks_end_after_start', sql`${table.endAt} > ${table.startAt}`),
     userStartIndex: index('time_off_blocks_user_start_at_idx').on(table.userId, table.startAt),
     userRangeIndex: index('time_off_blocks_user_range_idx').on(table.userId, table.startAt, table.endAt),
