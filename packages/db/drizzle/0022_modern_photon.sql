@@ -1,0 +1,2 @@
+ALTER TABLE "scheduled_notifications" ADD COLUMN "leased_until" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "scheduled_notifications_leased_until_idx" ON "scheduled_notifications" USING btree ("leased_until");

@@ -155,6 +155,13 @@
       "when": 1772586614710,
       "tag": "0021_grey_khan",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1772595869809,
+      "tag": "0022_modern_photon",
+      "breakpoints": true
     }
   ]
 }

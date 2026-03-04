@@ -370,6 +370,7 @@ export const scheduledNotifications = pgTable(
     bookingStartsAt: timestamp('booking_starts_at', { withTimezone: true }).notNull(),
     bookingEndsAt: timestamp('booking_ends_at', { withTimezone: true }).notNull(),
     sendAt: timestamp('send_at', { withTimezone: true }).notNull(),
+    leasedUntil: timestamp('leased_until', { withTimezone: true }),
     status: scheduledNotificationStatusEnum('status')
       .$type<ScheduledNotificationStatusRecord>()
       .notNull()
@@ -400,6 +401,7 @@ export const scheduledNotifications = pgTable(
       table.sendAt,
     ),
     sendAtIndex: index('scheduled_notifications_send_at_idx').on(table.sendAt),
+    leasedUntilIndex: index('scheduled_notifications_leased_until_idx').on(table.leasedUntil),
     attemptCountRange: check(
       'scheduled_notifications_attempt_count_range',
       sql`${table.attemptCount} >= 0 and ${table.attemptCount} <= 100`,

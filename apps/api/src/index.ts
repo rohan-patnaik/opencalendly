@@ -507,6 +507,7 @@ const CALENDAR_WRITEBACK_LEASE_MINUTES = 3;
 const NOTIFICATION_RUN_BATCH_LIMIT_DEFAULT = 20;
 const NOTIFICATION_RUN_BATCH_LIMIT_MAX = 100;
 const NOTIFICATION_RUN_MAX_ATTEMPTS = 5;
+const NOTIFICATION_RUN_LEASE_MINUTES = 3;
 const IDEMPOTENCY_KEY_HEADER = 'Idempotency-Key';
 const IDEMPOTENCY_KEY_MIN_LENGTH = 16;
 const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
@@ -1007,7 +1008,7 @@ type NotificationRuleRow = {
 };
 
 const listEventTypeNotificationRules = async (
-  db: Database,
+  db: Pick<Database, 'select'>,
   input: {
     eventTypeId: string;
     organizerId: string;
@@ -1040,7 +1041,7 @@ const listEventTypeNotificationRules = async (
 };
 
 const enqueueScheduledNotificationsForBooking = async (
-  db: Database,
+  db: Pick<Database, 'select' | 'insert'>,
   input: {
     bookingId: string;
     organizerId: string;
@@ -1094,7 +1095,7 @@ const enqueueScheduledNotificationsForBooking = async (
 };
 
 const cancelPendingScheduledNotificationsForBooking = async (
-  db: Database,
+  db: Pick<Database, 'update'>,
   input: {
     bookingId: string;
   },
@@ -1105,6 +1106,7 @@ const cancelPendingScheduledNotificationsForBooking = async (
     .set({
       status: 'canceled',
       canceledAt: now,
+      leasedUntil: null,
       updatedAt: now,
     })
     .where(
@@ -1116,6 +1118,42 @@ const cancelPendingScheduledNotificationsForBooking = async (
     .returning({ id: scheduledNotifications.id });
 
   return updated.length;
+};
+
+const claimDueScheduledNotificationRowIds = async (
+  db: Pick<Database, 'transaction'>,
+  input: {
+    now: Date;
+    organizerId: string;
+    limit: number;
+  },
+): Promise<string[]> => {
+  const leaseUntil = new Date(input.now.getTime() + NOTIFICATION_RUN_LEASE_MINUTES * 60_000);
+
+  return db.transaction(async (transaction) => {
+    const claimed = await transaction.execute<{ id: string }>(sql`
+      with due_rows as (
+        select id
+        from scheduled_notifications
+        where organizer_id = ${input.organizerId}
+          and status in ('pending', 'failed')
+          and attempt_count < ${NOTIFICATION_RUN_MAX_ATTEMPTS}
+          and send_at <= ${input.now}
+          and (leased_until is null or leased_until <= ${input.now})
+        order by send_at asc
+        limit ${input.limit}
+        for update skip locked
+      )
+      update scheduled_notifications as target
+      set leased_until = ${leaseUntil},
+          updated_at = ${input.now}
+      from due_rows
+      where target.id = due_rows.id
+      returning target.id
+    `);
+
+    return claimed.rows.map((row) => row.id);
+  });
 };
 
 const executeWebhookDelivery = async (
@@ -4299,6 +4337,23 @@ app.post('/v0/notifications/run', async (context) => {
 
     const limit = clampNotificationRunBatchLimit(parsed.data.limit ?? context.req.query('limit'));
     const now = new Date();
+    const claimedRowIds = await claimDueScheduledNotificationRowIds(db, {
+      now,
+      organizerId: authedUser.id,
+      limit,
+    });
+
+    if (claimedRowIds.length === 0) {
+      return context.json({
+        ok: true,
+        limit,
+        maxAttempts: NOTIFICATION_RUN_MAX_ATTEMPTS,
+        processed: 0,
+        succeeded: 0,
+        failed: 0,
+        skipped: 0,
+      });
+    }
 
     const dueRows = await db
       .select({
@@ -4321,14 +4376,7 @@ app.post('/v0/notifications/run', async (context) => {
       .from(scheduledNotifications)
       .innerJoin(eventTypes, eq(eventTypes.id, scheduledNotifications.eventTypeId))
       .innerJoin(users, eq(users.id, scheduledNotifications.organizerId))
-      .where(
-        and(
-          eq(scheduledNotifications.organizerId, authedUser.id),
-          inArray(scheduledNotifications.status, ['pending', 'failed']),
-          lt(scheduledNotifications.attemptCount, NOTIFICATION_RUN_MAX_ATTEMPTS),
-          lte(scheduledNotifications.sendAt, now),
-        ),
-      )
+      .where(inArray(scheduledNotifications.id, claimedRowIds))
       .orderBy(asc(scheduledNotifications.sendAt))
       .limit(limit);
 
@@ -4368,6 +4416,13 @@ app.post('/v0/notifications/run', async (context) => {
       });
 
       if (outcome.action === 'skip') {
+        await db
+          .update(scheduledNotifications)
+          .set({
+            leasedUntil: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(scheduledNotifications.id, row.id));
         skipped += 1;
         continue;
       }
@@ -6763,6 +6818,16 @@ app.post('/v0/team-bookings', async (context) => {
           throw new Error('Assigned organizer not found.');
         }
 
+        const queuedNotifications = await enqueueScheduledNotificationsForBooking(transaction, {
+          bookingId: insertedBooking.id,
+          organizerId: insertedBooking.organizerId,
+          eventTypeId: insertedBooking.eventTypeId,
+          inviteeEmail: insertedBooking.inviteeEmail,
+          inviteeName: insertedBooking.inviteeName,
+          startsAt: insertedBooking.startsAt,
+          endsAt: insertedBooking.endsAt,
+        });
+
         return {
           booking: insertedBooking,
           eventType: {
@@ -6780,6 +6845,7 @@ app.post('/v0/team-bookings', async (context) => {
           organizer,
           actionTokens: tokenSet.publicTokens,
           assignmentUserIds: slotResolution.assignmentUserIds,
+          queuedNotifications,
         };
       });
 
@@ -6822,16 +6888,6 @@ app.post('/v0/team-bookings', async (context) => {
         status: email.sent ? 'succeeded' : 'failed',
         ...(email.messageId ? { providerMessageId: email.messageId } : {}),
         ...(email.error ? { error: email.error } : {}),
-      });
-
-      const queuedNotifications = await enqueueScheduledNotificationsForBooking(db, {
-        bookingId: result.booking.id,
-        organizerId: result.booking.organizerId,
-        eventTypeId: result.booking.eventTypeId,
-        inviteeEmail: result.booking.inviteeEmail,
-        inviteeName: result.booking.inviteeName,
-        startsAt: result.booking.startsAt,
-        endsAt: result.booking.endsAt,
       });
 
       const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
@@ -6907,7 +6963,7 @@ app.post('/v0/team-bookings', async (context) => {
         },
         email,
         notifications: {
-          queued: queuedNotifications,
+          queued: result.queuedNotifications,
         },
         webhooks: {
           queued: queuedWebhookDeliveries,
@@ -7048,6 +7104,7 @@ app.post('/v0/bookings', async (context) => {
     }
 
     try {
+      let queuedNotifications = 0;
       const result = await commitBooking(
         {
           getPublicEventType: async (username, eventSlug) => {
@@ -7152,6 +7209,17 @@ app.post('/v0/bookings', async (context) => {
                     })),
                   );
                 },
+                afterInsertBooking: async (booking) => {
+                  queuedNotifications = await enqueueScheduledNotificationsForBooking(transaction, {
+                    bookingId: booking.id,
+                    organizerId: booking.organizerId,
+                    eventTypeId: booking.eventTypeId,
+                    inviteeEmail: booking.inviteeEmail,
+                    inviteeName: booking.inviteeName,
+                    startsAt: booking.startsAt,
+                    endsAt: booking.endsAt,
+                  });
+                },
                 insertBooking: async (input) => {
                   try {
                     const [inserted] = await transaction
@@ -7239,16 +7307,6 @@ app.post('/v0/bookings', async (context) => {
         status: email.sent ? 'succeeded' : 'failed',
         ...(email.messageId ? { providerMessageId: email.messageId } : {}),
         ...(email.error ? { error: email.error } : {}),
-      });
-
-      const queuedNotifications = await enqueueScheduledNotificationsForBooking(db, {
-        bookingId: result.booking.id,
-        organizerId: result.booking.organizerId,
-        eventTypeId: result.booking.eventTypeId,
-        inviteeEmail: result.booking.inviteeEmail,
-        inviteeName: result.booking.inviteeName,
-        startsAt: result.booking.startsAt,
-        endsAt: result.booking.endsAt,
       });
 
       const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
@@ -7606,6 +7664,7 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
             eventType,
             organizer,
             alreadyProcessed: true,
+            canceledNotifications: 0,
           };
         }
 
@@ -7651,11 +7710,16 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
           .delete(teamBookingAssignments)
           .where(eq(teamBookingAssignments.bookingId, booking.id));
 
+        const canceledNotifications = await cancelPendingScheduledNotificationsForBooking(transaction, {
+          bookingId: booking.id,
+        });
+
         return {
           booking: canceledBooking,
           eventType,
           organizer,
           alreadyProcessed: false,
+          canceledNotifications,
         };
       });
 
@@ -7728,10 +7792,6 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
         }
       }
 
-      const canceledNotifications = await cancelPendingScheduledNotificationsForBooking(db, {
-        bookingId: result.booking.id,
-      });
-
       const queuedWebhookDeliveries = result.alreadyProcessed
         ? 0
         : await enqueueWebhookDeliveries(db, {
@@ -7780,7 +7840,7 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
         },
         email,
         notifications: {
-          canceled: canceledNotifications,
+          canceled: result.canceledNotifications,
         },
         webhooks: {
           queued: queuedWebhookDeliveries,
@@ -7992,6 +8052,8 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             organizer: organizerRow,
             actionTokens: null,
             alreadyProcessed: true,
+            canceledNotificationsForOldBooking: 0,
+            queuedNotificationsForNewBooking: 0,
           };
         }
 
@@ -8309,6 +8371,22 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           }
         }
 
+        const canceledNotificationsForOldBooking = await cancelPendingScheduledNotificationsForBooking(
+          transaction,
+          {
+            bookingId: booking.id,
+          },
+        );
+        const queuedNotificationsForNewBooking = await enqueueScheduledNotificationsForBooking(transaction, {
+          bookingId: insertedBooking.id,
+          organizerId: insertedBooking.organizerId,
+          eventTypeId: insertedBooking.eventTypeId,
+          inviteeEmail: insertedBooking.inviteeEmail,
+          inviteeName: insertedBooking.inviteeName,
+          startsAt: insertedBooking.startsAt,
+          endsAt: insertedBooking.endsAt,
+        });
+
         return {
           oldBooking: {
             ...booking,
@@ -8319,6 +8397,8 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           organizer: organizerRow,
           actionTokens: tokenSet.publicTokens,
           alreadyProcessed: false,
+          canceledNotificationsForOldBooking,
+          queuedNotificationsForNewBooking,
         };
       });
 
@@ -8386,23 +8466,6 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           });
         }
       }
-
-      const canceledNotificationsForOldBooking = result.alreadyProcessed
-        ? 0
-        : await cancelPendingScheduledNotificationsForBooking(db, {
-            bookingId: result.oldBooking.id,
-          });
-      const queuedNotificationsForNewBooking = result.alreadyProcessed
-        ? 0
-        : await enqueueScheduledNotificationsForBooking(db, {
-            bookingId: result.newBooking.id,
-            organizerId: result.newBooking.organizerId,
-            eventTypeId: result.newBooking.eventTypeId,
-            inviteeEmail: result.newBooking.inviteeEmail,
-            inviteeName: result.newBooking.inviteeName,
-            startsAt: result.newBooking.startsAt,
-            endsAt: result.newBooking.endsAt,
-          });
 
       const queuedWebhookDeliveries = result.alreadyProcessed
         ? 0
@@ -8494,8 +8557,8 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         actions,
         email,
         notifications: {
-          canceledForOldBooking: canceledNotificationsForOldBooking,
-          queuedForNewBooking: queuedNotificationsForNewBooking,
+          canceledForOldBooking: result.canceledNotificationsForOldBooking,
+          queuedForNewBooking: result.queuedNotificationsForNewBooking,
         },
         webhooks: {
           queued: queuedWebhookDeliveries,

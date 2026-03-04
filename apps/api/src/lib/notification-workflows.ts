@@ -44,6 +44,7 @@ export type RunnerOutcome =
         providerMessageId: string | null;
         lastError: string | null;
         sentAt: Date | null;
+        leasedUntil: Date | null;
         updatedAt: Date;
       };
     };
@@ -119,6 +120,7 @@ export const resolveRunnerOutcome = (input: {
         providerMessageId: input.sendResult.messageId ?? null,
         lastError: null,
         sentAt: input.now,
+        leasedUntil: null,
         updatedAt: input.now,
       },
     };
@@ -133,6 +135,7 @@ export const resolveRunnerOutcome = (input: {
       providerMessageId: null,
       lastError: input.sendResult.error?.slice(0, 1000) ?? 'Email send failed.',
       sentAt: null,
+      leasedUntil: null,
       updatedAt: input.now,
     },
   };
