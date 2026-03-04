@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { createClerkClient, verifyToken } from '@clerk/backend';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { DateTime } from 'luxon';
@@ -43,6 +44,7 @@ import {
   calendarWritebackRunSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
+  clerkAuthExchangeRequestSchema,
   demoCreditsConsumeSchema,
   eventQuestionsSchema,
   eventTypeCreateSchema,
@@ -119,6 +121,11 @@ import {
   sendBookingRescheduledEmail,
 } from './lib/email';
 import {
+  deriveUsernameSeedFromEmail,
+  resolveDisplayName,
+  resolveUniqueUsername,
+} from './lib/clerk-auth';
+import {
   buildScheduledNotificationsForBooking,
   resolveRunnerOutcome,
   toEmailDeliveryTypeForNotification,
@@ -189,6 +196,8 @@ type Bindings = {
   GOOGLE_CLIENT_SECRET?: string;
   MICROSOFT_CLIENT_ID?: string;
   MICROSOFT_CLIENT_SECRET?: string;
+  CLERK_SECRET_KEY?: string;
+  CLERK_ALLOWED_AUDIENCES?: string;
 };
 
 type ContextLike = {
@@ -477,6 +486,49 @@ const resolveMicrosoftOAuthConfig = (
   return { clientId, clientSecret };
 };
 
+const resolveClerkSecretKey = (env: Bindings): string | null => {
+  const secretKey = env.CLERK_SECRET_KEY?.trim();
+  return secretKey ? secretKey : null;
+};
+
+const resolveClerkAuthorizedParties = (env: Bindings): string[] => {
+  const values = new Set<string>();
+  const configured = env.APP_BASE_URL?.trim();
+  if (configured) {
+    try {
+      values.add(new URL(configured).origin);
+    } catch {
+      throw new Error('APP_BASE_URL must be a valid absolute URL when Clerk auth is enabled.');
+    }
+  }
+
+  const shouldAllowLocalOrigins = Array.from(values).some((origin) => {
+    try {
+      const hostname = new URL(origin).hostname;
+      return hostname === 'localhost' || hostname === '127.0.0.1';
+    } catch {
+      return false;
+    }
+  });
+  if (shouldAllowLocalOrigins) {
+    values.add('http://localhost:3000');
+    values.add('http://127.0.0.1:3000');
+  }
+
+  if (values.size === 0) {
+    throw new Error('APP_BASE_URL must be configured for Clerk token verification.');
+  }
+
+  return Array.from(values);
+};
+
+const resolveClerkAllowedAudiences = (env: Bindings): string[] => {
+  return (env.CLERK_ALLOWED_AUDIENCES ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+};
+
 const toCalendarConnectionStatus = (input: {
   provider: CalendarProvider;
   externalEmail: string | null;
@@ -514,6 +566,7 @@ const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
 const IDEMPOTENCY_IN_PROGRESS_TTL_MINUTES = 10;
 const IDEMPOTENCY_COMPLETED_TTL_HOURS = 24;
 const IDEMPOTENCY_EXPIRED_CLEANUP_INTERVAL = 50;
+const SESSION_EXPIRED_CLEANUP_INTERVAL = 50;
 const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE = 120;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP = 300;
@@ -525,11 +578,18 @@ const PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE = 30;
 const PUBLIC_BOOKING_RATE_LIMIT_MAX_REQUESTS_PER_IP = 180;
 const PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS = 8_000;
 const PUBLIC_BOOKING_RATE_LIMIT_CLEANUP_INTERVAL = 50;
+const CLERK_EXCHANGE_RATE_LIMIT_WINDOW_MS = 60_000;
+const CLERK_EXCHANGE_RATE_LIMIT_MAX_REQUESTS_PER_IP = 40;
+const CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS = 4_000;
+const CLERK_EXCHANGE_RATE_LIMIT_CLEANUP_INTERVAL = 50;
 const publicAnalyticsRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
 let publicAnalyticsRateLimitRequestCounter = 0;
 const publicBookingRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
 let publicBookingRateLimitRequestCounter = 0;
+const clerkExchangeRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
+let clerkExchangeRateLimitRequestCounter = 0;
 let idempotencyCleanupRequestCounter = 0;
+let sessionCleanupRequestCounter = 0;
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -706,6 +766,55 @@ const isPublicBookingRateLimited = (input: {
 
   const scopedKey = `scope:${input.ip}|${input.scope}`;
   return consumeRateLimitKey(scopedKey, input.perScopeLimit);
+};
+
+const isClerkExchangeRateLimited = (input: {
+  ip: string;
+  nowMs?: number;
+}): boolean => {
+  const nowMs = input.nowMs ?? Date.now();
+  const cutoffMs = nowMs - CLERK_EXCHANGE_RATE_LIMIT_WINDOW_MS;
+
+  const shouldCleanup =
+    clerkExchangeRateLimitState.size > CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS ||
+    clerkExchangeRateLimitRequestCounter % CLERK_EXCHANGE_RATE_LIMIT_CLEANUP_INTERVAL === 0;
+  if (shouldCleanup) {
+    for (const [key, state] of clerkExchangeRateLimitState) {
+      if (state.windowStartMs < cutoffMs) {
+        clerkExchangeRateLimitState.delete(key);
+      }
+    }
+
+    if (clerkExchangeRateLimitState.size > CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS) {
+      const overflow = clerkExchangeRateLimitState.size - CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS;
+      let removed = 0;
+      for (const key of clerkExchangeRateLimitState.keys()) {
+        clerkExchangeRateLimitState.delete(key);
+        removed += 1;
+        if (removed >= overflow) {
+          break;
+        }
+      }
+    }
+  }
+
+  clerkExchangeRateLimitRequestCounter += 1;
+  const key = `ip:${input.ip}`;
+  const existing = clerkExchangeRateLimitState.get(key);
+  if (!existing || existing.windowStartMs < cutoffMs) {
+    clerkExchangeRateLimitState.set(key, {
+      windowStartMs: nowMs,
+      count: 1,
+    });
+    return false;
+  }
+
+  if (existing.count >= CLERK_EXCHANGE_RATE_LIMIT_MAX_REQUESTS_PER_IP) {
+    return true;
+  }
+
+  existing.count += 1;
+  return false;
 };
 
 const parseIdempotencyKey = (request: Request): { key: string } | { error: string } => {
@@ -1912,6 +2021,15 @@ const maybeCleanupExpiredIdempotencyRequests = async (db: Database, now: Date): 
   await db.delete(idempotencyRequests).where(lte(idempotencyRequests.expiresAt, now));
 };
 
+const maybeCleanupExpiredSessions = async (db: Database, now: Date): Promise<void> => {
+  sessionCleanupRequestCounter += 1;
+  if (sessionCleanupRequestCounter % SESSION_EXPIRED_CLEANUP_INTERVAL !== 0) {
+    return;
+  }
+
+  await db.delete(sessions).where(lte(sessions.expiresAt, now));
+};
+
 const claimIdempotencyRequest = async (
   db: Database,
   input: {
@@ -2634,6 +2752,9 @@ const resolveAuthenticatedUser = async (
     return null;
   }
 
+  const now = new Date();
+  await maybeCleanupExpiredSessions(db, now);
+
   const tokenHash = hashToken(token);
   const [row] = await db
     .select({
@@ -2645,7 +2766,7 @@ const resolveAuthenticatedUser = async (
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
-    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, new Date())))
+    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
     .limit(1);
 
   if (!row) {
@@ -2844,8 +2965,11 @@ app.post('/v0/auth/magic-link', async (context) => {
       return jsonError(context, 500, 'Unable to create or resolve user account.');
     }
 
+    const now = new Date();
+    await maybeCleanupExpiredSessions(db, now);
+
     const magicLinkToken = createRawToken();
-    const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MINUTES * 60_000);
+    const expiresAt = new Date(now.getTime() + MAGIC_LINK_TTL_MINUTES * 60_000);
 
     await db.insert(sessions).values({
       userId,
@@ -2871,6 +2995,7 @@ app.post('/v0/auth/verify', async (context) => {
     }
 
     const tokenHash = hashToken(parsed.data.token);
+    const now = new Date();
     const [row] = await db
       .select({
         sessionId: sessions.id,
@@ -2882,15 +3007,17 @@ app.post('/v0/auth/verify', async (context) => {
       })
       .from(sessions)
       .innerJoin(users, eq(users.id, sessions.userId))
-      .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, new Date())))
+      .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
       .limit(1);
 
     if (!row) {
       return jsonError(context, 401, 'Magic link token is invalid or expired.');
     }
 
+    await maybeCleanupExpiredSessions(db, now);
+
     const sessionToken = createRawToken();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
 
     await db
       .update(sessions)
@@ -2910,6 +3037,350 @@ app.post('/v0/auth/verify', async (context) => {
         username: row.username,
         displayName: row.displayName,
         timezone: normalizeTimezone(row.timezone),
+      },
+    });
+  });
+});
+
+app.post('/v0/auth/clerk/exchange', async (context) => {
+  const requestIp = resolveClientIp(context.req.raw);
+  if (isClerkExchangeRateLimited({ ip: requestIp })) {
+    console.warn('clerk_exchange_rate_limited', {
+      ipHash: hashToken(requestIp),
+    });
+    return jsonError(context, 429, 'Too many requests. Please retry shortly.');
+  }
+
+  return withDatabase(context, async (db) => {
+    const clerkSecretKey = resolveClerkSecretKey(context.env);
+    if (!clerkSecretKey) {
+      return jsonError(context, 503, 'Clerk is not configured on the API runtime.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = clerkAuthExchangeRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    let clerkUserId = '';
+    let authorizedParties: string[] = [];
+    try {
+      authorizedParties = resolveClerkAuthorizedParties(context.env);
+    } catch (error) {
+      return jsonError(
+        context,
+        500,
+        error instanceof Error
+          ? error.message
+          : 'APP_BASE_URL must be a valid absolute URL when Clerk auth is enabled.',
+      );
+    }
+    try {
+      const audiences = resolveClerkAllowedAudiences(context.env);
+      const tokenPayload = await verifyToken(parsed.data.clerkToken, {
+        secretKey: clerkSecretKey,
+        clockSkewInMs: 10_000,
+        ...(audiences.length > 0 ? { audience: audiences } : {}),
+        authorizedParties,
+      });
+      clerkUserId = tokenPayload.sub ?? '';
+    } catch (error) {
+      const reason =
+        typeof error === 'object' &&
+        error !== null &&
+        'reason' in error &&
+        typeof (error as { reason?: unknown }).reason === 'string'
+          ? (error as { reason: string }).reason
+          : null;
+      const authFailureReasons = new Set([
+        'TokenExpired',
+        'TokenInvalid',
+        'TokenInvalidAlgorithm',
+        'TokenInvalidAuthorizedParties',
+        'TokenInvalidSignature',
+        'TokenNotActiveYet',
+        'TokenIatInTheFuture',
+      ]);
+      const upstreamFailureReasons = new Set([
+        'InvalidSecretKey',
+        'RemoteJWKFailedToLoad',
+        'RemoteJWKInvalid',
+        'RemoteJWKMissing',
+        'LocalJWKMissing',
+        'JWKFailedToResolve',
+        'JWKKidMismatch',
+        'TokenVerificationFailed',
+      ]);
+
+      if (reason && upstreamFailureReasons.has(reason)) {
+        console.error('clerk_token_verification_failed', {
+          reason,
+          error: error instanceof Error ? error.message : 'unknown',
+        });
+        return jsonError(context, 502, 'Unable to verify Clerk token due to upstream dependency error.');
+      }
+
+      if (!reason || authFailureReasons.has(reason)) {
+        return jsonError(context, 401, 'Invalid or expired Clerk token.');
+      }
+
+      return jsonError(context, 401, 'Invalid Clerk token.');
+    }
+
+    if (!clerkUserId) {
+      return jsonError(context, 401, 'Invalid Clerk token payload.');
+    }
+
+    const clerkClient = createClerkClient({ secretKey: clerkSecretKey });
+    const CLERK_USER_LOOKUP_MAX_ATTEMPTS = 3;
+    const CLERK_USER_LOOKUP_RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+    const resolveLookupErrorStatus = (error: unknown): number | null => {
+      if (
+        typeof error === 'object' &&
+        error &&
+        'status' in error &&
+        typeof (error as { status?: unknown }).status === 'number'
+      ) {
+        return (error as { status: number }).status;
+      }
+      return null;
+    };
+
+    let clerkUser:
+      | Awaited<ReturnType<(typeof clerkClient.users)['getUser']>>
+      | null = null;
+    let clerkLookupError: unknown = null;
+    for (let attempt = 1; attempt <= CLERK_USER_LOOKUP_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        clerkUser = await clerkClient.users.getUser(clerkUserId);
+        break;
+      } catch (error) {
+        clerkLookupError = error;
+        const status = resolveLookupErrorStatus(error);
+        if (status === 404) {
+          return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
+        }
+
+        const retryable = status ? CLERK_USER_LOOKUP_RETRYABLE_STATUS_CODES.has(status) : true;
+        if (!retryable || attempt >= CLERK_USER_LOOKUP_MAX_ATTEMPTS) {
+          break;
+        }
+
+        const baseDelayMs = 200;
+        const maxDelayMs = 1_600;
+        const backoffDelayMs = Math.min(maxDelayMs, baseDelayMs * 2 ** (attempt - 1));
+        const jitterMs = Math.floor(Math.random() * 120);
+        await new Promise<void>((resolve) => setTimeout(resolve, backoffDelayMs + jitterMs));
+      }
+    }
+
+    if (!clerkUser && clerkLookupError) {
+      const status = resolveLookupErrorStatus(clerkLookupError);
+      console.error('clerk_user_lookup_failed', {
+        clerkUserIdHash: hashToken(clerkUserId),
+        attempts: CLERK_USER_LOOKUP_MAX_ATTEMPTS,
+        status,
+        error: clerkLookupError instanceof Error ? clerkLookupError.message : 'unknown',
+      });
+      return jsonError(context, 502, 'Upstream dependency error contacting Clerk.');
+    }
+
+    if (!clerkUser) {
+      return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
+    }
+
+    const primaryEmail =
+      clerkUser.emailAddresses.find(
+        (emailAddress) => emailAddress.id === clerkUser.primaryEmailAddressId,
+      ) ?? clerkUser.emailAddresses.find((emailAddress) => Boolean(emailAddress.emailAddress?.trim()));
+    const email = primaryEmail?.emailAddress?.trim().toLowerCase();
+    if (!email) {
+      return jsonError(context, 400, 'Clerk user is missing a primary email.');
+    }
+    const isPrimaryEmailVerified = primaryEmail?.verification?.status === 'verified';
+    if (!isPrimaryEmailVerified) {
+      return jsonError(context, 403, 'Email must be verified to create a session.');
+    }
+
+    const requestedTimezone = parsed.data.timezone ? normalizeTimezone(parsed.data.timezone) : null;
+    const preferredUsername =
+      parsed.data.username?.trim().toLowerCase() ||
+      clerkUser.username?.trim().toLowerCase() ||
+      deriveUsernameSeedFromEmail(email);
+    const resolvedDisplayName = resolveDisplayName({
+      providedDisplayName: parsed.data.displayName,
+      clerkFirstName: clerkUser.firstName,
+      clerkLastName: clerkUser.lastName,
+      email,
+    });
+
+    const [existing] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        username: users.username,
+        displayName: users.displayName,
+        timezone: users.timezone,
+      })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    let userRecord:
+      | {
+          id: string;
+          email: string;
+          username: string;
+          displayName: string;
+          timezone: string;
+        }
+      | null = null;
+
+    if (existing) {
+      const nextDisplayName = parsed.data.displayName ? resolvedDisplayName : existing.displayName;
+      const nextTimezone = requestedTimezone ?? existing.timezone;
+
+      if (nextDisplayName !== existing.displayName || nextTimezone !== existing.timezone) {
+        await db
+          .update(users)
+          .set({
+            displayName: nextDisplayName,
+            timezone: nextTimezone,
+          })
+          .where(eq(users.id, existing.id));
+      }
+
+      userRecord = {
+        id: existing.id,
+        email: existing.email,
+        username: existing.username,
+        displayName: nextDisplayName,
+        timezone: normalizeTimezone(nextTimezone),
+      };
+    } else {
+      const timezone = requestedTimezone ?? 'UTC';
+
+      for (let attempt = 0; attempt < 20 && !userRecord; attempt += 1) {
+        const candidateSeed =
+          attempt === 0 ? preferredUsername : `${preferredUsername}-${createRawToken().slice(0, 4)}`;
+        let username = '';
+        try {
+          username = await resolveUniqueUsername({
+            preferredCandidate: candidateSeed,
+            email,
+            isUsernameTaken: async (candidate) => {
+              const [existingWithUsername] = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.username, candidate))
+                .limit(1);
+              return Boolean(existingWithUsername);
+            },
+          });
+        } catch (error) {
+          console.error('clerk_username_resolution_failed', {
+            preferredUsername,
+            emailDomain: email.split('@')[1] ?? 'unknown',
+            attempt,
+            error: error instanceof Error ? error.message : 'unknown',
+          });
+          return jsonError(context, 503, 'Unable to provision account username. Please retry.');
+        }
+
+        try {
+          const [inserted] = await db
+            .insert(users)
+            .values({
+              email,
+              username,
+              displayName: resolvedDisplayName,
+              timezone,
+            })
+            .returning({
+              id: users.id,
+              email: users.email,
+              username: users.username,
+              displayName: users.displayName,
+              timezone: users.timezone,
+            });
+
+          if (inserted) {
+            userRecord = {
+              ...inserted,
+              timezone: normalizeTimezone(inserted.timezone),
+            };
+          }
+        } catch (error) {
+          if (!isUniqueViolation(error)) {
+            throw error;
+          }
+
+          if (isUniqueViolation(error, 'users_username_unique')) {
+            continue;
+          }
+
+          const [retried] = await db
+            .select({
+              id: users.id,
+              email: users.email,
+              username: users.username,
+              displayName: users.displayName,
+              timezone: users.timezone,
+            })
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
+          if (retried) {
+            userRecord = {
+              ...retried,
+              timezone: normalizeTimezone(retried.timezone),
+            };
+            break;
+          }
+        }
+      }
+    }
+
+    if (!userRecord) {
+      return jsonError(context, 500, 'Unable to create or resolve user account.');
+    }
+
+    const now = new Date();
+    await maybeCleanupExpiredSessions(db, now);
+
+    const sessionToken = createRawToken();
+    const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+    const [insertedSession] = await db.transaction(async (transaction) => {
+      await transaction.execute(sql`select id from users where id = ${userRecord.id} for update`);
+      await transaction.delete(sessions).where(eq(sessions.userId, userRecord.id));
+      return transaction
+        .insert(sessions)
+        .values({
+          userId: userRecord.id,
+          tokenHash: hashToken(sessionToken),
+          expiresAt,
+        })
+        .returning({
+          id: sessions.id,
+        });
+    });
+
+    if (!insertedSession) {
+      return jsonError(context, 500, 'Unable to create session.');
+    }
+
+    return context.json({
+      ok: true,
+      sessionToken,
+      expiresAt: expiresAt.toISOString(),
+      user: {
+        id: userRecord.id,
+        email: userRecord.email,
+        username: userRecord.username,
+        displayName: userRecord.displayName,
+        timezone: normalizeTimezone(userRecord.timezone),
       },
     });
   });

@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useClerk } from '@clerk/nextjs';
+import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 
 import { Button, Card, LinkButton, PageShell, Toast } from '../../components/ui';
 import { authedGetJson } from '../../lib/api-client';
@@ -97,6 +99,23 @@ const toIsoDate = (date: Date): string => {
 
 export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientProps) {
   const { session, ready, clear } = useAuthSession();
+  const { signOut } = useClerk();
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const handleSignOut = useCallback(async () => {
+    setSignOutError(null);
+    clear();
+    try {
+      await signOut({ redirectUrl: '/auth/sign-in' });
+    } catch (error) {
+      console.error('Clerk sign-out failed:', error);
+      if (isClerkAPIResponseError(error)) {
+        const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
+        setSignOutError(detail ?? 'Unable to sign out right now. Please try again.');
+        return;
+      }
+      setSignOutError('Unable to sign out right now. Please try again.');
+    }
+  }, [clear, signOut]);
 
   const defaultRange = useMemo(() => {
     const end = new Date();
@@ -246,7 +265,7 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
       <PageShell
         eyebrow="Authentication required"
         title="Analytics Dashboard"
-        description="Sign in with magic-link auth to access organizer analytics dashboards."
+        description="Sign in to access organizer analytics dashboards."
       >
         <Card>
           {authError ? <Toast variant="error">{authError}</Toast> : null}
@@ -275,10 +294,11 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
             Signed in as <strong>{authedUser.email}</strong>
           </span>
           <span>Timezone: {authedUser.timezone}</span>
-          <Button type="button" variant="ghost" size="sm" onClick={clear}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void handleSignOut()}>
             Sign out
           </Button>
         </div>
+        {signOutError ? <Toast variant="error">{signOutError}</Toast> : null}
       </section>
 
       <section className={styles.card}>

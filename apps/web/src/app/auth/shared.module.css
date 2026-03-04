@@ -4,6 +4,12 @@
   margin-top: 0.9rem;
 }
 
+.clerkContainer {
+  display: grid;
+  place-items: center;
+  margin-top: 0.35rem;
+}
+
 .grid {
   display: grid;
   gap: 0.75rem;

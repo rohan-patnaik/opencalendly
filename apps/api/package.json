@@ -9,6 +9,7 @@
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@clerk/backend": "^3.0.1",
     "@opencalendly/db": "0.1.0",
     "@opencalendly/shared": "0.1.0",
     "hono": "^4.7.4",

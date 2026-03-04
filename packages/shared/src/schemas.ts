@@ -55,6 +55,13 @@ export const verifyMagicLinkRequestSchema = z.object({
   token: z.string().min(32).max(256),
 });
 
+export const clerkAuthExchangeRequestSchema = z.object({
+  clerkToken: z.string().min(20).max(4096),
+  username: usernameSchema.optional(),
+  displayName: z.string().min(1).max(120).optional(),
+  timezone: timezoneSchema.optional(),
+});
+
 export const bookingActionTokenSchema = z.string().min(32).max(256);
 export const bookingActionTypeSchema = z.enum(['cancel', 'reschedule']);
 
@@ -329,6 +336,7 @@ export const webhookEventSchema = z.object({
 export type HealthCheck = z.infer<typeof healthCheckSchema>;
 export type MagicLinkRequest = z.infer<typeof magicLinkRequestSchema>;
 export type VerifyMagicLinkRequest = z.infer<typeof verifyMagicLinkRequestSchema>;
+export type ClerkAuthExchangeRequest = z.infer<typeof clerkAuthExchangeRequestSchema>;
 export type BookingActionToken = z.infer<typeof bookingActionTokenSchema>;
 export type BookingActionType = z.infer<typeof bookingActionTypeSchema>;
 export type EventTypeCreateInput = z.infer<typeof eventTypeCreateSchema>;

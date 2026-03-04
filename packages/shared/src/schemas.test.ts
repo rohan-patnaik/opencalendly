@@ -8,6 +8,7 @@ import {
   calendarConnectStartSchema,
   calendarSyncRequestSchema,
   calendarWritebackRunSchema,
+  clerkAuthExchangeRequestSchema,
   analyticsRangeQuerySchema,
   analyticsTrackFunnelEventSchema,
   bookingCreateSchema,
@@ -151,6 +152,26 @@ describe('shared schemas', () => {
   it('accepts booking action token payloads', () => {
     const token = 'a'.repeat(64);
     expect(bookingActionTokenSchema.parse(token)).toBe(token);
+  });
+
+  it('accepts clerk auth exchange payloads', () => {
+    const payload = clerkAuthExchangeRequestSchema.parse({
+      clerkToken: 'x'.repeat(64),
+      username: 'demo-user',
+      displayName: 'Demo User',
+      timezone: 'Asia/Kolkata',
+    });
+
+    expect(payload.username).toBe('demo-user');
+  });
+
+  it('rejects invalid clerk auth exchange payloads', () => {
+    const result = clerkAuthExchangeRequestSchema.safeParse({
+      clerkToken: 'short',
+      username: 'Invalid Spaces',
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it('accepts booking cancellation payloads', () => {

@@ -189,6 +189,26 @@
   justify-content: flex-end;
 }
 
+.inlineActionButton {
+  border: 0;
+  background: transparent;
+  color: var(--brand-primary);
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+
+.inlineActionButton:hover {
+  color: var(--brand-primary-hover);
+  text-decoration: underline;
+}
+
+.inlineActionButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .field {
   display: grid;
   gap: 0.4rem;

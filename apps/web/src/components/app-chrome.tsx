@@ -1,5 +1,7 @@
 'use client';
 
+import { useClerk } from '@clerk/nextjs';
+import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -30,8 +32,26 @@ const isActive = (pathname: string, href: string): boolean => {
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, ready, clear } = useAuthSession();
+  const { signOut } = useClerk();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
+  const handleSignOut = useCallback(async () => {
+    setSignOutError(null);
+    clear();
+    try {
+      await signOut({ redirectUrl: '/auth/sign-in' });
+    } catch (error) {
+      if (isClerkAPIResponseError(error)) {
+        const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
+        console.error('Clerk sign-out failed:', detail ?? 'unknown clerk error');
+        setSignOutError(detail ?? 'Unable to sign out right now. Please retry.');
+        return;
+      }
+      console.error('Clerk sign-out failed:', error);
+      setSignOutError('Unable to sign out right now. Please retry.');
+    }
+  }, [clear, signOut]);
 
   useEffect(() => {
     closeMobileNav();
@@ -121,7 +141,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           {ready && session ? (
             <>
               <span className={styles.sessionChip}>{session.user.email}</span>
-              <button type="button" className={styles.actionButton} onClick={clear}>
+              <button type="button" className={styles.actionButton} onClick={() => void handleSignOut()}>
                 Sign out
               </button>
             </>
@@ -168,6 +188,12 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
       </aside>
+
+      {signOutError ? (
+        <div className={styles.signOutError} role="alert">
+          {signOutError}
+        </div>
+      ) : null}
 
       <div className={styles.content}>{children}</div>
     </div>

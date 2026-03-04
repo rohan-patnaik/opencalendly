@@ -9,7 +9,8 @@
 ## Auth model
 
 - Auth uses bearer sessions: `Authorization: Bearer <sessionToken>`.
-- Session tokens are issued via magic-link flow.
+- Primary session tokens are issued via Clerk exchange flow.
+- Magic-link session issuance remains available for backward compatibility (deprecated for web UI).
 - Protected routes return `401` on missing/invalid/expired token.
 
 ## Endpoints
@@ -41,7 +42,45 @@ Notes:
 
 - Email delivery telemetry stores HMAC hashes (not raw emails) and requires `TELEMETRY_HMAC_KEY` (minimum 32 chars). If unset, email delivery telemetry writes are skipped.
 
+### `POST /v0/auth/clerk/exchange`
+
+Request:
+
+```json
+{
+  "clerkToken": "clerk-jwt-token",
+  "username": "demo",
+  "displayName": "Demo Organizer",
+  "timezone": "Asia/Kolkata"
+}
+```
+
+Notes:
+
+- `clerkToken` must be a valid Clerk session JWT.
+- `username`, `displayName`, and `timezone` are optional hints for first-time provisioning.
+- Existing OpenCalendly users are resolved by normalized email.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "sessionToken": "session-token",
+  "expiresAt": "2026-03-28T15:04:05.000Z",
+  "user": {
+    "id": "d8bdbf6d-aed7-4c84-a67f-a2c54f7c4f4a",
+    "email": "demo@opencalendly.dev",
+    "username": "demo",
+    "displayName": "Demo Organizer",
+    "timezone": "Asia/Kolkata"
+  }
+}
+```
+
 ### `POST /v0/auth/magic-link`
+
+Deprecated for web UI. Retained for backward compatibility during transition window.
 
 Request:
 
