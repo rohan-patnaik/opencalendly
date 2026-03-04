@@ -28,6 +28,7 @@ describe('buildHolidayTimeOffWindows', () => {
     expect(windows.length).toBeGreaterThan(0);
     expect(firstWindow).toBeDefined();
     expect(firstWindow?.sourceKey.startsWith('US:')).toBe(true);
+    expect(firstWindow?.startAt.toISOString()).toBe('2026-01-01T00:00:00.000Z');
   });
 
   it('produces stable source keys for repeated imports (idempotent keying)', () => {

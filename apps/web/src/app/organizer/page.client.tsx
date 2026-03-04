@@ -656,6 +656,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       if (!session) {
         return;
       }
+      setPanelError(null);
+      setPanelMessage(null);
 
       const startAtMs = Date.parse(timeOffCreateForm.startAt);
       const endAtMs = Date.parse(timeOffCreateForm.endAt);
@@ -670,8 +672,6 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
 
       const action = 'timeOffCreate';
       beginBusy(action);
-      setPanelError(null);
-      setPanelMessage(null);
 
       try {
         await organizerApi.createTimeOffBlock(apiBaseUrl, session, {
@@ -724,6 +724,8 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     if (!session) {
       return;
     }
+    setPanelError(null);
+    setPanelMessage(null);
 
     const year = Number.parseInt(holidayImportForm.year, 10);
     if (!Number.isInteger(year)) {
@@ -733,8 +735,6 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
 
     const action = 'timeOffImportHolidays';
     beginBusy(action);
-    setPanelError(null);
-    setPanelMessage(null);
 
     try {
       const result = await organizerApi.importHolidayTimeOffBlocks(apiBaseUrl, session, {

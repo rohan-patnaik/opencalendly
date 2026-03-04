@@ -326,11 +326,37 @@ Request:
 }
 ```
 
+Success response:
+
+```json
+{
+  "ok": true,
+  "timeOffBlock": {
+    "id": "a4e2af2c-7c0f-4fcb-b96b-4eddf6ebf7fd",
+    "startAt": "2026-03-10T09:00:00.000Z",
+    "endAt": "2026-03-10T17:00:00.000Z",
+    "reason": "Out of office",
+    "source": "manual",
+    "sourceKey": null,
+    "createdAt": "2026-03-04T00:00:00.000Z"
+  }
+}
+```
+
 ### `DELETE /v0/me/time-off/:id`
 
 Auth required.
 
 Deletes an organizer time-off block by id.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "deletedId": "a4e2af2c-7c0f-4fcb-b96b-4eddf6ebf7fd"
+}
+```
 
 ### `POST /v0/me/time-off/import-holidays`
 
