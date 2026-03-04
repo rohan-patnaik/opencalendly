@@ -15,6 +15,7 @@ import {
   type TeamEventType,
   type TeamMember,
   type TeamSummary,
+  type TimeOffBlock,
   type WritebackStatus,
 } from '../../lib/organizer-api';
 import { useAuthSession } from '../../lib/use-auth-session';
@@ -39,6 +40,7 @@ const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const organizerSections = [
   { id: 'event-types', label: 'Event types' },
   { id: 'availability', label: 'Availability' },
+  { id: 'time-off', label: 'Time off + holidays' },
   { id: 'teams', label: 'Teams' },
   { id: 'webhooks', label: 'Webhooks' },
   { id: 'calendars', label: 'Calendars' },
@@ -177,6 +179,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const [eventTypes, setEventTypes] = useState<OrganizerEventType[]>([]);
   const [availabilityRules, setAvailabilityRules] = useState<AvailabilityRule[]>([]);
   const [availabilityOverrides, setAvailabilityOverrides] = useState<AvailabilityOverride[]>([]);
+  const [timeOffBlocks, setTimeOffBlocks] = useState<TimeOffBlock[]>([]);
   const [teams, setTeams] = useState<TeamSummary[]>([]);
   const [webhooks, setWebhooks] = useState<OrganizerWebhook[]>([]);
   const [calendarStatuses, setCalendarStatuses] = useState<CalendarProviderStatus[]>([]);
@@ -195,6 +198,15 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
 
   const [rulesDraft, setRulesDraft] = useState('[]');
   const [overridesDraft, setOverridesDraft] = useState('[]');
+  const [timeOffCreateForm, setTimeOffCreateForm] = useState({
+    startAt: '',
+    endAt: '',
+    reason: '',
+  });
+  const [holidayImportForm, setHolidayImportForm] = useState({
+    locale: 'IN' as 'IN' | 'US',
+    year: String(new Date().getFullYear()),
+  });
 
   const [teamCreateForm, setTeamCreateForm] = useState({
     name: '',
@@ -283,19 +295,28 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     setGlobalError(null);
 
     try {
-      const [eventTypePayload, availabilityPayload, teamPayload, webhookPayload, calendarPayload, writebackPayload] =
-        await Promise.all([
-          organizerApi.listEventTypes(apiBaseUrl, session),
-          organizerApi.getAvailability(apiBaseUrl, session),
-          organizerApi.listTeams(apiBaseUrl, session),
-          organizerApi.listWebhooks(apiBaseUrl, session),
-          organizerApi.getCalendarSyncStatus(apiBaseUrl, session),
-          organizerApi.getWritebackStatus(apiBaseUrl, session),
-        ]);
+      const [
+        eventTypePayload,
+        availabilityPayload,
+        timeOffPayload,
+        teamPayload,
+        webhookPayload,
+        calendarPayload,
+        writebackPayload,
+      ] = await Promise.all([
+        organizerApi.listEventTypes(apiBaseUrl, session),
+        organizerApi.getAvailability(apiBaseUrl, session),
+        organizerApi.listTimeOffBlocks(apiBaseUrl, session),
+        organizerApi.listTeams(apiBaseUrl, session),
+        organizerApi.listWebhooks(apiBaseUrl, session),
+        organizerApi.getCalendarSyncStatus(apiBaseUrl, session),
+        organizerApi.getWritebackStatus(apiBaseUrl, session),
+      ]);
 
       setEventTypes(eventTypePayload.eventTypes);
       setAvailabilityRules(availabilityPayload.rules);
       setAvailabilityOverrides(availabilityPayload.overrides);
+      setTimeOffBlocks(timeOffPayload.timeOffBlocks);
       setTeams(teamPayload.teams);
       setWebhooks(webhookPayload.webhooks);
       setCalendarStatuses(calendarPayload.providers);
@@ -396,6 +417,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       setEventTypes([]);
       setAvailabilityRules([]);
       setAvailabilityOverrides([]);
+      setTimeOffBlocks([]);
       setTeams([]);
       setWebhooks([]);
       setCalendarStatuses([]);
@@ -627,6 +649,107 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       endBusy(action);
     }
   }, [apiBaseUrl, beginBusy, endBusy, overridesDraft, refreshOrganizerState, session]);
+
+  const handleCreateTimeOffBlock = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!session) {
+        return;
+      }
+      setPanelError(null);
+      setPanelMessage(null);
+
+      const startAtMs = Date.parse(timeOffCreateForm.startAt);
+      const endAtMs = Date.parse(timeOffCreateForm.endAt);
+      if (!Number.isFinite(startAtMs) || !Number.isFinite(endAtMs)) {
+        setPanelError('Time-off start and end are required.');
+        return;
+      }
+      if (endAtMs <= startAtMs) {
+        setPanelError('Time-off end must be after start.');
+        return;
+      }
+
+      const action = 'timeOffCreate';
+      beginBusy(action);
+
+      try {
+        await organizerApi.createTimeOffBlock(apiBaseUrl, session, {
+          startAt: new Date(startAtMs).toISOString(),
+          endAt: new Date(endAtMs).toISOString(),
+          reason: toNullableString(timeOffCreateForm.reason),
+        });
+
+        setTimeOffCreateForm({
+          startAt: '',
+          endAt: '',
+          reason: '',
+        });
+        setPanelMessage('Time-off block created.');
+        await refreshOrganizerState();
+      } catch (caught) {
+        setPanelError(caught instanceof Error ? caught.message : 'Unable to create time-off block.');
+      } finally {
+        endBusy(action);
+      }
+    },
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session, timeOffCreateForm],
+  );
+
+  const handleDeleteTimeOffBlock = useCallback(
+    async (timeOffId: string) => {
+      if (!session) {
+        return;
+      }
+
+      const action = `timeOffDelete:${timeOffId}`;
+      beginBusy(action);
+      setPanelError(null);
+      setPanelMessage(null);
+
+      try {
+        await organizerApi.deleteTimeOffBlock(apiBaseUrl, session, timeOffId);
+        setPanelMessage('Time-off block deleted.');
+        await refreshOrganizerState();
+      } catch (caught) {
+        setPanelError(caught instanceof Error ? caught.message : 'Unable to delete time-off block.');
+      } finally {
+        endBusy(action);
+      }
+    },
+    [apiBaseUrl, beginBusy, endBusy, refreshOrganizerState, session],
+  );
+
+  const handleImportHolidayTimeOffBlocks = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+    setPanelError(null);
+    setPanelMessage(null);
+
+    const year = Number(holidayImportForm.year);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      setPanelError('Holiday year must be between 2000 and 2100.');
+      return;
+    }
+
+    const action = 'timeOffImportHolidays';
+    beginBusy(action);
+
+    try {
+      const result = await organizerApi.importHolidayTimeOffBlocks(apiBaseUrl, session, {
+        locale: holidayImportForm.locale,
+        year,
+      });
+
+      setPanelMessage(`Holiday import complete: imported=${result.imported}, skipped=${result.skipped}.`);
+      await refreshOrganizerState();
+    } catch (caught) {
+      setPanelError(caught instanceof Error ? caught.message : 'Unable to import holiday time-off blocks.');
+    } finally {
+      endBusy(action);
+    }
+  }, [apiBaseUrl, beginBusy, endBusy, holidayImportForm.locale, holidayImportForm.year, refreshOrganizerState, session]);
 
   const handleCreateTeam = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1366,6 +1489,132 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
               {isBusy('overridesSave') ? 'Saving…' : 'Save overrides'}
             </button>
           </div>
+        </div>
+          </section>
+
+          <section id="time-off" className={styles.card}>
+        <div className={styles.sectionHeader}>
+          <h2>Time off + holiday import</h2>
+          <p>Create hard blocking windows and import yearly holiday presets.</p>
+        </div>
+
+        <div className={styles.splitGrid}>
+          <form className={styles.form} onSubmit={handleCreateTimeOffBlock}>
+            <h3>Add manual time-off block</h3>
+            <label className={styles.label}>
+              Start
+              <input
+                className={styles.input}
+                type="datetime-local"
+                value={timeOffCreateForm.startAt}
+                onChange={(event) =>
+                  setTimeOffCreateForm((prev) => ({ ...prev, startAt: event.target.value }))
+                }
+                required
+              />
+            </label>
+            <label className={styles.label}>
+              End
+              <input
+                className={styles.input}
+                type="datetime-local"
+                value={timeOffCreateForm.endAt}
+                onChange={(event) =>
+                  setTimeOffCreateForm((prev) => ({ ...prev, endAt: event.target.value }))
+                }
+                required
+              />
+            </label>
+            <label className={styles.label}>
+              Reason (optional)
+              <input
+                className={styles.input}
+                value={timeOffCreateForm.reason}
+                onChange={(event) =>
+                  setTimeOffCreateForm((prev) => ({ ...prev, reason: event.target.value }))
+                }
+                placeholder="Out of office"
+              />
+            </label>
+            <button type="submit" className={styles.primaryButton} disabled={isBusy('timeOffCreate')}>
+              {isBusy('timeOffCreate') ? 'Creating…' : 'Add time-off block'}
+            </button>
+          </form>
+
+          <div className={styles.form}>
+            <h3>Import holidays</h3>
+            <label className={styles.label}>
+              Locale
+              <select
+                className={styles.select}
+                value={holidayImportForm.locale}
+                onChange={(event) =>
+                  setHolidayImportForm((prev) => ({
+                    ...prev,
+                    locale: event.target.value as 'IN' | 'US',
+                  }))
+                }
+              >
+                <option value="IN">India (IN)</option>
+                <option value="US">United States (US)</option>
+              </select>
+            </label>
+            <label className={styles.label}>
+              Year
+              <input
+                className={styles.input}
+                type="number"
+                min={2000}
+                max={2100}
+                value={holidayImportForm.year}
+                onChange={(event) =>
+                  setHolidayImportForm((prev) => ({ ...prev, year: event.target.value }))
+                }
+                required
+              />
+            </label>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={() => void handleImportHolidayTimeOffBlocks()}
+              disabled={isBusy('timeOffImportHolidays')}
+            >
+              {isBusy('timeOffImportHolidays') ? 'Importing…' : 'Import holiday blocks'}
+            </button>
+            <p className={styles.helperText}>
+              Imports are idempotent by locale/date and will skip already imported holiday rows.
+            </p>
+          </div>
+        </div>
+
+        <div className={styles.form}>
+          <h3>Current time-off blocks</h3>
+          {timeOffBlocks.length === 0 ? (
+            <p className={styles.empty}>No time-off blocks configured.</p>
+          ) : (
+            <div className={styles.listGrid}>
+              {timeOffBlocks.map((block) => (
+                <article key={block.id} className={styles.itemCard}>
+                  <div className={styles.itemHead}>
+                    <strong>{block.reason ?? 'Unavailable'}</strong>
+                    <span className={styles.badge}>{block.source}</span>
+                  </div>
+                  <p>
+                    {formatDateTime(block.startAt)} - {formatDateTime(block.endAt)}
+                  </p>
+                  {block.sourceKey ? <p className={styles.helperText}>sourceKey: {block.sourceKey}</p> : null}
+                  <button
+                    type="button"
+                    className={styles.ghostButton}
+                    onClick={() => void handleDeleteTimeOffBlock(block.id)}
+                    disabled={isBusy(`timeOffDelete:${block.id}`)}
+                  >
+                    {isBusy(`timeOffDelete:${block.id}`) ? 'Deleting…' : 'Delete'}
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
           </section>
 

@@ -1,0 +1,2 @@
+ALTER TABLE "time_off_blocks" ADD CONSTRAINT "time_off_blocks_source_allowed" CHECK ("time_off_blocks"."source" in ('manual', 'holiday_import'));--> statement-breakpoint
+ALTER TABLE "time_off_blocks" ADD CONSTRAINT "time_off_blocks_source_key_state_check" CHECK (("time_off_blocks"."source" = 'manual' and "time_off_blocks"."source_key" is null) or ("time_off_blocks"."source" = 'holiday_import' and "time_off_blocks"."source_key" is not null));

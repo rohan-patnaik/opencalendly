@@ -285,6 +285,104 @@ Request:
 }
 ```
 
+### `GET /v0/me/time-off`
+
+Auth required.
+
+Lists explicit organizer time-off blocks (manual + holiday-imported) used as hard non-available windows.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "timeOffBlocks": [
+    {
+      "id": "a4e2af2c-7c0f-4fcb-b96b-4eddf6ebf7fd",
+      "startAt": "2026-12-25T00:00:00.000Z",
+      "endAt": "2026-12-26T00:00:00.000Z",
+      "reason": "Christmas Day",
+      "source": "holiday_import",
+      "sourceKey": "US:2026-12-25",
+      "createdAt": "2026-03-04T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+### `POST /v0/me/time-off`
+
+Auth required.
+
+Creates a manual time-off block.
+
+Request:
+
+```json
+{
+  "startAt": "2026-03-10T09:00:00.000Z",
+  "endAt": "2026-03-10T17:00:00.000Z",
+  "reason": "Out of office"
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "timeOffBlock": {
+    "id": "a4e2af2c-7c0f-4fcb-b96b-4eddf6ebf7fd",
+    "startAt": "2026-03-10T09:00:00.000Z",
+    "endAt": "2026-03-10T17:00:00.000Z",
+    "reason": "Out of office",
+    "source": "manual",
+    "sourceKey": null,
+    "createdAt": "2026-03-04T00:00:00.000Z"
+  }
+}
+```
+
+### `DELETE /v0/me/time-off/:id`
+
+Auth required.
+
+Deletes an organizer time-off block by id.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "deletedId": "a4e2af2c-7c0f-4fcb-b96b-4eddf6ebf7fd"
+}
+```
+
+### `POST /v0/me/time-off/import-holidays`
+
+Auth required.
+
+Imports preset public holidays as time-off blocks for a given locale/year.
+
+Request:
+
+```json
+{
+  "locale": "IN",
+  "year": 2026
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "imported": 5,
+  "skipped": 2
+}
+```
+
 ### `GET /v0/users/:username/event-types/:slug`
 
 Public endpoint for booking page details.
@@ -341,6 +439,7 @@ Success response:
 Behavior:
 
 - Computes slots from organizer rules + date overrides.
+- Applies organizer time-off blocks as hard non-available windows.
 - Removes conflicts from confirmed bookings.
 - Applies synced external busy windows (Feature 6) as non-available blocks.
 - Applies event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
@@ -382,6 +481,7 @@ Required header:
 Behavior:
 
 - Re-validates slot availability inside a DB transaction.
+- Includes organizer time-off blocks in the final write-time conflict check.
 - Includes synced external busy windows in the final write-time conflict check.
 - Uses DB unique slot constraint to avoid duplicate commits.
 - Enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) at commit time.
@@ -726,6 +826,7 @@ Rate-limit response (`429`):
 Behavior:
 
 - Transaction-safe organizer-level conflict checks are required before confirming the new slot.
+- Reschedule commit checks organizer time-off blocks as hard conflicts.
 - Reschedule commit enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
 - Reschedule sends notification emails to invitee + organizer.
 - Repeated submissions of the same token are idempotent.
@@ -1285,6 +1386,7 @@ Success response:
 Behavior:
 
 - Computes per-member schedules from rules + overrides.
+- Includes each member's time-off blocks as hard non-available windows.
 - Applies confirmed booking conflicts per member.
 - Applies each member's synced external busy windows (Feature 6) before slot assignment.
 - Applies event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
@@ -1367,6 +1469,7 @@ Notes:
 
 - Booking write remains transaction-safe.
 - Team assignment rows enforce per-member slot uniqueness.
+- Member selection and commit checks include member time-off blocks.
 - Member selection and commit checks include synced external busy windows.
 - Team booking commit enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
 - Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.

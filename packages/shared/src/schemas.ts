@@ -135,6 +135,21 @@ export const setAvailabilityOverridesSchema = z.object({
   overrides: z.array(availabilityOverrideSchema).max(200),
 });
 
+export const timeOffCreateSchema = z
+  .object({
+    startAt: z.string().datetime({ offset: true }),
+    endAt: z.string().datetime({ offset: true }),
+    reason: z.string().max(300).nullish(),
+  })
+  .refine((value) => Date.parse(value.endAt) > Date.parse(value.startAt), {
+    message: 'endAt must be after startAt.',
+  });
+
+export const timeOffHolidayImportSchema = z.object({
+  locale: z.enum(['IN', 'US']),
+  year: z.number().int().min(2000).max(2100),
+});
+
 export const availabilityQuerySchema = z.object({
   timezone: timezoneSchema.optional(),
   start: z.string().datetime({ offset: true }).optional(),
@@ -297,6 +312,8 @@ export type TeamEventTypeCreateInput = z.infer<typeof teamEventTypeCreateSchema>
 export type AvailabilityRuleInput = z.infer<typeof availabilityRuleSchema>;
 export type AvailabilityOverrideInput = z.infer<typeof availabilityOverrideSchema>;
 export type AvailabilityQueryInput = z.infer<typeof availabilityQuerySchema>;
+export type TimeOffCreateInput = z.infer<typeof timeOffCreateSchema>;
+export type TimeOffHolidayImportInput = z.infer<typeof timeOffHolidayImportSchema>;
 export type BookingCreateInput = z.infer<typeof bookingCreateSchema>;
 export type TeamBookingCreateInput = z.infer<typeof teamBookingCreateSchema>;
 export type BookingCancelInput = z.infer<typeof bookingCancelSchema>;

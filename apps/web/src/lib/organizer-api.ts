@@ -1,4 +1,5 @@
 import {
+  authedDeleteJson,
   authedGetJson,
   authedPatchJson,
   authedPostJson,
@@ -44,6 +45,16 @@ export type AvailabilityOverride = {
   endAt: string;
   isAvailable: boolean;
   reason: string | null;
+  createdAt: string;
+};
+
+export type TimeOffBlock = {
+  id: string;
+  startAt: string;
+  endAt: string;
+  reason: string | null;
+  source: string;
+  sourceKey: string | null;
   createdAt: string;
 };
 
@@ -156,6 +167,10 @@ const fallback = {
   availabilityGet: 'Unable to load availability.',
   availabilityRulesPut: 'Unable to update availability rules.',
   availabilityOverridesPut: 'Unable to update availability overrides.',
+  timeOffList: 'Unable to load time-off blocks.',
+  timeOffCreate: 'Unable to create time-off block.',
+  timeOffDelete: 'Unable to delete time-off block.',
+  timeOffHolidayImport: 'Unable to import holiday blocks.',
   teamsList: 'Unable to load teams.',
   teamCreate: 'Unable to create team.',
   teamMembersList: 'Unable to load team members.',
@@ -282,6 +297,55 @@ export const organizerApi = {
       session,
       body: { overrides },
       fallbackError: fallback.availabilityOverridesPut,
+    });
+  },
+
+  listTimeOffBlocks: async (apiBaseUrl: string, session: AuthSession | null) => {
+    return authedGetJson<{ ok: true; timeOffBlocks: TimeOffBlock[] }>({
+      url: `${apiBaseUrl}/v0/me/time-off`,
+      session,
+      fallbackError: fallback.timeOffList,
+    });
+  },
+
+  createTimeOffBlock: async (
+    apiBaseUrl: string,
+    session: AuthSession | null,
+    body: {
+      startAt: string;
+      endAt: string;
+      reason?: string | null;
+    },
+  ) => {
+    return authedPostJson<{ ok: true; timeOffBlock: TimeOffBlock }>({
+      url: `${apiBaseUrl}/v0/me/time-off`,
+      session,
+      body,
+      fallbackError: fallback.timeOffCreate,
+    });
+  },
+
+  deleteTimeOffBlock: async (apiBaseUrl: string, session: AuthSession | null, timeOffId: string) => {
+    return authedDeleteJson<{ ok: true; deletedId: string }>({
+      url: `${apiBaseUrl}/v0/me/time-off/${encodeURIComponent(timeOffId)}`,
+      session,
+      fallbackError: fallback.timeOffDelete,
+    });
+  },
+
+  importHolidayTimeOffBlocks: async (
+    apiBaseUrl: string,
+    session: AuthSession | null,
+    body: {
+      locale: 'IN' | 'US';
+      year: number;
+    },
+  ) => {
+    return authedPostJson<{ ok: true; imported: number; skipped: number }>({
+      url: `${apiBaseUrl}/v0/me/time-off/import-holidays`,
+      session,
+      body,
+      fallbackError: fallback.timeOffHolidayImport,
     });
   },
 

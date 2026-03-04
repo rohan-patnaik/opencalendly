@@ -103,5 +103,39 @@ describe('computeTeamAvailabilitySlots', () => {
     expect(result.slots[0]?.startsAt).toBe('2026-03-02T09:30:00.000Z');
     expect(result.slots.some((slot) => slot.startsAt === '2026-03-02T09:00:00.000Z')).toBe(false);
   });
-});
 
+  it('removes slots when a member has a blocking override (time-off)', () => {
+    const result = computeTeamAvailabilitySlots({
+      mode: 'collective',
+      rangeStartIso: '2026-03-02T00:00:00.000Z',
+      days: 1,
+      durationMinutes: 30,
+      members: [
+        {
+          userId: 'member-a',
+          timezone: 'UTC',
+          rules: [weekdayRule],
+          overrides: [],
+          bookings: [],
+        },
+        {
+          userId: 'member-b',
+          timezone: 'UTC',
+          rules: [weekdayRule],
+          overrides: [
+            {
+              startAt: new Date('2026-03-02T08:55:00.000Z'),
+              endAt: new Date('2026-03-02T09:35:00.000Z'),
+              isAvailable: false,
+            },
+          ],
+          bookings: [],
+        },
+      ],
+    });
+
+    expect(result.slots.some((slot) => slot.startsAt === '2026-03-02T09:00:00.000Z')).toBe(false);
+    expect(result.slots.some((slot) => slot.startsAt === '2026-03-02T09:30:00.000Z')).toBe(false);
+    expect(result.slots.some((slot) => slot.startsAt === '2026-03-02T10:00:00.000Z')).toBe(true);
+  });
+});

@@ -16,6 +16,8 @@ import {
   eventTypeCreateSchema,
   healthCheckSchema,
   magicLinkRequestSchema,
+  timeOffCreateSchema,
+  timeOffHolidayImportSchema,
   teamAddMemberSchema,
   teamBookingCreateSchema,
   teamCreateSchema,
@@ -101,6 +103,34 @@ describe('shared schemas', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('accepts manual time-off payloads', () => {
+    const payload = timeOffCreateSchema.parse({
+      startAt: '2026-03-10T09:00:00.000Z',
+      endAt: '2026-03-10T17:00:00.000Z',
+      reason: 'Out of office',
+    });
+
+    expect(payload.reason).toBe('Out of office');
+  });
+
+  it('rejects invalid time-off windows', () => {
+    const result = timeOffCreateSchema.safeParse({
+      startAt: '2026-03-10T17:00:00.000Z',
+      endAt: '2026-03-10T09:00:00.000Z',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts holiday import payloads', () => {
+    const payload = timeOffHolidayImportSchema.parse({
+      locale: 'IN',
+      year: 2026,
+    });
+
+    expect(payload.locale).toBe('IN');
   });
 
   it('accepts booking commit payload', () => {

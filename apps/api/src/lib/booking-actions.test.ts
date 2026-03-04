@@ -128,4 +128,31 @@ describe('booking action helpers', () => {
 
     expect(result).toBeNull();
   });
+
+  it('returns null when a blocking time-off override intersects the requested reschedule slot', () => {
+    const result = resolveRequestedRescheduleSlot({
+      requestedStartsAtIso: '2026-03-02T09:00:00.000Z',
+      durationMinutes: 30,
+      organizerTimezone: 'UTC',
+      rules: [
+        {
+          dayOfWeek: 1,
+          startMinute: 540,
+          endMinute: 660,
+          bufferBeforeMinutes: 0,
+          bufferAfterMinutes: 0,
+        },
+      ],
+      overrides: [
+        {
+          startAt: new Date('2026-03-02T08:50:00.000Z'),
+          endAt: new Date('2026-03-02T09:40:00.000Z'),
+          isAvailable: false,
+        },
+      ],
+      bookings: [],
+    });
+
+    expect(result).toBeNull();
+  });
 });
