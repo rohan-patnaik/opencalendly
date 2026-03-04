@@ -1,5 +1,6 @@
 'use client';
 
+import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -30,8 +31,13 @@ const isActive = (pathname: string, href: string): boolean => {
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, ready, clear } = useAuthSession();
+  const { signOut } = useClerk();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
+  const handleSignOut = useCallback(async () => {
+    await signOut().catch(() => undefined);
+    clear();
+  }, [clear, signOut]);
 
   useEffect(() => {
     closeMobileNav();
@@ -121,7 +127,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           {ready && session ? (
             <>
               <span className={styles.sessionChip}>{session.user.email}</span>
-              <button type="button" className={styles.actionButton} onClick={clear}>
+              <button type="button" className={styles.actionButton} onClick={() => void handleSignOut()}>
                 Sign out
               </button>
             </>

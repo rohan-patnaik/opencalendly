@@ -564,3 +564,28 @@ Acceptance criteria:
   - runner success/failure/retry behavior
   - idempotent processing of already-sent rows.
 - `docs/API.md` is updated with notification rule + runner contracts.
+
+### Feature 27: Clerk auth migration (Google + email sign-in) with API session bridge
+
+Scope:
+- Replace custom magic-link web auth UX with Clerk-hosted sign-in.
+- Support email sign-in and Google sign-in through Clerk.
+- Keep existing API bearer-session contracts by adding a Clerk-to-OpenCalendly session exchange.
+- Deprecate the `/auth/verify` web UX path while preserving backward-compatible routing behavior.
+
+Acceptance criteria:
+
+- Web app uses Clerk for authentication UI and state:
+  - `/auth/sign-in` renders Clerk sign-in (email + Google options enabled)
+  - `/auth/verify` no longer requires token paste UX and redirects to `/auth/sign-in`
+- API provides authenticated Clerk exchange endpoint:
+  - `POST /v0/auth/clerk/exchange` validates Clerk token server-side and issues OpenCalendly session token
+  - First-time Clerk users are provisioned/upserted in `users` with deterministic defaults (`timezone`, profile fields)
+- Organizer and dashboard pages continue to use existing API session flows after successful Clerk exchange (no regression in current protected routes).
+- Existing magic-link endpoints remain non-breaking for one release window but are marked deprecated in docs.
+- Environment contracts include Clerk keys (required/optional split documented and validated).
+- Tests cover:
+  - exchange endpoint success/failure
+  - first-time user provisioning via Clerk exchange
+  - web auth-session bootstrap from Clerk sign-in state
+  - protected route behavior for signed-out users.

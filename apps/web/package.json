@@ -10,6 +10,7 @@
     "pages:build": "next-on-pages"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.0.1",
     "@opencalendly/shared": "0.1.0",
     "next": "^15.2.0",
     "react": "^19.0.0",

@@ -1,7 +1,9 @@
+import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata } from 'next';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import AppChrome from '../components/app-chrome';
+import AuthSessionBridge from '../components/auth-session-bridge';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -21,10 +23,31 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
+
+  if (!clerkPublishableKey) {
+    return (
+      <html lang="en" data-theme="obsidian-amber" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+        <body style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+          <main style={{ margin: '3rem auto', maxWidth: 760, padding: '0 1rem' }}>
+            <h1>Clerk configuration required</h1>
+            <p>
+              Set <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code> in <code>.env</code> to run
+              the web app.
+            </p>
+          </main>
+        </body>
+      </html>
+    );
+  }
+
   return (
     <html lang="en" data-theme="obsidian-amber" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <body style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
-        <AppChrome>{children}</AppChrome>
+        <ClerkProvider publishableKey={clerkPublishableKey}>
+          <AuthSessionBridge />
+          <AppChrome>{children}</AppChrome>
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useClerk } from '@clerk/nextjs';
 
 import { Button, Card, LinkButton, PageShell, Toast } from '../../components/ui';
 import { authedGetJson } from '../../lib/api-client';
@@ -195,6 +196,7 @@ const buildDefaultEventTypeForm = () => ({
 
 export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerConsolePageClientProps) {
   const { session, ready, clear } = useAuthSession();
+  const { signOut } = useClerk();
 
   const [authChecking, setAuthChecking] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -278,6 +280,11 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const [busyActions, setBusyActions] = useState<Set<string>>(new Set());
   const teamDetailsRequestIdRef = useRef(0);
   const notificationRulesRequestIdRef = useRef(0);
+
+  const handleSignOut = useCallback(async () => {
+    await signOut().catch(() => undefined);
+    clear();
+  }, [clear, signOut]);
 
   const beginBusy = useCallback((action: string) => {
     setBusyActions((previous) => {
@@ -1327,7 +1334,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       <PageShell
         eyebrow="Authentication required"
         title="Organizer Console"
-        description="Sign in with magic-link auth to manage event types, teams, webhooks, and calendars."
+        description="Sign in to manage event types, teams, webhooks, and calendars."
       >
         <Card>
           {authError ? <Toast variant="error">{authError}</Toast> : null}
@@ -1356,7 +1363,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
             Signed in as <strong>{authedUser.email}</strong>
           </span>
           <span>Timezone: {authedUser.timezone}</span>
-          <Button type="button" variant="ghost" size="sm" onClick={clear}>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void handleSignOut()}>
             Sign out
           </Button>
         </div>

@@ -55,6 +55,8 @@ Populate required values in `.env` once, up front:
 | `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` | Optional Pages production branch (defaults to `main`)                                  |
 | `RESEND_API_KEY`           | Resend dashboard -> API Keys                                                                       |
 | `RESEND_FROM_EMAIL`        | Resend dashboard -> verified sender identity                                                       |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk dashboard -> API Keys -> Publishable key                                          |
+| `CLERK_SECRET_KEY`         | Clerk dashboard -> API Keys -> Secret key                                                          |
 | `GOOGLE_CLIENT_ID`         | Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID (Web application)    |
 | `GOOGLE_CLIENT_SECRET`     | Same Google OAuth credential as above                                                              |
 | `MICROSOFT_CLIENT_ID`      | Microsoft Entra -> App registrations -> Application (client) ID                                    |
@@ -110,9 +112,9 @@ npm run dev:web
 ### 7) Feature 11 auth + dashboard smoke test
 
 1. Open `http://localhost:3000/auth/sign-in`
-2. Request a magic-link token (email required; username/displayName required only for first-time account creation).
-3. Complete verification on `http://localhost:3000/auth/verify` (auto-filled token flow).
-4. Confirm redirect to `http://localhost:3000/dashboard` and analytics load without manual token paste.
+2. Complete Clerk sign-in with email or Google.
+3. Confirm redirect to `http://localhost:3000/dashboard` and analytics load without manual token paste.
+4. Open `http://localhost:3000/auth/verify` and confirm it redirects back to `/auth/sign-in`.
 
 ### 7.1) Feature 15 app shell smoke test
 
@@ -153,8 +155,8 @@ npm run dev:web
 ### Key web routes
 
 - `/` modern product homepage
-- `/auth/sign-in` magic-link session start
-- `/auth/verify` magic-link token verification
+- `/auth/sign-in` Clerk sign-in page (email + Google options)
+- `/auth/verify` legacy route redirecting to Clerk sign-in
 - `/demo/intro-call` public one-on-one booking demo
 - `/team/demo-team/team-intro-call` public team booking demo
 - `/bookings/actions/[token]` public cancel/reschedule action page

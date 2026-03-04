@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { createClerkClient, verifyToken } from '@clerk/backend';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { DateTime } from 'luxon';
@@ -43,6 +44,7 @@ import {
   calendarWritebackRunSchema,
   bookingCreateSchema,
   bookingRescheduleSchema,
+  clerkAuthExchangeRequestSchema,
   demoCreditsConsumeSchema,
   eventQuestionsSchema,
   eventTypeCreateSchema,
@@ -119,6 +121,11 @@ import {
   sendBookingRescheduledEmail,
 } from './lib/email';
 import {
+  deriveUsernameSeedFromEmail,
+  resolveDisplayName,
+  resolveUniqueUsername,
+} from './lib/clerk-auth';
+import {
   buildScheduledNotificationsForBooking,
   resolveRunnerOutcome,
   toEmailDeliveryTypeForNotification,
@@ -189,6 +196,7 @@ type Bindings = {
   GOOGLE_CLIENT_SECRET?: string;
   MICROSOFT_CLIENT_ID?: string;
   MICROSOFT_CLIENT_SECRET?: string;
+  CLERK_SECRET_KEY?: string;
 };
 
 type ContextLike = {
@@ -475,6 +483,11 @@ const resolveMicrosoftOAuthConfig = (
     return null;
   }
   return { clientId, clientSecret };
+};
+
+const resolveClerkSecretKey = (env: Bindings): string | null => {
+  const secretKey = env.CLERK_SECRET_KEY?.trim();
+  return secretKey ? secretKey : null;
 };
 
 const toCalendarConnectionStatus = (input: {
@@ -2910,6 +2923,194 @@ app.post('/v0/auth/verify', async (context) => {
         username: row.username,
         displayName: row.displayName,
         timezone: normalizeTimezone(row.timezone),
+      },
+    });
+  });
+});
+
+app.post('/v0/auth/clerk/exchange', async (context) => {
+  return withDatabase(context, async (db) => {
+    const clerkSecretKey = resolveClerkSecretKey(context.env);
+    if (!clerkSecretKey) {
+      return jsonError(context, 503, 'Clerk is not configured on the API runtime.');
+    }
+
+    const body = await context.req.json().catch(() => null);
+    const parsed = clerkAuthExchangeRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    let clerkUserId = '';
+    try {
+      const tokenPayload = await verifyToken(parsed.data.clerkToken, {
+        secretKey: clerkSecretKey,
+      });
+      clerkUserId = tokenPayload.sub ?? '';
+    } catch {
+      return jsonError(context, 401, 'Invalid or expired Clerk token.');
+    }
+
+    if (!clerkUserId) {
+      return jsonError(context, 401, 'Invalid Clerk token payload.');
+    }
+
+    const clerkClient = createClerkClient({ secretKey: clerkSecretKey });
+    const clerkUser = await clerkClient.users.getUser(clerkUserId).catch(() => null);
+    if (!clerkUser) {
+      return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
+    }
+
+    const primaryEmail =
+      clerkUser.emailAddresses.find(
+        (emailAddress) => emailAddress.id === clerkUser.primaryEmailAddressId,
+      ) ?? clerkUser.emailAddresses.find((emailAddress) => Boolean(emailAddress.emailAddress?.trim()));
+    const email = primaryEmail?.emailAddress?.trim().toLowerCase();
+    if (!email) {
+      return jsonError(context, 400, 'Clerk user is missing a primary email.');
+    }
+
+    const requestedTimezone = parsed.data.timezone ? normalizeTimezone(parsed.data.timezone) : null;
+    const preferredUsername =
+      parsed.data.username?.trim().toLowerCase() ||
+      clerkUser.username?.trim().toLowerCase() ||
+      deriveUsernameSeedFromEmail(email);
+    const resolvedDisplayName = resolveDisplayName({
+      providedDisplayName: parsed.data.displayName,
+      clerkFirstName: clerkUser.firstName,
+      clerkLastName: clerkUser.lastName,
+      email,
+    });
+
+    const [existing] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        username: users.username,
+        displayName: users.displayName,
+        timezone: users.timezone,
+      })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    let userRecord:
+      | {
+          id: string;
+          email: string;
+          username: string;
+          displayName: string;
+          timezone: string;
+        }
+      | null = null;
+
+    if (existing) {
+      const nextDisplayName = parsed.data.displayName ? resolvedDisplayName : existing.displayName;
+      const nextTimezone = requestedTimezone ?? existing.timezone;
+
+      if (nextDisplayName !== existing.displayName || nextTimezone !== existing.timezone) {
+        await db
+          .update(users)
+          .set({
+            displayName: nextDisplayName,
+            timezone: nextTimezone,
+          })
+          .where(eq(users.id, existing.id));
+      }
+
+      userRecord = {
+        id: existing.id,
+        email: existing.email,
+        username: existing.username,
+        displayName: nextDisplayName,
+        timezone: normalizeTimezone(nextTimezone),
+      };
+    } else {
+      const username = await resolveUniqueUsername({
+        preferredCandidate: preferredUsername,
+        email,
+        isUsernameTaken: async (candidate) => {
+          const [existingWithUsername] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.username, candidate))
+            .limit(1);
+          return Boolean(existingWithUsername);
+        },
+      });
+      const timezone = requestedTimezone ?? 'UTC';
+
+      try {
+        const [inserted] = await db
+          .insert(users)
+          .values({
+            email,
+            username,
+            displayName: resolvedDisplayName,
+            timezone,
+          })
+          .returning({
+            id: users.id,
+            email: users.email,
+            username: users.username,
+            displayName: users.displayName,
+            timezone: users.timezone,
+          });
+
+        if (inserted) {
+          userRecord = {
+            ...inserted,
+            timezone: normalizeTimezone(inserted.timezone),
+          };
+        }
+      } catch (error) {
+        if (!isUniqueViolation(error)) {
+          throw error;
+        }
+
+        const [retried] = await db
+          .select({
+            id: users.id,
+            email: users.email,
+            username: users.username,
+            displayName: users.displayName,
+            timezone: users.timezone,
+          })
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
+        if (retried) {
+          userRecord = {
+            ...retried,
+            timezone: normalizeTimezone(retried.timezone),
+          };
+        }
+      }
+    }
+
+    if (!userRecord) {
+      return jsonError(context, 500, 'Unable to create or resolve user account.');
+    }
+
+    const sessionToken = createRawToken();
+    const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+    await db.insert(sessions).values({
+      userId: userRecord.id,
+      tokenHash: hashToken(sessionToken),
+      expiresAt,
+    });
+
+    return context.json({
+      ok: true,
+      sessionToken,
+      expiresAt: expiresAt.toISOString(),
+      user: {
+        id: userRecord.id,
+        email: userRecord.email,
+        username: userRecord.username,
+        displayName: userRecord.displayName,
+        timezone: normalizeTimezone(userRecord.timezone),
       },
     });
   });
