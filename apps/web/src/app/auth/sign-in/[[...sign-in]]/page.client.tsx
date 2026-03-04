@@ -4,11 +4,11 @@ import { SignIn, useAuth, useClerk } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-import { Card, LinkButton, PageShell, Toast } from '../../../components/ui';
-import { resolveApiBaseUrl } from '../../../lib/api-base-url';
-import { useAuthSession } from '../../../lib/use-auth-session';
-import uiStyles from '../../../components/ui/primitives.module.css';
-import styles from '../shared.module.css';
+import { Card, LinkButton, PageShell, Toast } from '../../../../components/ui';
+import { resolveApiBaseUrl } from '../../../../lib/api-base-url';
+import { useAuthSession } from '../../../../lib/use-auth-session';
+import uiStyles from '../../../../components/ui/primitives.module.css';
+import styles from '../../shared.module.css';
 
 type LegacyVerifyResponse = {
   ok: boolean;
@@ -201,8 +201,9 @@ export default function SignInPageClient() {
           <SignIn
             path="/auth/sign-in"
             routing="path"
-            forceRedirectUrl="/auth/sign-in"
-            fallbackRedirectUrl="/auth/sign-in"
+            signUpUrl="/auth/sign-up"
+            forceRedirectUrl="/dashboard"
+            fallbackRedirectUrl="/dashboard"
           />
         </div>
         {isLoaded && isSignedIn && sessionReady && !session ? (

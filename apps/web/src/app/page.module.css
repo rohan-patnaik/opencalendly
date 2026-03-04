@@ -41,9 +41,9 @@
   letter-spacing: 0.16em;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--brand-primary);
+  color: var(--brand-secondary);
   background: var(--bg-hover);
-  border: 1px solid var(--brand-primary);
+  border: 1px solid var(--brand-secondary);
   border-radius: 999px;
   padding: 0.34rem 0.56rem;
 }
@@ -287,9 +287,9 @@
 .badge {
   width: fit-content;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--brand-primary);
+  border: 1px solid var(--brand-secondary);
   background: var(--bg-hover);
-  color: var(--brand-primary);
+  color: var(--brand-secondary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: var(--text-xs);

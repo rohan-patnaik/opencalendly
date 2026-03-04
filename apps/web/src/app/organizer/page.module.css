@@ -20,7 +20,7 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 700;
-  color: var(--brand-primary);
+  color: var(--brand-secondary);
   font-family: var(--font-inter);
 }
 

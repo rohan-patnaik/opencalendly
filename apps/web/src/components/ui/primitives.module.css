@@ -20,7 +20,7 @@
   letter-spacing: 0.16em;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--brand-primary);
+  color: var(--brand-secondary);
 }
 
 .pageTitle {
@@ -73,7 +73,7 @@
 .button {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
-  font-family: var(--font-inter);
+  font-family: inherit;
   font-weight: 600;
   font-size: var(--text-sm);
   min-height: 2.5rem;
@@ -217,7 +217,7 @@
 .label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .input,
@@ -228,9 +228,9 @@
   border-radius: var(--radius-sm);
   min-height: 2.75rem;
   padding: 0 var(--spacing-3);
-  background: var(--bg-base);
+  background: var(--bg-elevated);
   color: var(--text-primary);
-  font-family: var(--font-inter);
+  font-family: inherit;
   font-size: var(--text-sm);
   transition:
     border-color var(--motion-fast),
@@ -264,7 +264,7 @@
 
 .hint {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 0.82rem;
 }
 
@@ -275,6 +275,7 @@
   font-size: 0.9rem;
   background: var(--bg-elevated);
   color: var(--text-secondary);
+  border-left-width: 4px;
 }
 
 .toastInfo {
@@ -394,7 +395,7 @@
   font-size: 0.74rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   background: var(--bg-elevated);
 }
 

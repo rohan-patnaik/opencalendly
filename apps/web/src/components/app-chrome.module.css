@@ -12,10 +12,11 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 1.1rem;
-  padding: 0.78rem 1rem;
+  min-height: var(--app-header-height);
+  padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  backdrop-filter: blur(14px);
+  background: rgba(21, 20, 18, 0.94);
+  backdrop-filter: blur(10px);
 }
 
 .brandGroup {
@@ -35,7 +36,7 @@
 }
 
 .brand:hover {
-  color: var(--brand-primary);
+  color: var(--brand-secondary);
 }
 
 .mobileMenuButton {
@@ -80,18 +81,21 @@
   font-size: var(--text-sm);
   font-weight: 500;
   border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 2px 2px;
   transition:
     color var(--motion-fast),
-    border-color var(--motion-fast);
+    border-color var(--motion-fast),
+    background var(--motion-fast);
 }
 
 .navLink:hover {
   color: var(--text-primary);
+  background: rgba(35, 33, 31, 0.75);
 }
 
 .navLinkActive {
   color: var(--text-primary);
-  border-bottom-color: var(--brand-primary);
+  border-bottom-color: var(--brand-secondary);
 }
 
 .right {
@@ -123,7 +127,7 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   padding: 0.4rem 0.75rem;
-  background: var(--bg-surface);
+  background: var(--bg-elevated);
   font-size: var(--text-sm);
   transition:
     background var(--motion-fast),
@@ -132,7 +136,7 @@
 
 .actionButton:hover {
   background: var(--bg-hover);
-  border-color: var(--border-hover);
+  border-color: var(--brand-secondary);
 }
 
 .content {
@@ -237,7 +241,7 @@
 }
 
 .mobileNavLinkActive {
-  border-color: var(--brand-primary);
+  border-color: var(--brand-secondary);
   background: var(--bg-hover);
   color: var(--text-primary);
 }

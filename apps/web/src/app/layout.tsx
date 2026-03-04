@@ -28,7 +28,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   if (!clerkPublishableKey) {
     return (
       <html lang="en" data-theme="obsidian-amber" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-        <body style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+        <body>
           <main style={{ margin: '3rem auto', maxWidth: 760, padding: '0 1rem' }}>
             <h1>Clerk configuration required</h1>
             <p>
@@ -43,7 +43,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
 
   return (
     <html lang="en" data-theme="obsidian-amber" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+      <body>
         <ClerkProvider publishableKey={clerkPublishableKey}>
           <AuthSessionBridge />
           <AppChrome>{children}</AppChrome>

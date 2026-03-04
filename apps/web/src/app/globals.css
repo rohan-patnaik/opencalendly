@@ -1,50 +1,37 @@
 :root,
 :root[data-theme='obsidian-amber'] {
   color-scheme: dark;
-  /* Next.js fonts will be injected via layout.tsx */
-  /* Remove fallback font declarations here so layout fonts apply correctly */
-
-  /* backgrounds: deep, cinematic */
-  --bg-base: #080808;
-  --bg-surface: #121212;
-  --bg-elevated: #1a1a1a;
-
-  /* text: high contrast */
-  --text-primary: #ffffff;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-
-  /* borders: subtle, clean */
-  --border-default: #27272a;
-  --border-strong: #3f3f46;
-
-  /* brand: vibrant amber */
-  --brand-primary: #f59e0b; /* Amber 500 */
-  --brand-primary-hover: #d97706; /* Amber 600 */
-  --brand-primary-active: #b45309; /* Amber 700 */
-  --brand-secondary: #fcd34d; /* Amber 300 */
-
-  /* states */
-  --state-success: #10b981;
-  --state-warning: #f59e0b;
-  --state-error: #ef4444;
-  --state-info: #3b82f6;
-  --state-error-hover: #dc2626;
-
-  /* focus */
-  --focus-ring: #f59e0b;
-
-  /* explicit interaction tokens */
-  --bg-hover: #1f1f1f;
-  --bg-pressed: #171717;
-  --border-hover: #3f3f46;
-  --border-focus: #f59e0b;
-  --disabled-bg: #1a1a1a;
-  --disabled-text: #52525b;
-  --disabled-border: #27272a;
-  --on-brand: #000000;
-
+  /* Warm Grid Dark */
+  --bg-base: #151412;
+  --bg-surface: #1a1917;
+  --bg-elevated: #1f1e1b;
+  --text-primary: #f3d5b6;
+  --text-secondary: #8d867e;
+  --text-muted: #6f6963;
+  --border-default: #2b2826;
+  --border-strong: #3a3531;
+  --brand-primary: #f3d5b6;
+  --brand-primary-hover: #e4c09b;
+  --brand-primary-active: #d5aa83;
+  --brand-secondary: #bc5240;
+  --brand-secondary-hover: #d66a56;
+  --state-success: #69836c;
+  --state-warning: #e0a24c;
+  --state-error: #bc5240;
+  --state-info: #425b81;
+  --state-error-hover: #9e3e36;
+  --focus-ring: #f3d5b6;
+  --bg-hover: #23211f;
+  --bg-pressed: #1c1a18;
+  --border-hover: #3a3531;
+  --border-focus: #f3d5b6;
+  --disabled-bg: #201e1b;
+  --disabled-text: #4a4540;
+  --disabled-border: #2b2826;
+  --on-brand: #151412;
   --white: #ffffff;
+  --grid-line: rgba(35, 33, 31, 0.45);
+  --app-header-height: 72px;
 
   /* typography scale */
   --text-xs: 0.75rem;
@@ -56,7 +43,7 @@
   --text-3xl: 1.875rem;
   --text-4xl: 2.25rem;
 
-  /* radius scale: sharp, slightly rounded */
+  /* radius scale */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -72,7 +59,7 @@
   --spacing-8: 2rem;
   --spacing-10: 2.5rem;
 
-  /* shadows: sharp, deep */
+  /* shadows */
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8);
@@ -85,7 +72,7 @@
   --motion-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --motion-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Back-compat aliases for existing route styles */
+  /* Back-compat aliases */
   --bg: var(--bg-base);
   --surface: var(--bg-surface);
   --surface-soft: var(--bg-elevated);
@@ -125,17 +112,34 @@ body {
 body {
   color: var(--text-primary);
   background: var(--bg-base);
+  font-family:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  line-height: 1.55;
   transition:
     background var(--motion-slow),
     color var(--motion-fast);
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 80px 80px;
 }
 
 a {
-  color: var(--brand-primary);
+  color: var(--brand-secondary);
 }
 
 a:hover {
-  color: var(--brand-primary-hover);
+  color: var(--brand-secondary-hover);
 }
 
 h1,
@@ -144,6 +148,8 @@ h3,
 h4 {
   margin-top: 0;
   color: var(--text-primary);
+  font-family: var(--font-space-grotesk), 'Inter', 'Helvetica Neue', sans-serif;
+  line-height: 1.2;
 }
 
 p {
