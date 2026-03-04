@@ -621,3 +621,19 @@ Acceptance criteria:
 - `Deploy web (Pages production)` step explicitly passes those vars to `npm run deploy:web:production`.
 - Production deploy from `main` completes successfully with updated workflow.
 - `https://opencalendly.com/auth/sign-in` no longer renders the “Clerk configuration required” fallback when vars are configured in repo settings.
+
+### Feature 30: Pages deploy unblock for auth sign-in Suspense boundary
+
+Scope:
+- Unblock Cloudflare Pages production deployment by adding the required React Suspense boundary for `useSearchParams()` usage on `/auth/sign-in`.
+- Keep change strictly scoped to web build/runtime compatibility (no API/schema behavior changes).
+
+Acceptance criteria:
+
+- `/auth/sign-in` server entry wraps the client page component in `Suspense`.
+- A lightweight auth-page fallback UI renders while sign-in client content hydrates.
+- `npm run pages:build -w apps/web` succeeds locally.
+- GitHub `Deploy Production` workflow succeeds end-to-end on `main`.
+- Production auth routes remain reachable:
+  - `https://opencalendly.com/auth/sign-in`
+  - `https://opencalendly.com/auth/verify`
