@@ -35,10 +35,13 @@ export default function AuthSessionBridge() {
       return;
     }
 
+    const existingSession = readAuthSession();
     if (!isSignedIn) {
       lastSyncKeyRef.current = '';
       inFlightSyncKeyRef.current = null;
-      clearAuthSession();
+      if (!existingSession) {
+        clearAuthSession();
+      }
       return;
     }
 
@@ -51,7 +54,7 @@ export default function AuthSessionBridge() {
       isLoaded,
       isSignedIn,
       primaryEmail,
-      existingSession: readAuthSession(),
+      existingSession,
       lastSyncKey: lastSyncKeyRef.current,
       sessionId,
     });
@@ -68,8 +71,11 @@ export default function AuthSessionBridge() {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const exchangeSession = async () => {
       const clerkToken = await getToken();
-      if (!clerkToken || cancelled) {
+      if (cancelled) {
         return;
+      }
+      if (!clerkToken) {
+        throw new Error('Unable to obtain Clerk token for exchange.');
       }
 
       const response = await fetch(`${apiBaseUrl}/v0/auth/clerk/exchange`, {

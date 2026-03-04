@@ -33,7 +33,7 @@ export const resolveDisplayName = (input: {
 }): string => {
   const provided = input.providedDisplayName?.trim();
   if (provided) {
-    return provided;
+    return provided.slice(0, 120);
   }
 
   const fromClerk = [input.clerkFirstName, input.clerkLastName]

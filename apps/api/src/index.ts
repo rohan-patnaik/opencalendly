@@ -511,8 +511,18 @@ const resolveClerkAuthorizedParties = (env: Bindings, request: Request): string[
     // Ignore malformed request URL.
   }
 
-  values.add('http://localhost:3000');
-  values.add('http://127.0.0.1:3000');
+  const shouldAllowLocalOrigins = Array.from(values).some((origin) => {
+    try {
+      const hostname = new URL(origin).hostname;
+      return hostname === 'localhost' || hostname === '127.0.0.1';
+    } catch {
+      return false;
+    }
+  });
+  if (shouldAllowLocalOrigins) {
+    values.add('http://localhost:3000');
+    values.add('http://127.0.0.1:3000');
+  }
 
   return Array.from(values);
 };
@@ -3030,7 +3040,12 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
       if (status === 404) {
         return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
       }
-      throw error;
+      console.error('clerk_user_lookup_failed', {
+        clerkUserId,
+        status,
+        error: error instanceof Error ? error.message : 'unknown',
+      });
+      return jsonError(context, 502, 'Upstream dependency error contacting Clerk.');
     }
     if (!clerkUser) {
       return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
