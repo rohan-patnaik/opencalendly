@@ -589,3 +589,19 @@ Acceptance criteria:
   - first-time user provisioning via Clerk exchange
   - web auth-session bootstrap from Clerk sign-in state
   - protected route behavior for signed-out users.
+
+### Feature 28: Pages deploy unblock for auth verify edge runtime
+
+Scope:
+- Unblock Cloudflare Pages production deployment after Clerk auth migration by restoring required Next-on-Pages runtime configuration.
+- Keep change strictly scoped to web build compatibility (no API/schema behavior changes).
+
+Acceptance criteria:
+
+- `/auth/verify` explicitly exports Next.js edge runtime configuration:
+  - `export const runtime = 'edge'`
+- `npm run pages:build -w apps/web` succeeds locally.
+- GitHub `Deploy Production` workflow succeeds end-to-end on `main`.
+- Production web remains reachable on:
+  - `https://opencalendly.com`
+  - `https://www.opencalendly.com`

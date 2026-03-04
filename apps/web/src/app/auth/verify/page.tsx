@@ -11,6 +11,8 @@ const firstParam = (value: string | string[] | undefined): string | undefined =>
   return value;
 };
 
+export const runtime = 'edge';
+
 export default async function VerifyPage({ searchParams }: VerifyPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const nextParams = new URLSearchParams({ source: 'legacy-verify' });
