@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth, useUser } from '@clerk/nextjs';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { resolveApiBaseUrl } from '../lib/api-base-url';
 import { clearAuthSession, readAuthSession, writeAuthSession } from '../lib/auth-session';
@@ -27,6 +27,8 @@ export default function AuthSessionBridge() {
   const { isLoaded, isSignedIn, getToken, sessionId } = useAuth();
   const { user } = useUser();
   const lastSyncKeyRef = useRef('');
+  const inFlightSyncKeyRef = useRef<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -35,6 +37,7 @@ export default function AuthSessionBridge() {
 
     if (!isSignedIn) {
       lastSyncKeyRef.current = '';
+      inFlightSyncKeyRef.current = null;
       clearAuthSession();
       return;
     }
@@ -55,9 +58,14 @@ export default function AuthSessionBridge() {
     if (!exchangeDecision.shouldExchange || !exchangeDecision.syncKey) {
       return;
     }
-    lastSyncKeyRef.current = exchangeDecision.syncKey;
+    if (inFlightSyncKeyRef.current === exchangeDecision.syncKey) {
+      return;
+    }
+    inFlightSyncKeyRef.current = exchangeDecision.syncKey;
 
     let cancelled = false;
+    const syncKey = exchangeDecision.syncKey;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const exchangeSession = async () => {
       const clerkToken = await getToken();
       if (!clerkToken || cancelled) {
@@ -92,16 +100,29 @@ export default function AuthSessionBridge() {
         expiresAt: payload.expiresAt,
         user: payload.user,
       });
+      lastSyncKeyRef.current = syncKey;
     };
 
     void exchangeSession().catch((error) => {
       console.error('Clerk session exchange failed:', error);
+      if (!cancelled) {
+        retryTimer = setTimeout(() => {
+          setRetryNonce((current) => current + 1);
+        }, 2_000);
+      }
+    }).finally(() => {
+      if (inFlightSyncKeyRef.current === syncKey) {
+        inFlightSyncKeyRef.current = null;
+      }
     });
 
     return () => {
       cancelled = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
     };
-  }, [getToken, isLoaded, isSignedIn, sessionId, user]);
+  }, [getToken, isLoaded, isSignedIn, retryNonce, sessionId, user]);
 
   return null;
 }

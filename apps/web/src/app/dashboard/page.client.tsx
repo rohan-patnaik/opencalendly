@@ -100,8 +100,12 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
   const { session, ready, clear } = useAuthSession();
   const { signOut } = useClerk();
   const handleSignOut = useCallback(async () => {
-    await signOut().catch(() => undefined);
-    clear();
+    try {
+      await signOut();
+      clear();
+    } catch (error) {
+      console.error('Clerk sign-out failed:', error);
+    }
   }, [clear, signOut]);
 
   const defaultRange = useMemo(() => {

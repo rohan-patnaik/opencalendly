@@ -197,6 +197,7 @@ type Bindings = {
   MICROSOFT_CLIENT_ID?: string;
   MICROSOFT_CLIENT_SECRET?: string;
   CLERK_SECRET_KEY?: string;
+  CLERK_ALLOWED_AUDIENCES?: string;
 };
 
 type ContextLike = {
@@ -490,6 +491,39 @@ const resolveClerkSecretKey = (env: Bindings): string | null => {
   return secretKey ? secretKey : null;
 };
 
+const resolveClerkAuthorizedParties = (env: Bindings, request: Request): string[] => {
+  const values = new Set<string>();
+  const configured = env.APP_BASE_URL?.trim();
+  if (configured) {
+    try {
+      values.add(new URL(configured).origin);
+    } catch {
+      // Ignore invalid APP_BASE_URL here; request handlers already validate URL where required.
+    }
+  }
+
+  try {
+    const origin = new URL(request.url).origin;
+    if (origin) {
+      values.add(origin);
+    }
+  } catch {
+    // Ignore malformed request URL.
+  }
+
+  values.add('http://localhost:3000');
+  values.add('http://127.0.0.1:3000');
+
+  return Array.from(values);
+};
+
+const resolveClerkAllowedAudiences = (env: Bindings): string[] => {
+  return (env.CLERK_ALLOWED_AUDIENCES ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+};
+
 const toCalendarConnectionStatus = (input: {
   provider: CalendarProvider;
   externalEmail: string | null;
@@ -527,6 +561,7 @@ const IDEMPOTENCY_KEY_MAX_LENGTH = 200;
 const IDEMPOTENCY_IN_PROGRESS_TTL_MINUTES = 10;
 const IDEMPOTENCY_COMPLETED_TTL_HOURS = 24;
 const IDEMPOTENCY_EXPIRED_CLEANUP_INTERVAL = 50;
+const SESSION_EXPIRED_CLEANUP_INTERVAL = 50;
 const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE = 120;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP = 300;
@@ -543,6 +578,7 @@ let publicAnalyticsRateLimitRequestCounter = 0;
 const publicBookingRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
 let publicBookingRateLimitRequestCounter = 0;
 let idempotencyCleanupRequestCounter = 0;
+let sessionCleanupRequestCounter = 0;
 
 const toCalendarProvider = (value: string): CalendarProvider | null => {
   if (value === 'google' || value === 'microsoft') {
@@ -1925,6 +1961,15 @@ const maybeCleanupExpiredIdempotencyRequests = async (db: Database, now: Date): 
   await db.delete(idempotencyRequests).where(lte(idempotencyRequests.expiresAt, now));
 };
 
+const maybeCleanupExpiredSessions = async (db: Database, now: Date): Promise<void> => {
+  sessionCleanupRequestCounter += 1;
+  if (sessionCleanupRequestCounter % SESSION_EXPIRED_CLEANUP_INTERVAL !== 0) {
+    return;
+  }
+
+  await db.delete(sessions).where(lte(sessions.expiresAt, now));
+};
+
 const claimIdempotencyRequest = async (
   db: Database,
   input: {
@@ -2647,6 +2692,9 @@ const resolveAuthenticatedUser = async (
     return null;
   }
 
+  const now = new Date();
+  await maybeCleanupExpiredSessions(db, now);
+
   const tokenHash = hashToken(token);
   const [row] = await db
     .select({
@@ -2658,7 +2706,7 @@ const resolveAuthenticatedUser = async (
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
-    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, new Date())))
+    .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
     .limit(1);
 
   if (!row) {
@@ -2857,8 +2905,11 @@ app.post('/v0/auth/magic-link', async (context) => {
       return jsonError(context, 500, 'Unable to create or resolve user account.');
     }
 
+    const now = new Date();
+    await maybeCleanupExpiredSessions(db, now);
+
     const magicLinkToken = createRawToken();
-    const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MINUTES * 60_000);
+    const expiresAt = new Date(now.getTime() + MAGIC_LINK_TTL_MINUTES * 60_000);
 
     await db.insert(sessions).values({
       userId,
@@ -2884,6 +2935,7 @@ app.post('/v0/auth/verify', async (context) => {
     }
 
     const tokenHash = hashToken(parsed.data.token);
+    const now = new Date();
     const [row] = await db
       .select({
         sessionId: sessions.id,
@@ -2895,15 +2947,17 @@ app.post('/v0/auth/verify', async (context) => {
       })
       .from(sessions)
       .innerJoin(users, eq(users.id, sessions.userId))
-      .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, new Date())))
+      .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
       .limit(1);
 
     if (!row) {
       return jsonError(context, 401, 'Magic link token is invalid or expired.');
     }
 
+    await maybeCleanupExpiredSessions(db, now);
+
     const sessionToken = createRawToken();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
 
     await db
       .update(sessions)
@@ -2943,8 +2997,12 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
 
     let clerkUserId = '';
     try {
+      const audiences = resolveClerkAllowedAudiences(context.env);
+      const authorizedParties = resolveClerkAuthorizedParties(context.env, context.req.raw);
       const tokenPayload = await verifyToken(parsed.data.clerkToken, {
         secretKey: clerkSecretKey,
+        ...(audiences.length > 0 ? { audience: audiences } : {}),
+        ...(authorizedParties.length > 0 ? { authorizedParties } : {}),
       });
       clerkUserId = tokenPayload.sub ?? '';
     } catch {
@@ -2956,7 +3014,24 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     }
 
     const clerkClient = createClerkClient({ secretKey: clerkSecretKey });
-    const clerkUser = await clerkClient.users.getUser(clerkUserId).catch(() => null);
+    let clerkUser:
+      | Awaited<ReturnType<(typeof clerkClient.users)['getUser']>>
+      | null = null;
+    try {
+      clerkUser = await clerkClient.users.getUser(clerkUserId);
+    } catch (error) {
+      const status =
+        typeof error === 'object' &&
+        error &&
+        'status' in error &&
+        typeof (error as { status?: unknown }).status === 'number'
+          ? ((error as { status: number }).status as number)
+          : null;
+      if (status === 404) {
+        return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
+      }
+      throw error;
+    }
     if (!clerkUser) {
       return jsonError(context, 401, 'Unable to resolve Clerk user profile.');
     }
@@ -3028,8 +3103,9 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     } else {
       const timezone = requestedTimezone ?? 'UTC';
 
-      for (let attempt = 0; attempt < 5 && !userRecord; attempt += 1) {
-        const candidateSeed = attempt === 0 ? preferredUsername : `${preferredUsername}-${attempt}`;
+      for (let attempt = 0; attempt < 20 && !userRecord; attempt += 1) {
+        const candidateSeed =
+          attempt === 0 ? preferredUsername : `${preferredUsername}-${createRawToken().slice(0, 4)}`;
         const username = await resolveUniqueUsername({
           preferredCandidate: candidateSeed,
           email,
@@ -3071,6 +3147,10 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
             throw error;
           }
 
+          if (isUniqueViolation(error, 'users_username_unique')) {
+            continue;
+          }
+
           const [retried] = await db
             .select({
               id: users.id,
@@ -3087,6 +3167,7 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
               ...retried,
               timezone: normalizeTimezone(retried.timezone),
             };
+            break;
           }
         }
       }
@@ -3096,8 +3177,11 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
       return jsonError(context, 500, 'Unable to create or resolve user account.');
     }
 
+    const now = new Date();
+    await maybeCleanupExpiredSessions(db, now);
+
     const sessionToken = createRawToken();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
 
     await db.insert(sessions).values({
       userId: userRecord.id,

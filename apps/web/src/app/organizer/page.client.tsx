@@ -282,8 +282,12 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const notificationRulesRequestIdRef = useRef(0);
 
   const handleSignOut = useCallback(async () => {
-    await signOut().catch(() => undefined);
-    clear();
+    try {
+      await signOut();
+      clear();
+    } catch (error) {
+      console.error('Clerk sign-out failed:', error);
+    }
   }, [clear, signOut]);
 
   const beginBusy = useCallback((action: string) => {

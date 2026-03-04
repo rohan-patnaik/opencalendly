@@ -8,15 +8,16 @@ export const normalizeUsernameCandidate = (value: string): string => {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
-  if (!normalized) {
+  const truncated = normalized.slice(0, 64).replace(/-+$/g, '');
+  if (!truncated) {
     return 'user';
   }
 
-  if (normalized.length >= 3) {
-    return normalized.slice(0, 64);
+  if (truncated.length >= 3) {
+    return truncated;
   }
 
-  return `${normalized}user`.slice(0, 64);
+  return `${truncated}user`.slice(0, 64).replace(/-+$/g, '');
 };
 
 export const deriveUsernameSeedFromEmail = (email: string): string => {
@@ -56,7 +57,9 @@ export const resolveUniqueUsername = async (input: {
 }): Promise<string> => {
   const base = normalizeUsernameCandidate(
     input.preferredCandidate || deriveUsernameSeedFromEmail(input.email),
-  ).slice(0, 58);
+  )
+    .slice(0, 58)
+    .replace(/-+$/g, '') || 'user';
 
   for (let suffix = 0; suffix < 500; suffix += 1) {
     const candidate = suffix === 0 ? base : `${base}-${suffix}`;
@@ -65,6 +68,14 @@ export const resolveUniqueUsername = async (input: {
     }
   }
 
-  const token = (input.tokenGenerator ?? createRawToken)().slice(0, 8);
-  return `${base}-${token}`.slice(0, 64);
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const token = (input.tokenGenerator ?? createRawToken)().slice(0, 8);
+    const suffix = attempt === 0 ? token : `${token}-${attempt}`;
+    const candidate = normalizeUsernameCandidate(`${base}-${suffix}`);
+    if (!(await input.isUsernameTaken(candidate))) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Unable to resolve unique username after retries.');
 };

@@ -35,8 +35,12 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const handleSignOut = useCallback(async () => {
-    await signOut().catch(() => undefined);
-    clear();
+    try {
+      await signOut();
+      clear();
+    } catch (error) {
+      console.error('Clerk sign-out failed:', error);
+    }
   }, [clear, signOut]);
 
   useEffect(() => {

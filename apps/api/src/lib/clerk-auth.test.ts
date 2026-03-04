@@ -11,6 +11,7 @@ describe('clerk auth helpers', () => {
   it('normalizes username candidates to slug-safe lowercase values', () => {
     expect(normalizeUsernameCandidate('  Rohan Patnaik  ')).toBe('rohan-patnaik');
     expect(normalizeUsernameCandidate('___Invalid***')).toBe('invalid');
+    expect(normalizeUsernameCandidate('rohan-patnaik-'.repeat(10))).not.toMatch(/-$/);
   });
 
   it('derives username seeds from email local part', () => {
@@ -47,5 +48,26 @@ describe('clerk auth helpers', () => {
     });
 
     expect(candidate).toBe('demo-2');
+  });
+
+  it('falls back to tokenized username after exhausting numeric suffixes', async () => {
+    const generatedTokens = ['abcdef12', 'fallback1'];
+    const candidate = await resolveUniqueUsername({
+      preferredCandidate: 'demo',
+      email: 'demo@example.com',
+      isUsernameTaken: async (value) => {
+        if (value === 'demo') {
+          return true;
+        }
+        const match = /^demo-(\d+)$/.exec(value);
+        if (match) {
+          return Number.parseInt(match[1] ?? '', 10) < 500;
+        }
+        return value === 'demo-abcdef12';
+      },
+      tokenGenerator: () => generatedTokens.shift() ?? 'fallback2',
+    });
+
+    expect(candidate).toBe('demo-fallback-1');
   });
 });
