@@ -15,7 +15,7 @@
   min-height: var(--app-header-height);
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border-default);
-  background: rgba(21, 20, 18, 0.94);
+  background: var(--app-header-bg);
   backdrop-filter: blur(10px);
 }
 
@@ -90,7 +90,7 @@
 
 .navLink:hover {
   color: var(--text-primary);
-  background: rgba(35, 33, 31, 0.75);
+  background: var(--app-nav-hover-bg);
 }
 
 .navLinkActive {

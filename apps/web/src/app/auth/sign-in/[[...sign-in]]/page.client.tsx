@@ -202,8 +202,8 @@ export default function SignInPageClient() {
             path="/auth/sign-in"
             routing="path"
             signUpUrl="/auth/sign-up"
-            forceRedirectUrl="/dashboard"
-            fallbackRedirectUrl="/dashboard"
+            forceRedirectUrl="/auth/sign-in"
+            fallbackRedirectUrl="/auth/sign-in"
           />
         </div>
         {isLoaded && isSignedIn && sessionReady && !session ? (

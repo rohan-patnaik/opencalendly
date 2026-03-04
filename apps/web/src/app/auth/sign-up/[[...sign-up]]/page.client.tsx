@@ -50,10 +50,13 @@ export default function SignUpPageClient() {
             path="/auth/sign-up"
             routing="path"
             signInUrl="/auth/sign-in"
-            forceRedirectUrl="/dashboard"
-            fallbackRedirectUrl="/dashboard"
+            forceRedirectUrl="/auth/sign-in"
+            fallbackRedirectUrl="/auth/sign-in"
           />
         </div>
+        {isLoaded && isSignedIn && sessionReady && !session ? (
+          <Toast variant="info">Finalizing your OpenCalendly session…</Toast>
+        ) : null}
         <div className={uiStyles.actions}>
           <LinkButton href="/auth/sign-in" variant="secondary">
             Back to sign in

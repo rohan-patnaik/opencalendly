@@ -13,13 +13,13 @@
   --brand-primary: #f3d5b6;
   --brand-primary-hover: #e4c09b;
   --brand-primary-active: #d5aa83;
-  --brand-secondary: #bc5240;
-  --brand-secondary-hover: #d66a56;
+  --brand-secondary: #d66a56;
+  --brand-secondary-hover: #e07a66;
   --state-success: #69836c;
   --state-warning: #e0a24c;
-  --state-error: #bc5240;
+  --state-error: #a84535;
   --state-info: #425b81;
-  --state-error-hover: #9e3e36;
+  --state-error-hover: #8f362b;
   --focus-ring: #f3d5b6;
   --bg-hover: #23211f;
   --bg-pressed: #1c1a18;
@@ -31,6 +31,8 @@
   --on-brand: #151412;
   --white: #ffffff;
   --grid-line: rgba(35, 33, 31, 0.45);
+  --app-header-bg: #151412f0;
+  --app-nav-hover-bg: #23211fbf;
   --app-header-height: 72px;
 
   /* typography scale */
@@ -113,7 +115,7 @@ body {
   color: var(--text-primary);
   background: var(--bg-base);
   font-family:
-    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
   line-height: 1.55;
   transition:
