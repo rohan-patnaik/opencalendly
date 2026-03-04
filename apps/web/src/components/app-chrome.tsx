@@ -36,9 +36,9 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const handleSignOut = useCallback(async () => {
+    clear();
     try {
       await signOut({ redirectUrl: '/auth/sign-in' });
-      clear();
     } catch (error) {
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;

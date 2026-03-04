@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { createClerkClient, verifyToken } from '@clerk/backend';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -3017,6 +3017,7 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
       const audiences = resolveClerkAllowedAudiences(context.env);
       const tokenPayload = await verifyToken(parsed.data.clerkToken, {
         secretKey: clerkSecretKey,
+        clockSkewInMs: 10_000,
         ...(audiences.length > 0 ? { audience: audiences } : {}),
         authorizedParties,
       });
@@ -3064,6 +3065,10 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     const email = primaryEmail?.emailAddress?.trim().toLowerCase();
     if (!email) {
       return jsonError(context, 400, 'Clerk user is missing a primary email.');
+    }
+    const isPrimaryEmailVerified = primaryEmail?.verification?.status === 'verified';
+    if (!isPrimaryEmailVerified) {
+      return jsonError(context, 403, 'Email must be verified to create a session.');
     }
 
     const requestedTimezone = parsed.data.timezone ? normalizeTimezone(parsed.data.timezone) : null;
@@ -3215,22 +3220,23 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
     const sessionToken = createRawToken();
     const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
 
-    const [insertedSession] = await db
-      .insert(sessions)
-      .values({
-        userId: userRecord.id,
-        tokenHash: hashToken(sessionToken),
-        expiresAt,
-      })
-      .returning({
-        id: sessions.id,
-      });
+    const [insertedSession] = await db.transaction(async (transaction) => {
+      await transaction.execute(sql`select id from users where id = ${userRecord.id} for update`);
+      await transaction.delete(sessions).where(eq(sessions.userId, userRecord.id));
+      return transaction
+        .insert(sessions)
+        .values({
+          userId: userRecord.id,
+          tokenHash: hashToken(sessionToken),
+          expiresAt,
+        })
+        .returning({
+          id: sessions.id,
+        });
+    });
 
-    if (insertedSession) {
-      // Keep a single active API session per user for Clerk exchange flows.
-      await db
-        .delete(sessions)
-        .where(and(eq(sessions.userId, userRecord.id), ne(sessions.id, insertedSession.id)));
+    if (!insertedSession) {
+      return jsonError(context, 500, 'Unable to create session.');
     }
 
     return context.json({

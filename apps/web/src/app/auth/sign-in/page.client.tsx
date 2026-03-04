@@ -1,6 +1,6 @@
 'use client';
 
-import { SignIn, useAuth } from '@clerk/nextjs';
+import { SignIn, useAuth, useClerk } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -28,6 +28,7 @@ export default function SignInPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isLoaded, isSignedIn } = useAuth();
+  const { signOut } = useClerk();
   const { ready: sessionReady, session, save } = useAuthSession();
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
   const apiBaseUrl = resolveApiBaseUrl('Auth sign-in page');
@@ -37,6 +38,9 @@ export default function SignInPageClient() {
   const [legacyError, setLegacyError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
     if (!legacyToken || session || handledLegacyTokenRef.current === legacyToken) {
       return;
     }
@@ -46,6 +50,9 @@ export default function SignInPageClient() {
 
     let cancelled = false;
     const verifyLegacyToken = async () => {
+      if (isLoaded && isSignedIn) {
+        await signOut();
+      }
       const response = await fetch(`${apiBaseUrl}/v0/auth/verify`, {
         method: 'POST',
         headers: {
@@ -89,7 +96,7 @@ export default function SignInPageClient() {
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, legacyToken, router, save, session]);
+  }, [apiBaseUrl, isLoaded, isSignedIn, legacyToken, router, save, session, sessionReady, signOut]);
 
   useEffect(() => {
     if (isLoaded && isSignedIn && sessionReady && session) {
