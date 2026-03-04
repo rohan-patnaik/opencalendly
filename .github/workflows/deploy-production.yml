@@ -38,12 +38,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Deploy API worker (production)
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npm run deploy:api:production
-
       - name: Verify required web deploy vars
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
@@ -52,7 +46,7 @@ jobs:
         run: |
           missing=0
           for key in NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY NEXT_PUBLIC_API_BASE_URL API_BASE_URL; do
-            if [ -z "${!key}" ]; then
+            if [ -z "${!key//[[:space:]]/}" ]; then
               echo "Missing required repository variable: ${key}"
               missing=1
             fi
@@ -60,6 +54,12 @@ jobs:
           if [ "${missing}" -ne 0 ]; then
             exit 1
           fi
+
+      - name: Deploy API worker (production)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:api:production
 
       - name: Deploy web (Pages production)
         env:
