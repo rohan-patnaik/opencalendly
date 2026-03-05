@@ -1,6 +1,6 @@
 import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata } from 'next';
-import { Inter, Space_Grotesk } from 'next/font/google';
+import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import AppChrome from '../components/app-chrome';
 import AuthSessionBridge from '../components/auth-session-bridge';
@@ -17,6 +17,12 @@ const spaceGrotesk = Space_Grotesk({
   display: 'swap',
 });
 
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: 'OpenCalendly',
   description: 'Open-source scheduling platform',
@@ -27,8 +33,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
 
   if (!clerkPublishableKey) {
     return (
-      <html lang="en" data-theme="obsidian-amber" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-        <body style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+      <html
+        lang="en"
+        data-theme="obsidian-amber"
+        className={`${inter.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable}`}
+      >
+        <body>
           <main style={{ margin: '3rem auto', maxWidth: 760, padding: '0 1rem' }}>
             <h1>Clerk configuration required</h1>
             <p>
@@ -42,8 +52,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   }
 
   return (
-    <html lang="en" data-theme="obsidian-amber" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+    <html
+      lang="en"
+      data-theme="obsidian-amber"
+      className={`${inter.variable} ${spaceGrotesk.variable} ${jetBrainsMono.variable}`}
+    >
+      <body>
         <ClerkProvider publishableKey={clerkPublishableKey}>
           <AuthSessionBridge />
           <AppChrome>{children}</AppChrome>

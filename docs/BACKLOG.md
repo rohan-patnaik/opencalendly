@@ -637,3 +637,42 @@ Acceptance criteria:
 - Production auth routes remain reachable:
   - `https://opencalendly.com/auth/sign-in`
   - `https://opencalendly.com/auth/verify`
+
+### Feature 32: Warm Grid Dark UI foundation + navbar route stability
+
+Scope:
+- Apply the requested Warm Grid Dark visual system across web app surfaces using tokenized colors and subtle page-level gridlines.
+- Fix navbar route runtime issues observed in local development (`ENOENT` for app route chunks/pages and transient 500s).
+- Keep booking/API behavior unchanged; focus on frontend styling and route/runtime stability.
+
+Acceptance criteria:
+
+- Theme tokens in `apps/web/src/app/globals.css` are updated to the Warm Grid Dark palette:
+  - app background `#151412`
+  - gridline accent `#23211F`
+  - heading/primary text `#F3D5B6`
+  - body/secondary text `#8D867E`
+  - accent `#BC5240`
+- Subtle background grid is visible on page-level backgrounds for marketing/public surfaces, while dense content stays on card/panel surfaces for readability.
+- Navbar-linked routes render without runtime chunk/page missing errors in local dev:
+  - `/`
+  - `/features`
+  - `/solutions`
+  - `/pricing`
+  - `/resources`
+  - `/demo/intro-call`
+  - `/team/demo-team/team-intro-call`
+  - `/embed/playground`
+  - `/organizer`
+  - `/dashboard`
+- UI regressions from unstyled controls on key pages are fixed (forms, buttons, cards, panels use shared primitive styles).
+- Clerk auth entry route remains functional from navbar sign-in flow.
+- Clerk path-based auth callbacks resolve without 404 in local dev:
+  - `/auth/sign-in/sso-callback?...`
+  - `/auth/sign-in/SignIn_clerk_catchall_check_*`
+- Web dev startup performs a clean `.next` reset before `next dev` to reduce stale chunk/runtime cache issues during local route iteration.
+- Validation passes:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+  - `npm run build -w apps/web`

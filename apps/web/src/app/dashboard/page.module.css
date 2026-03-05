@@ -19,7 +19,7 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   font-size: var(--text-xs);
-  color: var(--brand-primary);
+  color: var(--brand-secondary);
   font-weight: 700;
   font-family: var(--font-inter);
 }
@@ -54,7 +54,7 @@
   border-radius: var(--radius-sm);
   padding: 0.58rem 0.98rem;
   font-weight: 600;
-  font-family: var(--font-inter);
+  font-family: inherit;
   font-size: var(--text-sm);
   border: 1px solid var(--border-strong);
   transition:

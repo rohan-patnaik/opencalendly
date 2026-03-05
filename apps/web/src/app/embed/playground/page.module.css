@@ -26,8 +26,8 @@
   letter-spacing: 0.14em;
   font-size: 0.7rem;
   font-weight: 700;
-  color: var(--brand-primary);
-  border: 1px solid var(--brand-primary);
+  color: var(--brand-secondary);
+  border: 1px solid var(--brand-secondary);
   background: var(--bg-hover);
   border-radius: 999px;
   padding: 0.24rem 0.46rem;

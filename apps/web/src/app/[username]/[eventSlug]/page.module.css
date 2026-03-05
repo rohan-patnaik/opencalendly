@@ -38,8 +38,8 @@
   font-size: var(--text-xs);
   font-family: var(--font-inter);
   font-weight: 700;
-  color: var(--brand-primary);
-  border: 1px solid var(--brand-primary);
+  color: var(--brand-secondary);
+  border: 1px solid var(--brand-secondary);
   background: var(--bg-hover);
   border-radius: var(--radius-sm);
   padding: 0.24rem 0.46rem;
