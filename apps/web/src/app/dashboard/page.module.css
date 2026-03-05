@@ -54,7 +54,7 @@
   border-radius: var(--radius-sm);
   padding: 0.58rem 0.98rem;
   font-weight: 600;
-  font-family: var(--font-inter);
+  font-family: inherit;
   font-size: var(--text-sm);
   border: 1px solid var(--border-strong);
   transition:

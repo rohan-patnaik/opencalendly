@@ -20,7 +20,7 @@
   --state-error: #a84535;
   --state-info: #425b81;
   --state-error-hover: #8f362b;
-  --focus-ring: #e07a66;
+  --focus-ring: #f3d5b6;
   --bg-hover: #23211f;
   --bg-pressed: #1c1a18;
   --border-hover: #3a3531;
@@ -115,7 +115,8 @@ body {
   color: var(--text-primary);
   background: var(--bg-base);
   font-family:
-    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    var(--font-jetbrains-mono), 'JetBrains Mono', var(--font-inter), 'Helvetica Neue', Arial,
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
   line-height: 1.55;
   transition:

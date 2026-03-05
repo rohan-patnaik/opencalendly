@@ -16,6 +16,7 @@ export default function SignUpPageClient() {
   const { ready: sessionReady, session } = useAuthSession();
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
   const [sessionBridgeTimedOut, setSessionBridgeTimedOut] = useState(false);
+  const [sessionBridgeRetryKey, setSessionBridgeRetryKey] = useState(0);
 
   useEffect(() => {
     if (isLoaded && isSignedIn && sessionReady && session) {
@@ -36,7 +37,7 @@ export default function SignUpPageClient() {
     return () => {
       clearTimeout(timer);
     };
-  }, [isLoaded, isSignedIn, session, sessionReady]);
+  }, [isLoaded, isSignedIn, session, sessionReady, sessionBridgeRetryKey]);
 
   if (!clerkPublishableKey) {
     return (
@@ -80,6 +81,7 @@ export default function SignUpPageClient() {
                 className={uiStyles.inlineActionButton}
                 onClick={() => {
                   setSessionBridgeTimedOut(false);
+                  setSessionBridgeRetryKey((value) => value + 1);
                   router.refresh();
                 }}
               >
