@@ -8,28 +8,6 @@ const heroSignals = [
   { label: 'Public scheduling', value: '1:1, team, embed' },
 ];
 
-const calendarArt = [
-  '            xx      xx                    ',
-  '         xxxxxx  xxxxxx                   ',
-  '       xxooooxxxxxxooooxx                 ',
-  '      xxoooooooooooooooooxx               ',
-  '     xxoooooooooooooooooooox              ',
-  '     xxoo  oo  oo  oo  oo  oxx            ',
-  '     xxoo  oo  oo  oo  oo  oxx            ',
-  '     xx                          xx       ',
-  '     xx   xx   xx   xx   xx   xx xx       ',
-  '     xx   xx   xx   xx   xx   xx xx       ',
-  '     xx   xx   xx   oo   oo   xx xx       ',
-  '     xx   xx   xx   oo   oo   xx xx       ',
-  '     xx   xx   xx   xx   xx   xx xx       ',
-  '     xx   oo   oo   xx   xx   xx xx       ',
-  '     xx   oo   oo   xx   xx   xx xx       ',
-  '     xx                          xx       ',
-  '     xxoooooo    oooooooooo     xx        ',
-  '      xxooooooooooooooooooo   xxx         ',
-  '       xxxxxxxxxxxxxxxxxxxxxxxxx          ',
-];
-
 const proofStrip = [
   { value: '10+', label: 'Feature streams shipped' },
   { value: '40+', label: 'API routes in v1' },
@@ -95,7 +73,71 @@ const routeLinks = [
   { label: 'Open analytics dashboard', href: '/dashboard', kind: 'Auth' },
 ];
 
-const calendarArtWidth = Math.max(...calendarArt.map((row) => row.length));
+const calendarRows = [
+  [0, 0, 0, 1, 0, 0],
+  [0, 0, 1, 1, 0, 0],
+  [1, 0, 0, 2, 0, 0],
+  [0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 1],
+];
+
+function CalendarDotArt() {
+  return (
+    <svg
+      className={styles.calendarArt}
+      viewBox="0 0 420 320"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <pattern id="calendar-dot-base" width="12" height="12" patternUnits="userSpaceOnUse">
+          <circle cx="6" cy="6" r="2" fill="var(--text-primary)" opacity="0.4" />
+        </pattern>
+        <pattern id="calendar-dot-accent" width="12" height="12" patternUnits="userSpaceOnUse">
+          <circle cx="6" cy="6" r="2" fill="var(--brand-primary)" />
+        </pattern>
+      </defs>
+
+      <rect x="68" y="44" width="228" height="210" rx="38" fill="none" stroke="url(#calendar-dot-base)" strokeWidth="16" />
+      <rect x="96" y="72" width="172" height="44" rx="14" fill="url(#calendar-dot-accent)" />
+      <rect x="112" y="26" width="20" height="44" rx="10" fill="url(#calendar-dot-base)" />
+      <rect x="186" y="26" width="20" height="44" rx="10" fill="url(#calendar-dot-base)" />
+      <rect x="260" y="26" width="20" height="44" rx="10" fill="url(#calendar-dot-base)" />
+      <line x1="96" y1="126" x2="268" y2="126" stroke="url(#calendar-dot-base)" strokeWidth="10" strokeLinecap="round" />
+
+      {calendarRows.flatMap((row, rowIndex) =>
+        row.map((cell, columnIndex) => {
+          if (cell === 0) {
+            return null;
+          }
+
+          const x = 104 + columnIndex * 32;
+          const y = 142 + rowIndex * 28;
+          const fill = cell === 2 ? 'url(#calendar-dot-accent)' : 'url(#calendar-dot-base)';
+
+          return <rect key={`${rowIndex}-${columnIndex}`} x={x} y={y} width="18" height="18" rx="5" fill={fill} />;
+        }),
+      )}
+
+      <path
+        d="M 325 110 C 346 130 356 158 356 188 C 356 226 340 252 314 272"
+        fill="none"
+        stroke="url(#calendar-dot-base)"
+        strokeWidth="16"
+        strokeLinecap="round"
+      />
+      <circle cx="308" cy="194" r="8" fill="var(--brand-primary)" />
+      <path
+        d="M 301 194 L 306 199 L 316 188"
+        fill="none"
+        stroke="var(--bg-base)"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -134,26 +176,7 @@ export default function HomePage() {
                 <span className={styles.artEyebrow}>Calendar sketch</span>
                 <span className={styles.artBadge}>UTC aware</span>
               </div>
-              <div
-                className={styles.calendarArt}
-                style={{ gridTemplateColumns: `repeat(${calendarArtWidth}, minmax(0, 1fr))` }}
-                aria-hidden="true"
-              >
-                {calendarArt.flatMap((row, rowIndex) =>
-                  row.padEnd(calendarArtWidth, ' ').split('').map((cell, columnIndex) => (
-                    <span
-                      key={`${rowIndex}-${columnIndex}`}
-                      className={[
-                        styles.artCell,
-                        cell === 'x' ? styles.artCellFilled : '',
-                        cell === 'o' ? styles.artCellAccent : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    />
-                  )),
-                )}
-              </div>
+              <CalendarDotArt />
               <div className={styles.artLegend}>
                 <div>
                   <span className={styles.legendDot} />

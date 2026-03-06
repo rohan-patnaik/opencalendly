@@ -74,7 +74,7 @@
   border-radius: 999px;
   font-size: 0.92rem;
   min-height: 3rem;
-  padding-inline: 1.25rem;
+  padding: 0 1.25rem;
 }
 
 .signalGrid {
@@ -160,27 +160,12 @@
 }
 
 .calendarArt {
-  display: grid;
-  gap: 0.32rem;
-  justify-content: center;
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 30rem;
+  justify-self: center;
   padding: 0.5rem 0 0.25rem;
-}
-
-.artCell {
-  width: 0.45rem;
-  aspect-ratio: 1;
-  border-radius: 999px;
-  opacity: 0;
-}
-
-.artCellFilled {
-  opacity: 0.42;
-  background: var(--text-primary);
-}
-
-.artCellAccent {
-  opacity: 1;
-  background: var(--brand-primary);
 }
 
 .artLegend {
