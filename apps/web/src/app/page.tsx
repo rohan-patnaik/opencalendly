@@ -166,9 +166,6 @@ function CalendarDotArt() {
 }
 
 export default function HomePage() {
-  const primaryButtonClass = styles.primaryButton || '';
-  const secondaryButtonClass = styles.secondaryButton || '';
-
   return (
     <main className={styles.page}>
       <section className={styles.hero}>
@@ -182,10 +179,20 @@ export default function HomePage() {
               directly to the APIs you operate.
             </p>
             <div className={styles.heroActions}>
-              <LinkButton className={primaryButtonClass} href="/demo/intro-call" variant="primary" size="lg">
+              <LinkButton
+                className={styles.primaryButton ?? ''}
+                href="/demo/intro-call"
+                variant="primary"
+                size="lg"
+              >
                 Start booking demo
               </LinkButton>
-              <LinkButton className={secondaryButtonClass} href="/organizer" variant="secondary" size="lg">
+              <LinkButton
+                className={styles.secondaryButton ?? ''}
+                href="/organizer"
+                variant="secondary"
+                size="lg"
+              >
                 Open organizer console
               </LinkButton>
             </div>
@@ -317,10 +324,20 @@ export default function HomePage() {
           </p>
         </div>
         <div className={styles.heroActions}>
-          <LinkButton className={primaryButtonClass} href="/auth/sign-in" variant="primary" size="lg">
+          <LinkButton
+            className={styles.primaryButton ?? ''}
+            href="/auth/sign-in"
+            variant="primary"
+            size="lg"
+          >
             Sign in to organizer
           </LinkButton>
-          <LinkButton className={secondaryButtonClass} href="/resources" variant="secondary" size="lg">
+          <LinkButton
+            className={styles.secondaryButton ?? ''}
+            href="/resources"
+            variant="secondary"
+            size="lg"
+          >
             Read implementation notes
           </LinkButton>
         </div>

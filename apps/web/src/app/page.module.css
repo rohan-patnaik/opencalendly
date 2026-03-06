@@ -140,6 +140,11 @@
   align-items: center;
 }
 
+.artHeader {
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .artEyebrow {
   color: var(--text-muted);
   font-size: 0.78rem;
