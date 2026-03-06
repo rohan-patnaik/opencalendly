@@ -134,7 +134,7 @@
 
 .buttonGhost {
   background: transparent;
-  color: var(--brand-primary);
+  color: var(--text-secondary);
   border-color: transparent;
 }
 
