@@ -243,7 +243,8 @@
 
 .valueCard,
 .integrationCard,
-.workflowCard {
+.workflowCard,
+.routeCard {
   transition:
     transform var(--motion-fast),
     border-color var(--motion-fast),
