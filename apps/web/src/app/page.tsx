@@ -104,12 +104,31 @@ function CalendarDotArt() {
         </pattern>
       </defs>
 
-      <rect x="68" y="44" width="228" height="210" rx="38" fill="none" stroke={`url(#${baseId})`} strokeWidth="16" />
+      <rect
+        x="68"
+        y="44"
+        width="228"
+        height="210"
+        rx="38"
+        fill="none"
+        stroke="var(--border-strong)"
+        strokeOpacity="0.9"
+        strokeWidth="16"
+      />
       <rect x="96" y="72" width="172" height="44" rx="14" fill={`url(#${accentId})`} />
       <rect x="112" y="26" width="20" height="44" rx="10" fill={`url(#${baseId})`} />
       <rect x="186" y="26" width="20" height="44" rx="10" fill={`url(#${baseId})`} />
       <rect x="260" y="26" width="20" height="44" rx="10" fill={`url(#${baseId})`} />
-      <line x1="96" y1="126" x2="268" y2="126" stroke={`url(#${baseId})`} strokeWidth="10" strokeLinecap="round" />
+      <line
+        x1="96"
+        y1="126"
+        x2="268"
+        y2="126"
+        stroke="var(--border-strong)"
+        strokeOpacity="0.75"
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
 
       {calendarRows.flatMap((row, rowIndex) =>
         row.map((cell, columnIndex) => {
@@ -128,7 +147,8 @@ function CalendarDotArt() {
       <path
         d="M 325 110 C 346 130 356 158 356 188 C 356 226 340 252 314 272"
         fill="none"
-        stroke={`url(#${baseId})`}
+        stroke="var(--text-muted)"
+        strokeOpacity="0.72"
         strokeWidth="16"
         strokeLinecap="round"
       />
@@ -279,7 +299,7 @@ export default function HomePage() {
                   <li key={point}>{point}</li>
                 ))}
               </ul>
-              <LinkButton href={item.cta.href} className={secondaryButtonClass} variant="secondary" size="lg">
+              <LinkButton href={item.cta.href} variant="secondary" size="lg">
                 {item.cta.label}
               </LinkButton>
             </article>
