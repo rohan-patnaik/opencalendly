@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useId } from 'react';
 import { LinkButton } from '../components/ui/button';
 import styles from './page.module.css';
 
@@ -82,6 +83,10 @@ const calendarRows = [
 ];
 
 function CalendarDotArt() {
+  const uid = useId();
+  const baseId = `${uid}-calendar-dot-base`;
+  const accentId = `${uid}-calendar-dot-accent`;
+
   return (
     <svg
       className={styles.calendarArt}
@@ -90,20 +95,20 @@ function CalendarDotArt() {
       focusable="false"
     >
       <defs>
-        <pattern id="calendar-dot-base" width="12" height="12" patternUnits="userSpaceOnUse">
+        <pattern id={baseId} width="12" height="12" patternUnits="userSpaceOnUse">
           <circle cx="6" cy="6" r="2" fill="var(--text-primary)" opacity="0.4" />
         </pattern>
-        <pattern id="calendar-dot-accent" width="12" height="12" patternUnits="userSpaceOnUse">
+        <pattern id={accentId} width="12" height="12" patternUnits="userSpaceOnUse">
           <circle cx="6" cy="6" r="2" fill="var(--brand-primary)" />
         </pattern>
       </defs>
 
-      <rect x="68" y="44" width="228" height="210" rx="38" fill="none" stroke="url(#calendar-dot-base)" strokeWidth="16" />
-      <rect x="96" y="72" width="172" height="44" rx="14" fill="url(#calendar-dot-accent)" />
-      <rect x="112" y="26" width="20" height="44" rx="10" fill="url(#calendar-dot-base)" />
-      <rect x="186" y="26" width="20" height="44" rx="10" fill="url(#calendar-dot-base)" />
-      <rect x="260" y="26" width="20" height="44" rx="10" fill="url(#calendar-dot-base)" />
-      <line x1="96" y1="126" x2="268" y2="126" stroke="url(#calendar-dot-base)" strokeWidth="10" strokeLinecap="round" />
+      <rect x="68" y="44" width="228" height="210" rx="38" fill="none" stroke={`url(#${baseId})`} strokeWidth="16" />
+      <rect x="96" y="72" width="172" height="44" rx="14" fill={`url(#${accentId})`} />
+      <rect x="112" y="26" width="20" height="44" rx="10" fill={`url(#${baseId})`} />
+      <rect x="186" y="26" width="20" height="44" rx="10" fill={`url(#${baseId})`} />
+      <rect x="260" y="26" width="20" height="44" rx="10" fill={`url(#${baseId})`} />
+      <line x1="96" y1="126" x2="268" y2="126" stroke={`url(#${baseId})`} strokeWidth="10" strokeLinecap="round" />
 
       {calendarRows.flatMap((row, rowIndex) =>
         row.map((cell, columnIndex) => {
@@ -113,7 +118,7 @@ function CalendarDotArt() {
 
           const x = 104 + columnIndex * 32;
           const y = 142 + rowIndex * 28;
-          const fill = cell === 2 ? 'url(#calendar-dot-accent)' : 'url(#calendar-dot-base)';
+          const fill = cell === 2 ? `url(#${accentId})` : `url(#${baseId})`;
 
           return <rect key={`${rowIndex}-${columnIndex}`} x={x} y={y} width="18" height="18" rx="5" fill={fill} />;
         }),
@@ -122,7 +127,7 @@ function CalendarDotArt() {
       <path
         d="M 325 110 C 346 130 356 158 356 188 C 356 226 340 252 314 272"
         fill="none"
-        stroke="url(#calendar-dot-base)"
+        stroke={`url(#${baseId})`}
         strokeWidth="16"
         strokeLinecap="round"
       />

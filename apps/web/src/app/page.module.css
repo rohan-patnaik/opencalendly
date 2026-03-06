@@ -69,8 +69,8 @@
   gap: 0.72rem;
 }
 
-.primaryButton,
-.secondaryButton {
+.heroActions .primaryButton,
+.heroActions .secondaryButton {
   border-radius: 999px;
   font-size: 0.92rem;
   min-height: 3rem;
@@ -389,7 +389,9 @@
   .integrationCard,
   .workflowCard,
   .routeCard,
-  .footerLinks a {
+  .footerLinks a,
+  .primaryButton,
+  .secondaryButton {
     transition: none;
   }
 
