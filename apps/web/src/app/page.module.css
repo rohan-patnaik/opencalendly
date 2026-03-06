@@ -138,8 +138,6 @@
 .artLegend {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
 }
 
 .artEyebrow {
@@ -242,8 +240,7 @@
 
 .valueCard,
 .integrationCard,
-.workflowCard,
-.routeCard {
+.workflowCard {
   transition:
     transform var(--motion-fast),
     border-color var(--motion-fast),
