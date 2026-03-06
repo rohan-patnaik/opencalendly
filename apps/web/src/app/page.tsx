@@ -170,7 +170,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className={styles.heroArtPanel}>
+          <div className={styles.heroArtPanel} aria-hidden="true">
             <div className={styles.artFrame}>
               <div className={styles.artHeader}>
                 <span className={styles.artEyebrow}>Calendar sketch</span>
