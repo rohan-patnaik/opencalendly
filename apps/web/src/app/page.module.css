@@ -25,7 +25,7 @@
 
 .heroGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
   gap: 2rem;
   align-items: stretch;
 }
@@ -448,14 +448,6 @@
   .primaryButton,
   .secondaryButton {
     width: 100%;
-  }
-
-  .calendarArt {
-    gap: 0.24rem;
-  }
-
-  .artCell {
-    width: 0.34rem;
   }
 
   .artLegend {
