@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LinkButton } from '../components/ui/button';
 import styles from './page.module.css';
 
 const heroSignals = [
@@ -110,12 +111,12 @@ export default function HomePage() {
               directly to the APIs you operate.
             </p>
             <div className={styles.heroActions}>
-              <Link className={styles.primaryButton} href="/demo/intro-call">
+              <LinkButton className={styles.primaryButton ?? ''} href="/demo/intro-call" variant="primary" size="lg">
                 Start booking demo
-              </Link>
-              <Link className={styles.secondaryButton} href="/organizer">
+              </LinkButton>
+              <LinkButton className={styles.secondaryButton ?? ''} href="/organizer" variant="secondary" size="lg">
                 Open organizer console
-              </Link>
+              </LinkButton>
             </div>
             <div className={styles.signalGrid}>
               {heroSignals.map((item) => (
@@ -246,9 +247,9 @@ export default function HomePage() {
                   <li key={point}>{point}</li>
                 ))}
               </ul>
-              <Link href={item.cta.href} className={styles.secondaryButton}>
+              <LinkButton href={item.cta.href} className={styles.secondaryButton ?? ''} variant="secondary" size="lg">
                 {item.cta.label}
-              </Link>
+              </LinkButton>
             </article>
           ))}
         </div>
@@ -264,12 +265,12 @@ export default function HomePage() {
           </p>
         </div>
         <div className={styles.heroActions}>
-          <Link className={styles.primaryButton} href="/auth/sign-in">
+          <LinkButton className={styles.primaryButton ?? ''} href="/auth/sign-in" variant="primary" size="lg">
             Sign in to organizer
-          </Link>
-          <Link className={styles.secondaryButton} href="/resources">
+          </LinkButton>
+          <LinkButton className={styles.secondaryButton ?? ''} href="/resources" variant="secondary" size="lg">
             Read implementation notes
-          </Link>
+          </LinkButton>
         </div>
       </section>
 

@@ -690,11 +690,11 @@ Acceptance criteria:
 - Global web theme tokens in `apps/web/src/app/globals.css` are updated so that:
   - main heading color is approximately `#D9A066`
   - standard body text color is approximately `#E0E0E0`
-  - primary button styling uses approximately `#D9A066`
+  - primary and secondary button styling consistently use the amber accent, with shared hover and active states aligned to the same token family
 - Background grid squares use a medium step sized roughly to two lines of hero-heading height on desktop.
 - Shared chrome/navigation remains readable and aligned with the updated token palette.
 - Homepage hero is redesigned with a custom dot-and-space calendar illustration inspired by the provided reference style, implemented in code (no external image dependency).
-- Homepage CTA buttons and proof/section surfaces match the revised palette without breaking route links or existing content structure.
+- Homepage CTA and shared secondary buttons match the revised palette without breaking route links or existing content structure.
 - No booking, auth, API, or organizer behavior changes are introduced by this feature.
 - Validation passes:
   - `npm run lint`
