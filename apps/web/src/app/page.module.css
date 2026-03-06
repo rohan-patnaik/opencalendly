@@ -448,8 +448,8 @@
     flex-direction: column;
   }
 
-  .primaryButton,
-  .secondaryButton {
+  .heroActions .primaryButton,
+  .heroActions .secondaryButton {
     width: 100%;
   }
 
