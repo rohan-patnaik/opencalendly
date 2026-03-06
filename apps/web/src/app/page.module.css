@@ -277,8 +277,8 @@
 .pricingCard li,
 .routeCard span:last-child,
 .footer p,
-.routePanel p,
-.ctaBand p {
+.routePanel p:not(.sectionEyebrow),
+.ctaBand p:not(.sectionEyebrow) {
   color: var(--text-primary);
 }
 
