@@ -121,15 +121,15 @@
 }
 
 .buttonSecondary:hover:not(:disabled) {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-  color: var(--on-brand);
+  background: var(--bg-hover);
+  border-color: var(--brand-primary-hover);
+  color: var(--brand-primary-hover);
 }
 
 .buttonSecondary:active:not(:disabled) {
-  background: var(--brand-primary-active);
-  border-color: var(--brand-primary-active);
-  color: var(--on-brand);
+  background: var(--bg-pressed);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .buttonGhost {

@@ -10,8 +10,8 @@
   --text-primary: #e0e0e0;
   --text-secondary: #b8b8b8;
   --text-muted: #a3a3a3;
-  --border-default: #2d2419;
-  --border-strong: #4a3822;
+  --border-default: #2a2a2a;
+  --border-strong: #3a3a3a;
   --brand-primary: #d9a066;
   --brand-primary-hover: #e4b27a;
   --brand-primary-active: #bf8549;
@@ -26,7 +26,7 @@
   --focus-ring: #d9a066;
   --bg-hover: #1d1d1d;
   --bg-pressed: #161616;
-  --border-hover: #6a5030;
+  --border-hover: #4a4a4a;
   --border-focus: #d9a066;
   --disabled-bg: #181818;
   --disabled-text: #686868;
