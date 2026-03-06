@@ -115,18 +115,21 @@
 }
 
 .buttonSecondary {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
 }
 
 .buttonSecondary:hover:not(:disabled) {
   background: var(--bg-hover);
-  border-color: var(--border-hover);
+  border-color: var(--brand-primary-hover);
+  color: var(--brand-primary-hover);
 }
 
 .buttonSecondary:active:not(:disabled) {
   background: var(--bg-pressed);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .buttonGhost {
@@ -137,7 +140,7 @@
 
 .buttonGhost:hover:not(:disabled) {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--brand-primary-hover);
   border-color: var(--border-default);
 }
 

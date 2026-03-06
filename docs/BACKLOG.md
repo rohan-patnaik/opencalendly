@@ -676,3 +676,27 @@ Acceptance criteria:
   - `npm run typecheck`
   - `npm run test`
   - `npm run build -w apps/web`
+
+### Feature 33: Calendar hero art + amber text/button theme refinement
+
+Scope:
+- Refine the current dark grid visual system to the requested amber-and-light-text palette.
+- Increase page grid sizing to a medium square that reads closer to the provided reference.
+- Rebuild the homepage hero around a custom dot-and-space calendar artwork treatment.
+- Keep product behavior unchanged; this feature is styling and homepage presentation only.
+
+Acceptance criteria:
+
+- Global web theme tokens in `apps/web/src/app/globals.css` are updated so that:
+  - main heading color is approximately `#D9A066`
+  - standard body text color is approximately `#E0E0E0`
+  - primary and secondary button styling consistently use the amber accent, with shared hover and active states aligned to the same token family
+- Background grid squares use a medium step sized roughly to two lines of hero-heading height on desktop.
+- Shared chrome/navigation remains readable and aligned with the updated token palette.
+- Homepage hero is redesigned with a custom dot-and-space calendar illustration inspired by the provided reference style, implemented in code (no external image dependency).
+- Homepage CTA and shared secondary buttons match the revised palette without breaking route links or existing content structure.
+- No booking, auth, API, or organizer behavior changes are introduced by this feature.
+- Validation passes:
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run build -w apps/web`
