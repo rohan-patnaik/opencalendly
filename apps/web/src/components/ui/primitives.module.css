@@ -115,29 +115,32 @@
 }
 
 .buttonSecondary {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
 }
 
 .buttonSecondary:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: var(--border-hover);
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: var(--on-brand);
 }
 
 .buttonSecondary:active:not(:disabled) {
-  background: var(--bg-pressed);
+  background: var(--brand-primary-active);
+  border-color: var(--brand-primary-active);
+  color: var(--on-brand);
 }
 
 .buttonGhost {
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--brand-primary);
   border-color: transparent;
 }
 
 .buttonGhost:hover:not(:disabled) {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--brand-primary-hover);
   border-color: var(--border-default);
 }
 

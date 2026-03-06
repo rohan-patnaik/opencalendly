@@ -1,72 +1,69 @@
 .page {
-  max-width: 1200px;
+  width: min(1240px, calc(100% - 2.4rem));
   margin: 0 auto;
-  padding: 2.25rem 1.2rem 4rem;
+  padding: 2.4rem 0 4rem;
   display: grid;
-  gap: 1.1rem;
+  gap: 1rem;
 }
 
-.hero {
-  position: relative;
-  overflow: hidden;
+.hero,
+.workflowPanel,
+.routePanel,
+.integrationPanel,
+.pricingPanel,
+.ctaBand,
+.footer {
   border-radius: 28px;
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
 }
 
-.heroOrbit {
-  position: absolute;
-  inset: -20% auto auto 52%;
-  width: 30rem;
-  height: 30rem;
-  border-radius: 50%;
-  background: var(--brand-primary);
-  opacity: 0.45;
-  filter: blur(80px);
-  animation: pulse-orbit 8s ease-in-out infinite;
+.hero {
+  padding: 2rem;
 }
 
-.heroContent {
-  position: relative;
-  z-index: 1;
-  padding: 2rem 2rem 2.2rem;
-  max-width: 46rem;
+.heroGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 2rem;
+  align-items: stretch;
 }
 
-.kicker {
+.heroCopy {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+}
+
+.kicker,
+.sectionEyebrow {
   margin: 0;
-  width: fit-content;
+  color: var(--brand-primary);
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--brand-secondary);
-  background: var(--bg-hover);
-  border: 1px solid var(--brand-secondary);
-  border-radius: 999px;
-  padding: 0.34rem 0.56rem;
 }
 
-.hero h1 {
-  margin: 0.85rem 0 0.9rem;
-  font-family: var(--font-space-grotesk);
-  font-size: clamp(2.5rem, 4vw, 3.8rem);
-  font-weight: 700;
-  line-height: 1.08;
-  letter-spacing: -0.03em;
+.heroCopy h1 {
+  margin: 0;
+  max-width: 10ch;
+  font-size: clamp(3rem, 6vw, 5.4rem);
+  line-height: 0.94;
+  letter-spacing: -0.05em;
   text-wrap: balance;
 }
 
-.hero p {
+.heroLead {
   margin: 0;
-  font-size: var(--text-lg);
-  color: var(--text-secondary);
-  max-width: 38rem;
+  max-width: 58ch;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-primary);
 }
 
 .heroActions {
-  margin-top: 1.25rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.72rem;
@@ -77,32 +74,32 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 3rem;
+  border-radius: 999px;
   text-decoration: none;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-inter);
-  font-weight: 600;
-  font-size: var(--text-sm);
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
   transition:
     transform var(--motion-fast),
-    box-shadow var(--motion-fast),
     background var(--motion-fast),
     border-color var(--motion-fast),
-    color var(--motion-fast);
+    color var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 
 .primaryButton {
   background: var(--brand-primary);
   color: var(--on-brand);
   border: 1px solid var(--brand-primary);
-  padding: 0.66rem 1.25rem;
+  padding: 0 1.25rem;
 }
 
 .secondaryButton {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border: 1px solid var(--border-strong);
-  padding: 0.66rem 1.25rem;
+  background: transparent;
+  color: var(--brand-primary);
+  border: 1px solid var(--brand-primary);
+  padding: 0 1.2rem;
 }
 
 .primaryButton:hover,
@@ -122,46 +119,159 @@
 }
 
 .secondaryButton:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-hover);
+  background: var(--brand-primary);
+  color: var(--on-brand);
 }
 
-.proofStrip {
+.signalGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
-.proofCard {
-  border-radius: 14px;
+.signalCard,
+.proofCard,
+.valueCard,
+.routeCard,
+.integrationCard,
+.pricingCard,
+.workflowCard {
+  border-radius: 20px;
   border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  padding: 0.85rem;
-  box-shadow: var(--shadow-soft);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
 }
 
+.signalCard {
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.signalValue,
 .proofValue {
   margin: 0;
-  font-family: var(--font-space-grotesk);
-  font-size: 1.75rem;
+  color: var(--text-heading);
+  font-size: 1.2rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--brand-primary);
 }
 
+.signalLabel,
 .proofLabel {
-  margin: 0.2rem 0 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  line-height: 1.55;
 }
 
+.heroArtPanel {
+  display: flex;
+}
+
+.artFrame {
+  width: 100%;
+  min-height: 100%;
+  border-radius: 24px;
+  border: 1px solid var(--border-strong);
+  background: #0d0d0d;
+  box-shadow: inset 0 0 0 1px rgba(217, 160, 102, 0.05);
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  align-content: start;
+}
+
+.artHeader,
+.artLegend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.artEyebrow {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.artBadge {
+  border-radius: 999px;
+  border: 1px solid var(--brand-primary);
+  color: var(--brand-primary);
+  padding: 0.32rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.calendarArt {
+  display: grid;
+  gap: 0.32rem;
+  justify-content: center;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.artCell {
+  width: 0.45rem;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  opacity: 0;
+}
+
+.artCellFilled {
+  opacity: 0.42;
+  background: var(--text-primary);
+}
+
+.artCellAccent {
+  opacity: 1;
+  background: var(--brand-primary);
+}
+
+.artLegend {
+  justify-content: flex-start;
+  gap: 1.4rem;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.artLegend > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.legendDot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--text-primary);
+  opacity: 0.42;
+}
+
+.legendDotAccent {
+  background: var(--brand-primary);
+  opacity: 1;
+}
+
+.proofStrip,
 .valueGrid,
+.workflowGrid,
 .routeGrid,
 .integrationGrid,
 .pricingGrid,
-.workflowGrid {
+.footerLinks {
   display: grid;
-  gap: 0.78rem;
+  gap: 0.85rem;
+}
+
+.proofStrip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.proofCard {
+  padding: 1rem;
 }
 
 .valueGrid {
@@ -185,81 +295,16 @@
 }
 
 .valueCard,
-.routeCard,
 .integrationCard,
+.workflowCard,
 .pricingCard,
-.workflowCard {
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
-}
-
-.valueCard:hover,
-.integrationCard:hover,
-.workflowCard:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-md);
+.routeCard {
+  padding: 1.25rem;
 }
 
 .valueCard,
 .integrationCard,
 .workflowCard {
-  padding: var(--spacing-6);
-}
-
-.valueCard h2,
-.integrationCard h3,
-.workflowCard h3 {
-  margin: 0;
-  font-family: var(--font-space-grotesk);
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
-.valueCard p,
-.integrationCard p,
-.workflowCard p {
-  margin: 0.56rem 0 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-}
-
-.workflowPanel,
-.routePanel,
-.integrationPanel,
-.pricingPanel {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-  padding: var(--spacing-8);
-}
-
-.workflowPanel h2,
-.routePanel h2,
-.integrationPanel h2,
-.pricingPanel h2 {
-  margin: 0;
-  font-family: var(--font-space-grotesk);
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.routePanel p {
-  margin: 0.5rem 0 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-}
-
-.routeCard {
-  text-decoration: none;
-  color: var(--text-primary);
-  padding: var(--spacing-5);
-  display: grid;
-  gap: 0.34rem;
   transition:
     transform var(--motion-fast),
     border-color var(--motion-fast),
@@ -267,119 +312,126 @@
     background var(--motion-fast);
 }
 
-.routeCard strong {
-  font-size: var(--text-base);
-  font-weight: 600;
-}
-
-.routeCard span:last-child {
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
+.valueCard:hover,
+.integrationCard:hover,
+.workflowCard:hover,
 .routeCard:hover {
-  transform: translateY(-1px);
-  border-color: var(--border-hover);
+  transform: translateY(-2px);
   background: var(--bg-hover);
+  border-color: var(--border-hover);
   box-shadow: var(--shadow-md);
+}
+
+.valueCard h2,
+.integrationCard h3,
+.workflowCard h3,
+.pricingCard h3,
+.footer h3,
+.routeCard strong {
+  margin: 0;
+  color: var(--text-heading);
+}
+
+.valueCard p,
+.integrationCard p,
+.workflowCard p,
+.pricingCard li,
+.routeCard span:last-child,
+.footer p,
+.routePanel p,
+.ctaBand p {
+  color: var(--text-primary);
+}
+
+.workflowPanel,
+.routePanel,
+.integrationPanel,
+.pricingPanel,
+.ctaBand {
+  padding: 1.5rem;
+}
+
+.sectionHeading {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.sectionHeading h2,
+.workflowPanel h2,
+.routePanel h2,
+.integrationPanel h2,
+.pricingPanel h2,
+.ctaBand h2 {
+  margin: 0;
+  font-size: clamp(1.7rem, 2.7vw, 2.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+
+.routeCard {
+  display: grid;
+  gap: 0.42rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition:
+    transform var(--motion-fast),
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 
 .badge {
   width: fit-content;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--brand-secondary);
-  background: var(--bg-hover);
-  color: var(--brand-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: var(--text-xs);
+  border-radius: 999px;
+  border: 1px solid var(--brand-primary);
+  color: var(--brand-primary);
+  padding: 0.18rem 0.48rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  padding: 0.18rem 0.42rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .pricingCard {
-  padding: var(--spacing-6);
   display: grid;
-  gap: var(--spacing-4);
-}
-
-.pricingCard h3 {
-  margin: 0;
-  font-family: var(--font-space-grotesk);
-  font-size: 1.25rem;
+  gap: 1rem;
 }
 
 .pricingCard ul {
   margin: 0;
   padding-left: 1rem;
-  display: grid;
-  gap: 0.35rem;
 }
 
-.pricingCard li {
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
+.pricingCard li::marker {
+  color: var(--brand-primary);
 }
 
 .ctaBand {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-  padding: var(--spacing-8);
   display: grid;
-  gap: var(--spacing-6);
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: minmax(0, 1.3fr) auto;
+  gap: 1.5rem;
   align-items: center;
 }
 
-.ctaBand h2 {
-  margin: 0;
-  font-family: var(--font-space-grotesk);
-  font-size: 1.75rem;
-}
-
-.ctaBand p {
-  margin: 0.4rem 0 0;
-  color: var(--text-secondary);
-  font-size: var(--text-base);
-}
-
 .footer {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-  padding: var(--spacing-6);
+  padding: 1.35rem;
   display: grid;
-  gap: var(--spacing-6);
-  grid-template-columns: 1fr 2fr;
-}
-
-.footer h3 {
-  margin: 0;
-  font-family: var(--font-space-grotesk);
-}
-
-.footer p {
-  margin: 0.45rem 0 0;
-  color: var(--text-secondary);
+  gap: 1.2rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
 }
 
 .footerLinks {
-  display: grid;
-  gap: 0.45rem 0.8rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .footerLinks a {
-  text-decoration: none;
-  color: var(--text-secondary);
+  border-radius: 14px;
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  padding: 0.45rem 0.58rem;
   background: var(--bg-elevated);
-  font-size: var(--text-sm);
+  color: var(--text-primary);
+  text-decoration: none;
+  padding: 0.7rem 0.85rem;
   transition:
     background var(--motion-fast),
     border-color var(--motion-fast),
@@ -388,66 +440,92 @@
 
 .footerLinks a:hover {
   background: var(--bg-hover);
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
-
-@keyframes pulse-orbit {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 0.45;
-  }
-
-  50% {
-    transform: translateY(6px) scale(1.05);
-    opacity: 0.56;
-  }
+  border-color: var(--brand-primary);
+  color: var(--text-heading);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .heroOrbit {
-    animation: none;
-  }
-
   .primaryButton,
   .secondaryButton,
-  .routeCard,
   .valueCard,
   .integrationCard,
   .workflowCard,
+  .routeCard,
   .footerLinks a {
     transition: none;
   }
 
   .primaryButton:hover,
   .secondaryButton:hover,
+  .valueCard:hover,
+  .integrationCard:hover,
+  .workflowCard:hover,
   .routeCard:hover {
     transform: none;
   }
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1120px) {
+  .heroGrid,
+  .proofStrip,
   .valueGrid,
   .workflowGrid,
   .routeGrid,
   .integrationGrid,
   .pricingGrid,
-  .proofStrip,
   .ctaBand,
   .footer,
   .footerLinks {
     grid-template-columns: 1fr;
   }
 
-  .heroContent {
-    padding: 1.4rem 1.1rem 1.6rem;
+  .hero {
+    padding: 1.2rem;
   }
 
-  .heroOrbit {
-    left: 24%;
-    top: -30%;
-    width: 22rem;
-    height: 22rem;
+  .signalGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .heroCopy h1 {
+    max-width: 12ch;
+  }
+
+  .artFrame {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    width: min(100% - 1rem, 1240px);
+    padding: 1rem 0 3rem;
+  }
+
+  .heroCopy h1 {
+    font-size: clamp(2.4rem, 15vw, 3.2rem);
+  }
+
+  .heroActions {
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+
+  .calendarArt {
+    gap: 0.24rem;
+  }
+
+  .artCell {
+    width: 0.34rem;
+  }
+
+  .artLegend {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
   }
 }

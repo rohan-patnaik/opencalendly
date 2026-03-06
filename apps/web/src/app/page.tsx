@@ -1,6 +1,34 @@
 import Link from 'next/link';
 import styles from './page.module.css';
 
+const heroSignals = [
+  { label: 'Conflict safe commits', value: 'Txn checked' },
+  { label: 'Calendar writeback', value: 'Google + Microsoft' },
+  { label: 'Public scheduling', value: '1:1, team, embed' },
+];
+
+const calendarArt = [
+  '            xx      xx                    ',
+  '         xxxxxx  xxxxxx                   ',
+  '       xxooooxxxxxxooooxx                 ',
+  '      xxoooooooooooooooooxx               ',
+  '     xxoooooooooooooooooooox              ',
+  '     xxoo  oo  oo  oo  oo  oxx            ',
+  '     xxoo  oo  oo  oo  oo  oxx            ',
+  '     xx                          xx       ',
+  '     xx   xx   xx   xx   xx   xx xx       ',
+  '     xx   xx   xx   xx   xx   xx xx       ',
+  '     xx   xx   xx   oo   oo   xx xx       ',
+  '     xx   xx   xx   oo   oo   xx xx       ',
+  '     xx   xx   xx   xx   xx   xx xx       ',
+  '     xx   oo   oo   xx   xx   xx xx       ',
+  '     xx   oo   oo   xx   xx   xx xx       ',
+  '     xx                          xx       ',
+  '     xxoooooo    oooooooooo     xx        ',
+  '      xxooooooooooooooooooo   xxx         ',
+  '       xxxxxxxxxxxxxxxxxxxxxxxxx          ',
+];
+
 const proofStrip = [
   { value: '10+', label: 'Feature streams shipped' },
   { value: '40+', label: 'API routes in v1' },
@@ -10,39 +38,39 @@ const proofStrip = [
 
 const platformPillars = [
   {
-    title: 'Scheduling that rechecks correctness at commit',
-    copy: 'Slot conflicts are validated at booking mutation time with transaction-safe guarantees and idempotency keys.',
+    title: 'Availability is checked twice',
+    copy: 'OpenCalendly recomputes booking correctness at commit time so public pages stay fast without trusting stale slot reads.',
   },
   {
-    title: 'Organizer operations without hidden dashboards',
-    copy: 'Event types, availability, teams, webhooks, calendar sync, and writeback controls are exposed in product UI.',
+    title: 'Operators keep control',
+    copy: 'Teams can manage event types, availability, webhooks, and calendar sync from product surfaces instead of hidden ops scripts.',
   },
   {
-    title: 'Public flows ready for real traffic',
-    copy: 'One-on-one booking, team booking, cancel/reschedule links, and embed scripts all route to implemented APIs.',
+    title: 'Shipping stays portable',
+    copy: 'Neon, Cloudflare, Clerk, and Resend stay replaceable because the app is implemented as code you own end to end.',
   },
 ];
 
 const workflowBlocks = [
   {
-    title: '1. Publish event types',
-    copy: 'Create one-on-one or team event types, define location mode, and control active state from organizer UI.',
+    title: '1. Publish booking links',
+    copy: 'Launch one-on-one and team event types with buffer-aware, timezone-safe scheduling pages.',
   },
   {
-    title: '2. Open booking links',
-    copy: 'Share public booking pages with timezone handling, buffer-aware slot generation, and duplicate-request protection.',
+    title: '2. Route real traffic',
+    copy: 'Invitees book through public flows, embeds, and action links that hit the same correctness-safe booking APIs.',
   },
   {
-    title: '3. Operate at runtime',
-    copy: 'Track analytics, run webhook deliveries, sync calendars, and clear writeback failures from authenticated surfaces.',
+    title: '3. Operate from one console',
+    copy: 'Organizers review analytics, calendar status, and runtime health without leaving the product surface.',
   },
 ];
 
 const integrationCards = [
-  { title: 'Google Calendar', copy: 'OAuth connect, sync, busy-window conflict blocking, and writeback retries.' },
-  { title: 'Microsoft Calendar', copy: 'Provider parity with connection lifecycle, sync scheduling, and failure visibility.' },
-  { title: 'Resend', copy: 'Booking lifecycle emails with delivery telemetry and action-link support.' },
-  { title: 'Cloudflare Workers', copy: 'Low-cost API runtime with Hyperdrive bridge to Neon.' },
+  { title: 'Google Calendar', copy: 'Busy sync, OAuth connection lifecycle, and writeback retries.' },
+  { title: 'Microsoft Calendar', copy: 'Provider parity for conflicts, event updates, and operator visibility.' },
+  { title: 'Resend', copy: 'Lifecycle email delivery for confirmations, cancellations, and action links.' },
+  { title: 'Cloudflare + Neon', copy: 'Edge runtime plus transactional storage tuned for free-tier constraints.' },
 ];
 
 const pricingPreview = [
@@ -53,7 +81,7 @@ const pricingPreview = [
   },
   {
     tier: 'Operator Focused',
-    points: ['Calendar sync + writeback controls', 'Action links + lifecycle emails', 'Rate-limit and idempotency hardening'],
+    points: ['Calendar sync + writeback controls', 'Action-link cancel/reschedule UX', 'Auth, reviews, and deployment guardrails'],
     cta: { href: '/features', label: 'See feature matrix' },
   },
 ];
@@ -66,25 +94,76 @@ const routeLinks = [
   { label: 'Open analytics dashboard', href: '/dashboard', kind: 'Auth' },
 ];
 
+const calendarArtWidth = Math.max(...calendarArt.map((row) => row.length));
+
 export default function HomePage() {
   return (
     <main className={styles.page}>
       <section className={styles.hero}>
-        <div className={styles.heroOrbit} aria-hidden="true" />
-        <div className={styles.heroContent}>
-          <p className={styles.kicker}>OpenCalendly alternative</p>
-          <h1>Calendly-grade scheduling UX, fully owned by your stack.</h1>
-          <p>
-            Run scheduling on Neon + Cloudflare with modern booking flows, operational tooling, and
-            public embeds without vendor lock-in.
-          </p>
-          <div className={styles.heroActions}>
-            <Link className={styles.primaryButton} href="/demo/intro-call">
-              Start booking demo
-            </Link>
-            <Link className={styles.secondaryButton} href="/features">
-              Explore feature surface
-            </Link>
+        <div className={styles.heroGrid}>
+          <div className={styles.heroCopy}>
+            <p className={styles.kicker}>Open scheduling, quietly opinionated.</p>
+            <h1>Calendly-class booking flows on infrastructure your team actually owns.</h1>
+            <p className={styles.heroLead}>
+              OpenCalendly keeps the booking surface polished while the runtime stays transparent:
+              Neon for data, Cloudflare for delivery, Clerk for auth, and product flows wired
+              directly to the APIs you operate.
+            </p>
+            <div className={styles.heroActions}>
+              <Link className={styles.primaryButton} href="/demo/intro-call">
+                Start booking demo
+              </Link>
+              <Link className={styles.secondaryButton} href="/organizer">
+                Open organizer console
+              </Link>
+            </div>
+            <div className={styles.signalGrid}>
+              {heroSignals.map((item) => (
+                <article key={item.label} className={styles.signalCard}>
+                  <p className={styles.signalValue}>{item.value}</p>
+                  <p className={styles.signalLabel}>{item.label}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.heroArtPanel}>
+            <div className={styles.artFrame}>
+              <div className={styles.artHeader}>
+                <span className={styles.artEyebrow}>Calendar sketch</span>
+                <span className={styles.artBadge}>UTC aware</span>
+              </div>
+              <div
+                className={styles.calendarArt}
+                style={{ gridTemplateColumns: `repeat(${calendarArtWidth}, minmax(0, 1fr))` }}
+                aria-hidden="true"
+              >
+                {calendarArt.flatMap((row, rowIndex) =>
+                  row.padEnd(calendarArtWidth, ' ').split('').map((cell, columnIndex) => (
+                    <span
+                      key={`${rowIndex}-${columnIndex}`}
+                      className={[
+                        styles.artCell,
+                        cell === 'x' ? styles.artCellFilled : '',
+                        cell === 'o' ? styles.artCellAccent : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    />
+                  )),
+                )}
+              </div>
+              <div className={styles.artLegend}>
+                <div>
+                  <span className={styles.legendDot} />
+                  <span>open slots</span>
+                </div>
+                <div>
+                  <span className={`${styles.legendDot} ${styles.legendDotAccent}`} />
+                  <span>selected flow</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -108,7 +187,10 @@ export default function HomePage() {
       </section>
 
       <section className={styles.workflowPanel}>
-        <h2>How teams run OpenCalendly</h2>
+        <div className={styles.sectionHeading}>
+          <p className={styles.sectionEyebrow}>Product loop</p>
+          <h2>How teams run OpenCalendly</h2>
+        </div>
         <div className={styles.workflowGrid}>
           {workflowBlocks.map((block) => (
             <article key={block.title} className={styles.workflowCard}>
@@ -120,8 +202,10 @@ export default function HomePage() {
       </section>
 
       <section className={styles.routePanel}>
-        <h2>Live product routes</h2>
-        <p>All links below are wired to currently implemented product functionality.</p>
+        <div className={styles.sectionHeading}>
+          <p className={styles.sectionEyebrow}>Live routes</p>
+          <h2>Every link below is wired to a real product flow</h2>
+        </div>
         <div className={styles.routeGrid}>
           {routeLinks.map((item) => (
             <Link key={item.href} href={item.href} className={styles.routeCard}>
@@ -134,7 +218,10 @@ export default function HomePage() {
       </section>
 
       <section className={styles.integrationPanel}>
-        <h2>Integrations + platform</h2>
+        <div className={styles.sectionHeading}>
+          <p className={styles.sectionEyebrow}>Platform stack</p>
+          <h2>Built for practical ownership, not vendor theater</h2>
+        </div>
         <div className={styles.integrationGrid}>
           {integrationCards.map((item) => (
             <article key={item.title} className={styles.integrationCard}>
@@ -146,7 +233,10 @@ export default function HomePage() {
       </section>
 
       <section className={styles.pricingPanel}>
-        <h2>Pricing clarity before scale</h2>
+        <div className={styles.sectionHeading}>
+          <p className={styles.sectionEyebrow}>Plan preview</p>
+          <h2>Pricing clarity before any team scales usage</h2>
+        </div>
         <div className={styles.pricingGrid}>
           {pricingPreview.map((item) => (
             <article key={item.tier} className={styles.pricingCard}>
@@ -166,15 +256,19 @@ export default function HomePage() {
 
       <section className={styles.ctaBand}>
         <div>
-          <h2>Ready to own your scheduling stack?</h2>
-          <p>Start with demos, then move into organizer workflows and analytics without changing infra.</p>
+          <p className={styles.sectionEyebrow}>Next move</p>
+          <h2>Use the public demos, then step into the operator surfaces.</h2>
+          <p>
+            The goal is still simple: get a booking link live fast, keep the workflow readable, and
+            avoid hidden dependencies when the app grows.
+          </p>
         </div>
         <div className={styles.heroActions}>
           <Link className={styles.primaryButton} href="/auth/sign-in">
             Sign in to organizer
           </Link>
           <Link className={styles.secondaryButton} href="/resources">
-            Read implementation resources
+            Read implementation notes
           </Link>
         </div>
       </section>
@@ -182,7 +276,7 @@ export default function HomePage() {
       <footer className={styles.footer}>
         <div>
           <h3>OpenCalendly</h3>
-          <p>Open-source scheduling for free-tier constraints.</p>
+          <p>Open-source scheduling for teams that want product polish without opaque runtime tradeoffs.</p>
         </div>
         <div className={styles.footerLinks}>
           <Link href="/features">Features</Link>

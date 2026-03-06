@@ -1,38 +1,39 @@
 :root,
 :root[data-theme='obsidian-amber'] {
   color-scheme: dark;
-  /* Warm Grid Dark */
-  --bg-base: #151412;
-  --bg-surface: #1a1917;
-  --bg-elevated: #1f1e1b;
-  --text-primary: #f3d5b6;
-  --text-secondary: #8d867e;
-  --text-muted: #6f6963;
-  --border-default: #2b2826;
-  --border-strong: #3a3531;
-  --brand-primary: #d66a56;
-  --brand-primary-hover: #e07a66;
-  --brand-primary-active: #bc5240;
-  --brand-secondary: #e07a66;
-  --brand-secondary-hover: #ec8e7c;
+  /* Dark grid with amber type */
+  --bg-base: #080808;
+  --bg-surface: #111111;
+  --bg-elevated: #171717;
+  --text-heading: #d9a066;
+  --text-primary: #e0e0e0;
+  --text-secondary: #d6d6d6;
+  --text-muted: #a3a3a3;
+  --border-default: #2d2419;
+  --border-strong: #4a3822;
+  --brand-primary: #d9a066;
+  --brand-primary-hover: #e4b27a;
+  --brand-primary-active: #bf8549;
+  --brand-secondary: #d9a066;
+  --brand-secondary-hover: #e4b27a;
   --state-success: #69836c;
   --state-warning: #e0a24c;
   --state-error: #a84535;
   --state-info: #425b81;
   --state-error-hover: #8f362b;
-  --focus-ring: #f3d5b6;
-  --bg-hover: #23211f;
-  --bg-pressed: #1c1a18;
-  --border-hover: #3a3531;
-  --border-focus: #f3d5b6;
-  --disabled-bg: #201e1b;
-  --disabled-text: #4a4540;
-  --disabled-border: #2b2826;
-  --on-brand: #151412;
+  --focus-ring: #d9a066;
+  --bg-hover: #1d1d1d;
+  --bg-pressed: #161616;
+  --border-hover: #6a5030;
+  --border-focus: #d9a066;
+  --disabled-bg: #181818;
+  --disabled-text: #686868;
+  --disabled-border: #282828;
+  --on-brand: #080808;
   --white: #ffffff;
-  --grid-line: rgba(35, 33, 31, 0.45);
-  --app-header-bg: #151412f0;
-  --app-nav-hover-bg: #23211fbf;
+  --grid-line: rgba(217, 160, 102, 0.08);
+  --app-header-bg: rgba(8, 8, 8, 0.94);
+  --app-nav-hover-bg: rgba(217, 160, 102, 0.08);
   --app-header-height: 72px;
 
   /* typography scale */
@@ -83,7 +84,7 @@
   --surface-2: var(--bg-elevated);
   --text: var(--text-primary);
   --muted: var(--text-secondary);
-  --text-strong: var(--text-primary);
+  --text-strong: var(--text-heading);
   --accent-1: var(--brand-primary);
   --accent-2: var(--brand-secondary);
   --accent-3: var(--brand-secondary);
@@ -134,15 +135,15 @@ body::before {
   background-image:
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 80px 80px;
+  background-size: 96px 96px;
 }
 
 a {
-  color: var(--brand-secondary);
+  color: var(--brand-primary);
 }
 
 a:hover {
-  color: var(--brand-secondary-hover);
+  color: var(--brand-primary-hover);
 }
 
 h1,
@@ -150,13 +151,13 @@ h2,
 h3,
 h4 {
   margin-top: 0;
-  color: var(--text-primary);
+  color: var(--text-heading);
   font-family: var(--font-space-grotesk), Inter, 'Helvetica Neue', sans-serif;
   line-height: 1.2;
 }
 
 p {
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 ul {
