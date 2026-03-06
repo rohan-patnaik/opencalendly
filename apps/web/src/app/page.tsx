@@ -74,7 +74,9 @@ const routeLinks = [
   { label: 'Open analytics dashboard', href: '/dashboard', kind: 'Auth' },
 ];
 
-const calendarRows = [
+type CalendarCell = 0 | 1 | 2;
+
+const calendarRows: CalendarCell[][] = [
   [0, 0, 0, 1, 0, 0],
   [0, 0, 1, 1, 0, 0],
   [1, 0, 0, 2, 0, 0],
@@ -145,6 +147,9 @@ function CalendarDotArt() {
 }
 
 export default function HomePage() {
+  const primaryButtonClass = styles.primaryButton!;
+  const secondaryButtonClass = styles.secondaryButton!;
+
   return (
     <main className={styles.page}>
       <section className={styles.hero}>
@@ -158,10 +163,10 @@ export default function HomePage() {
               directly to the APIs you operate.
             </p>
             <div className={styles.heroActions}>
-              <LinkButton className={styles.primaryButton ?? ''} href="/demo/intro-call" variant="primary" size="lg">
+              <LinkButton className={primaryButtonClass} href="/demo/intro-call" variant="primary" size="lg">
                 Start booking demo
               </LinkButton>
-              <LinkButton className={styles.secondaryButton ?? ''} href="/organizer" variant="secondary" size="lg">
+              <LinkButton className={secondaryButtonClass} href="/organizer" variant="secondary" size="lg">
                 Open organizer console
               </LinkButton>
             </div>
@@ -275,7 +280,7 @@ export default function HomePage() {
                   <li key={point}>{point}</li>
                 ))}
               </ul>
-              <LinkButton href={item.cta.href} className={styles.secondaryButton ?? ''} variant="secondary" size="lg">
+              <LinkButton href={item.cta.href} className={secondaryButtonClass} variant="secondary" size="lg">
                 {item.cta.label}
               </LinkButton>
             </article>
@@ -293,10 +298,10 @@ export default function HomePage() {
           </p>
         </div>
         <div className={styles.heroActions}>
-          <LinkButton className={styles.primaryButton ?? ''} href="/auth/sign-in" variant="primary" size="lg">
+          <LinkButton className={primaryButtonClass} href="/auth/sign-in" variant="primary" size="lg">
             Sign in to organizer
           </LinkButton>
-          <LinkButton className={styles.secondaryButton ?? ''} href="/resources" variant="secondary" size="lg">
+          <LinkButton className={secondaryButtonClass} href="/resources" variant="secondary" size="lg">
             Read implementation notes
           </LinkButton>
         </div>

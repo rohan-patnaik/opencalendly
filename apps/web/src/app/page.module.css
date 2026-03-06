@@ -27,7 +27,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(300px, 0.92fr);
   gap: 2rem;
-  align-items: stretch;
 }
 
 .heroCopy {
