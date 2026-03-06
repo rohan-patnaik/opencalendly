@@ -80,7 +80,6 @@ const calendarRows: CalendarCell[][] = [
   [0, 0, 0, 1, 0, 0],
   [0, 0, 1, 1, 0, 0],
   [1, 0, 0, 2, 0, 0],
-  [0, 0, 0, 0, 0, 0],
   [0, 0, 0, 0, 0, 1],
 ];
 
@@ -147,8 +146,8 @@ function CalendarDotArt() {
 }
 
 export default function HomePage() {
-  const primaryButtonClass = styles.primaryButton!;
-  const secondaryButtonClass = styles.secondaryButton!;
+  const primaryButtonClass = styles.primaryButton || '';
+  const secondaryButtonClass = styles.secondaryButton || '';
 
   return (
     <main className={styles.page}>
