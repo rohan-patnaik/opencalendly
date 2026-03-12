@@ -173,6 +173,10 @@ flowchart LR
 3. New accounts are admitted lazily on their first successful paid action if today’s admission pool still has room.
 4. Allowlisted dev/internal emails bypass both admission counting and credit deductions.
 5. Exhausted days keep waitlist capture active so interest can be queued without over-consuming provider limits.
+6. Launch defaults are `15` admitted accounts/day and `20` credits/account/day.
+7. The account limit is sized from the email budget using `floor((daily_email_budget * 0.7) / expected_emails_per_demo_account)`, with email volume treated as the first launch bottleneck.
+8. The credit limit is sized from the intended feature mix for one meaningful demo session rather than from page views or anonymous traffic.
+9. Operators should revisit both values after collecting real usage data, but should lower the account limit before lowering per-account credits if outbound email volume starts to pressure the daily budget.
 
 ## Correctness and idempotency notes
 

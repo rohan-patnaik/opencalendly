@@ -929,6 +929,12 @@ Behavior:
 
 Returns launch-demo admission state plus the authenticated account’s daily credit state when a bearer session is present.
 
+Operator defaults:
+
+- `DEMO_DAILY_ACCOUNT_LIMIT = 15`
+- `DEMO_DAILY_CREDIT_LIMIT = 20`
+- These launch defaults are sized from the email budget plus the intended feature mix for one demo session. See [README.md](../README.md) for the sizing rationale and recalculation guidance.
+
 Success response:
 
 ```json

@@ -58,6 +58,7 @@ Acceptance criteria:
 - Seeded launch-demo booking surfaces require sign-in so anonymous traffic cannot consume quota.
 - Exhausted path supports waitlist capture (email + optional metadata) with deduping per day/email.
 - A protected dev/admin endpoint can reset today's admission + credit state for local/demo operations.
+- Operator docs explain the launch defaults (`15` admitted accounts/day and `20` credits/account/day) and how to recalculate them when provider budgets or feature-email costs change.
 - Deprecated compatibility paths are removed: legacy magic-link auth endpoints, the public `/v0/demo-credits/consume` endpoint, dead GitHub OAuth config, and the `demo_credits_daily` table.
 - Feature includes tests for quota helper logic, waitlist dedupe, deprecated consume endpoint behavior, and route-level quota/auth regressions.
 - `docs/API.md`, `README.md`, and `docs/PRD.md` are updated for operator setup and product behavior notes.

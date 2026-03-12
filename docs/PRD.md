@@ -29,7 +29,7 @@ Build a practical open-source scheduling platform for solo creators, consultants
 - Monorepo + infra bootstrap.
 - One-on-one event types + public booking links + timezone/buffer handling.
 - Secure token-based cancel/reschedule + lifecycle emails.
-- Launch demo admission + per-account daily credits + waitlist + reset controls.
+- Launch demo admission + per-account daily credits + waitlist + reset controls, with defaults sized from the launch email budget and target feature mix.
 - Embeds + outbound webhooks with retry/signature.
 - Team scheduling modes (`round_robin`, `collective`) with correctness-safe commit.
 - Calendar sync hardening (Google + Microsoft) with external busy conflict blocking and writeback retry.

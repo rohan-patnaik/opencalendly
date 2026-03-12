@@ -217,6 +217,16 @@ To keep usage within free-tier limits, OpenCalendly enforces a launch-phase demo
 - Dev/internal allowlisted accounts bypass both admission and credit deductions.
 - Quota resets daily and can be manually reset via the dev route.
 
+Launch defaults and sizing:
+
+- `DEMO_DAILY_ACCOUNT_LIMIT` defaults to `15` admitted accounts per UTC day.
+- `DEMO_DAILY_CREDIT_LIMIT` defaults to `20` credits per admitted account per UTC day.
+- The `15/day` default is sized from the launch email budget, not from Workers or Clerk capacity. The planning heuristic is `floor((daily_email_budget * 0.7) / expected_emails_per_demo_account)`.
+- The shipped launch assumption was roughly `100` transactional emails/day with `4-5` emails per admitted demo account, which yields a safe starting band of about `14-17` accounts/day. OpenCalendly uses `15/day` as the default.
+- The `20 credits/day` default is sized to cover a meaningful demo session, not passive browsing. A representative session is `one_on_one_booking (4) + team_booking (5) + booking_reschedule (3) + booking_cancel (2) + calendar_connect (3) + calendar_sync (2) + one setup/edit action (1) = 20`.
+- Recalculate the account limit first when provider limits or email-heavy features change: pick a safe daily email budget, estimate average emails per admitted account, then recompute `DEMO_DAILY_ACCOUNT_LIMIT` with the formula above.
+- Recalculate the credit limit from the target feature mix for one demo session. Lower the account limit before lowering per-account credits if send volume increases, so admitted users can still complete a meaningful evaluation.
+
 Feature 3 API endpoints:
 
 - `GET /v0/demo-credits/status`
