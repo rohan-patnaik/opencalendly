@@ -2,6 +2,8 @@ import { Suspense } from 'react';
 
 import SignInPageClient from './page.client';
 
+export const runtime = 'edge';
+
 function SignInPageFallback() {
   return (
     <section

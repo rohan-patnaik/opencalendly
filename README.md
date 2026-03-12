@@ -195,6 +195,8 @@ npm run deploy:api:production
 npm run deploy:web:production
 ```
 
+The web deploy builds from the repository root and sets Vercel `rootDirectory=apps/web` before running `next-on-pages`. That keeps the monorepo path resolution stable in CI and local production deploys.
+
 6. Verify production app + API domain wiring:
 
 ```bash

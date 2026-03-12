@@ -2,6 +2,8 @@ import { Suspense } from 'react';
 
 import SignUpPageClient from './page.client';
 
+export const runtime = 'edge';
+
 function SignUpPageFallback() {
   return (
     <section

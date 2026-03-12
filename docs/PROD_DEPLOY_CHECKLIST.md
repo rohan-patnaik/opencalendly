@@ -48,6 +48,7 @@ Last updated: 28 Feb 2026 (IST)
 ## Web deploy (Cloudflare Pages)
 
 - [ ] Build/deploy Next.js app to Pages (automated from GitHub Actions on `main` push, or manually if needed).
+- [ ] Confirm the Pages build is running from the repository root so Vercel honors `apps/web` as the monorepo root directory.
 - [ ] Custom domains are attached in Pages project:
   - `opencalendly.com`
   - `www.opencalendly.com`

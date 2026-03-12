@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "pages:build": "next-on-pages"
+    "pages:build": "node ../../scripts/build-pages-output.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.1",

@@ -32,11 +32,11 @@ if (!pagesProject) {
   process.exit(1);
 }
 
-const outputDir = resolve(process.cwd(), 'apps/web/.vercel/output/static');
+const outputDir = resolve(process.cwd(), '.vercel/output/static');
 
 try {
   console.log('Building web app for Cloudflare Pages...');
-  await run('npm', ['run', 'pages:build', '-w', 'apps/web']);
+  await run(process.execPath, ['./scripts/build-pages-output.mjs']);
 
   if (!existsSync(outputDir)) {
     throw new Error(
