@@ -688,6 +688,24 @@ Acceptance criteria:
   - `npm run typecheck`
   - `npm run test`
   - `npm run build -w apps/web`
+### Feature 38: Embed playground hydration stability
+
+Scope:
+- Fix the embed playground route so its first client render matches the server-rendered HTML.
+- Keep the change scoped to timezone initialization on the embed preview page and a small regression test.
+
+Acceptance criteria:
+
+- `apps/web/src/app/embed/playground/page.client.tsx` does not read the browser timezone during initial render.
+- The embed playground server render remains deterministic with `UTC` until the client hydrates and upgrades to the browser timezone.
+- Loading `/embed/playground` locally no longer logs a hydration mismatch caused by the timezone query parameter.
+- Regression coverage exists for the server-side timezone fallback.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+  - `npm run build -w apps/web`
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:

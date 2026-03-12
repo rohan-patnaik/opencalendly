@@ -32,6 +32,10 @@ describe('groupSlotsByDay', () => {
 });
 
 describe('getBrowserTimezone', () => {
+  it('falls back to UTC during server render', () => {
+    expect(getBrowserTimezone()).toBe('UTC');
+  });
+
   it('returns browser timezone when window is available', () => {
     vi.stubGlobal('window', {});
     vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({

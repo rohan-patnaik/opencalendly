@@ -10,6 +10,7 @@ type EmbedPlaygroundPageClientProps = {
 };
 
 const DEFAULT_TITLE = 'OpenCalendly booking widget';
+const DEFAULT_EMBED_TIMEZONE = 'UTC';
 
 const toScriptSnippet = (input: {
   src: string;
@@ -28,7 +29,7 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
 
   const [username, setUsername] = useState('demo');
   const [eventSlug, setEventSlug] = useState('intro-call');
-  const [timezone, setTimezone] = useState(getBrowserTimezone());
+  const [timezone, setTimezone] = useState(DEFAULT_EMBED_TIMEZONE);
   const [width, setWidth] = useState('100%');
   const [height, setHeight] = useState('760px');
   const [radius, setRadius] = useState('14px');
@@ -56,6 +57,15 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
       title: title.trim() || DEFAULT_TITLE,
     });
   }, [height, radius, scriptSrc, shadow, title, width]);
+
+  useEffect(() => {
+    setTimezone((currentTimezone) => {
+      if (currentTimezone !== DEFAULT_EMBED_TIMEZONE) {
+        return currentTimezone;
+      }
+      return getBrowserTimezone();
+    });
+  }, []);
 
   useEffect(() => {
     const host = previewHostRef.current;
