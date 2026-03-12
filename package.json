@@ -6,7 +6,7 @@
   "license": "GPL-3.0-only",
   "packageManager": "npm@11.7.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "workspaces": [
     "apps/*",

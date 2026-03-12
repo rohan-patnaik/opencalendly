@@ -745,6 +745,33 @@ Acceptance criteria:
 - Validation passes:
   - `npm run env:check`
   - repo-wide search shows no stale AGPL license references outside historical Git metadata or lockfile history comments
+### Feature 41: Node 24 baseline migration
+
+Scope:
+- Move the repository tooling and CI baseline from Node 22 to Node 24.
+- Upgrade GitHub Actions that still carry Node 20 runtime deprecation warnings.
+- Keep the change scoped to local tooling, repository metadata, and GitHub workflow configuration only.
+
+Acceptance criteria:
+
+- GitHub workflow actions use Node 24-capable major versions:
+  - `actions/checkout@v5`
+  - `actions/setup-node@v5`
+  - `actions/github-script@v8`
+- CI and production deploy workflows run with `node-version: 24`.
+- Root package metadata reflects the new local/CI baseline:
+  - `package.json` sets `engines.node` to `>=24`
+  - `.nvmrc` exists with `24`
+- Top-level docs describe Node 24 as the supported local baseline.
+- Cloudflare runtime settings remain unchanged.
+- Validation passes under Node 24:
+  - `npm install`
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run test:smoke`
+  - `npm run typecheck`
+  - `npm run build -w apps/web`
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
