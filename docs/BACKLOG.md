@@ -706,6 +706,30 @@ Acceptance criteria:
   - `npm run typecheck`
   - `npm run test`
   - `npm run build -w apps/web`
+### Feature 39: Review gate hardening
+
+Scope:
+- Stop `main` merges from being blocked by third-party review statuses that are outside repository control.
+- Keep CodeRabbit auto-triggering in place and add an explicit maintainer re-trigger path without relying on ad hoc comment wording.
+- Update engineering and deploy docs so the required checks match the actual protected branch policy.
+
+Acceptance criteria:
+
+- `.github/workflows/coderabbit-review-trigger.yml` supports the existing PR events plus a maintainer-only manual re-trigger path.
+- `main` branch protection required checks are reduced to repo-owned or deterministic checks:
+  - `lint-test-typecheck`
+  - `GitGuardian Security Checks`
+  - `trigger-coderabbit-review`
+- `Greptile Review` and raw `CodeRabbit` status are no longer required GitHub merge blockers on `main`.
+- Repo policy/docs match the protected branch behavior:
+  - `AGENTS.md`
+  - `docs/STACK.md`
+  - `docs/PROD_DEPLOY_CHECKLIST.md`
+  - `docs/PRD.md`
+  - `.github/pull_request_template.md`
+- Validation passes:
+  - `npm run env:check`
+  - workflow file remains parseable and reviewed
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
