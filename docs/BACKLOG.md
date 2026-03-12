@@ -802,6 +802,29 @@ Acceptance criteria:
   - `npm run test`
   - `npm run typecheck`
   - local Node 24 smoke run for bootstrap + reset flow
+### Feature 43: Persisted public rate-limit upsert fix
+
+Scope:
+- Fix the persisted public rate-limit helper so public booking and analytics routes stop failing with SQL syntax errors at runtime.
+- Keep the change scoped to rate-limit persistence internals without changing route contracts or quotas.
+
+Acceptance criteria:
+
+- Public persisted rate limiting uses a Drizzle-backed upsert path instead of handwritten raw SQL.
+- These routes no longer return `500 {"error":"syntax error at or near \",\""}` during normal use:
+  - `GET /v0/users/:username/event-types/:eventSlug/availability`
+  - `GET /v0/teams/:teamSlug/event-types/:eventSlug/availability`
+  - `POST /v0/analytics/funnel/events`
+- Existing rate-limit behavior is preserved:
+  - window bucketing still uses the same minute window
+  - counts still increment atomically on conflict
+  - cleanup behavior remains unchanged
+- Validation passes:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - local browser smoke confirms `/demo/intro-call` no longer surfaces the SQL syntax error
+  - local browser smoke confirms `/team/demo-team/team-intro-call` no longer surfaces the SQL syntax error
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
