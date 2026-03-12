@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { Client } from 'pg';
 
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1']);
+const NEON_HOST_PATTERN = /\.neon\.tech(?::\d+)?(?:\/|$)/i;
 
 const parseEnvFile = (contents) => {
   const values = {};
@@ -107,6 +108,9 @@ assertLocalUrl('NEXT_PUBLIC_API_BASE_URL');
 const databaseUrl = mergedEnv.DATABASE_URL?.trim();
 if (!databaseUrl) {
   fail('DATABASE_URL is required for local DB reset.');
+}
+if (!NEON_HOST_PATTERN.test(databaseUrl)) {
+  fail('DATABASE_URL must point to Neon Postgres (*.neon.tech).');
 }
 
 const client = new Client({
