@@ -17,6 +17,7 @@ describe('dev auth helpers', () => {
   it('recognizes localhost origins', () => {
     expect(isLocalOriginValue('http://localhost:3000')).toBe(true);
     expect(isLocalOriginValue('http://127.0.0.1:3000')).toBe(true);
+    expect(isLocalOriginValue('http://[::1]:3000')).toBe(true);
     expect(isLocalOriginValue('https://opencalendly.com')).toBe(false);
   });
 
@@ -25,6 +26,17 @@ describe('dev auth helpers', () => {
       method: 'POST',
       headers: {
         origin: 'http://localhost:3000',
+      },
+    });
+
+    expect(isLocalBootstrapRequest(request)).toBe(true);
+  });
+
+  it('accepts bootstrap requests with local referers', () => {
+    const request = new Request('http://[::1]:8787/v0/dev/auth/bootstrap', {
+      method: 'POST',
+      headers: {
+        referer: 'http://localhost:3000/organizer',
       },
     });
 
@@ -44,6 +56,17 @@ describe('dev auth helpers', () => {
       method: 'POST',
       headers: {
         origin: 'https://opencalendly.com',
+      },
+    });
+
+    expect(isLocalBootstrapRequest(request)).toBe(false);
+  });
+
+  it('rejects bootstrap requests with remote referers', () => {
+    const request = new Request('http://127.0.0.1:8787/v0/dev/auth/bootstrap', {
+      method: 'POST',
+      headers: {
+        referer: 'https://opencalendly.com/login',
       },
     });
 

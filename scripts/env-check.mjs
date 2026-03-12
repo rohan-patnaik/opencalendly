@@ -19,6 +19,8 @@ const REQUIRED = {
 };
 
 const OPTIONAL = {
+  RESET_DATABASE_URL:
+    'Optional dedicated Neon URL for npm run db:reset:local. Use a disposable local-only branch/database.',
   CLOUDFLARE_PAGES_PROJECT:
     'Cloudflare Pages project name used by npm run deploy:web:production.',
   CLOUDFLARE_PAGES_PRODUCTION_BRANCH:
@@ -92,6 +94,11 @@ if (databaseUrl && !NEON_HOST_PATTERN.test(databaseUrl)) {
   errors.push('DATABASE_URL must be a Neon URL with host ending in .neon.tech');
 }
 
+const resetDatabaseUrl = parsed.RESET_DATABASE_URL;
+if (resetDatabaseUrl && !NEON_HOST_PATTERN.test(resetDatabaseUrl)) {
+  errors.push('RESET_DATABASE_URL must be a Neon URL with host ending in .neon.tech');
+}
+
 const appBaseUrl = parsed.APP_BASE_URL;
 if (appBaseUrl && !/^https?:\/\/.+/i.test(appBaseUrl)) {
   errors.push('APP_BASE_URL must be an absolute http(s) URL.');
@@ -131,6 +138,11 @@ if (sessionSecret && sessionSecret.length < 32) {
 const telemetryHmacKey = parsed.TELEMETRY_HMAC_KEY;
 if (telemetryHmacKey && telemetryHmacKey.length < 32) {
   errors.push('TELEMETRY_HMAC_KEY must be at least 32 characters when provided.');
+}
+
+const enableDevAuthBootstrap = parsed.ENABLE_DEV_AUTH_BOOTSTRAP;
+if (enableDevAuthBootstrap && !/^(true|false)$/i.test(enableDevAuthBootstrap.trim())) {
+  errors.push('ENABLE_DEV_AUTH_BOOTSTRAP must be "true" or "false" when provided.');
 }
 
 if (apiBaseUrl && publicApiBaseUrl && apiBaseUrl !== publicApiBaseUrl) {

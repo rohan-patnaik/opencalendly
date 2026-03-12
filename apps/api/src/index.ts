@@ -2724,19 +2724,25 @@ const issueSessionForUser = async (
   const sessionToken = createRawToken();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
 
-  const [insertedSession] = await db.transaction(async (transaction) => {
-    await transaction.execute(sql`select id from users where id = ${userRecord.id} for update`);
+  const insertedSession = await db.transaction(async (transaction) => {
+    const lockedUser = await transaction.execute<{ id: string }>(
+      sql`select id from users where id = ${userRecord.id} for update`,
+    );
+    if (!lockedUser.rows[0]) {
+      return null;
+    }
+
     await transaction.delete(sessions).where(eq(sessions.userId, userRecord.id));
-    return transaction
+    const [inserted] = await transaction
       .insert(sessions)
       .values({
         userId: userRecord.id,
         tokenHash: hashToken(sessionToken),
         expiresAt,
       })
-      .returning({
-        id: sessions.id,
-      });
+      .returning({ id: sessions.id });
+
+    return inserted ?? null;
   });
 
   if (!insertedSession) {
@@ -3190,15 +3196,15 @@ app.get('/health', (context) => {
 });
 
 app.post('/v0/dev/auth/bootstrap', async (context) => {
+  if (!isDevAuthBootstrapEnabled(context.env.ENABLE_DEV_AUTH_BOOTSTRAP?.trim())) {
+    return jsonError(context, 404, 'Not found.');
+  }
+
+  if (!isLocalBootstrapRequest(context.req.raw)) {
+    return jsonError(context, 403, 'Local development access only.');
+  }
+
   return withDatabase(context, async (db) => {
-    if (!isDevAuthBootstrapEnabled(context.env.ENABLE_DEV_AUTH_BOOTSTRAP?.trim())) {
-      return jsonError(context, 404, 'Not found.');
-    }
-
-    if (!isLocalBootstrapRequest(context.req.raw)) {
-      return jsonError(context, 403, 'Local development access only.');
-    }
-
     const body = await context.req.json().catch(() => null);
     if (body === null) {
       return jsonError(context, 400, 'Malformed JSON body.');

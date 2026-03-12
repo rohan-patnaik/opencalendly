@@ -4,8 +4,10 @@ import { resolve } from 'node:path';
 
 import { Client } from 'pg';
 
-const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1']);
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
 const NEON_HOST_PATTERN = /\.neon\.tech(?::\d+)?(?:\/|$)/i;
+
+const normalizeHostname = (hostname) => hostname.trim().toLowerCase().replace(/^\[(.*)\]$/, '$1');
 
 const parseEnvFile = (contents) => {
   const values = {};
@@ -70,16 +72,16 @@ const assertLocalUrl = (key) => {
     fail(`${key} must be a valid absolute URL for local DB reset.`);
   }
 
-  if (!LOCAL_HOSTNAMES.has(parsed.hostname.trim().toLowerCase())) {
+  if (!LOCAL_HOSTNAMES.has(normalizeHostname(parsed.hostname))) {
     fail(`${key} must point to localhost or 127.0.0.1 for local DB reset.`);
   }
 };
 
-const runCommand = (command, args) => {
+const runCommand = (command, args, env) => {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, args, {
       stdio: 'inherit',
-      env: mergedEnv,
+      env,
       shell: process.platform === 'win32',
     });
 
@@ -105,16 +107,21 @@ assertLocalUrl('APP_BASE_URL');
 assertLocalUrl('API_BASE_URL');
 assertLocalUrl('NEXT_PUBLIC_API_BASE_URL');
 
-const databaseUrl = mergedEnv.DATABASE_URL?.trim();
-if (!databaseUrl) {
-  fail('DATABASE_URL is required for local DB reset.');
+const resetDatabaseUrl = mergedEnv.RESET_DATABASE_URL?.trim();
+if (!resetDatabaseUrl) {
+  fail('RESET_DATABASE_URL is required for local DB reset.');
 }
-if (!NEON_HOST_PATTERN.test(databaseUrl)) {
-  fail('DATABASE_URL must point to Neon Postgres (*.neon.tech).');
+if (!NEON_HOST_PATTERN.test(resetDatabaseUrl)) {
+  fail('RESET_DATABASE_URL must point to Neon Postgres (*.neon.tech).');
 }
 
+const resetEnv = {
+  ...mergedEnv,
+  DATABASE_URL: resetDatabaseUrl,
+};
+
 const client = new Client({
-  connectionString: databaseUrl,
+  connectionString: resetDatabaseUrl,
 });
 
 const reset = async () => {
@@ -129,8 +136,16 @@ const reset = async () => {
     await client.end();
   }
 
-  await runCommand('node', ['./scripts/run-with-root-env.mjs', 'npm', 'run', 'migrate', '-w', 'packages/db']);
-  await runCommand('node', ['./scripts/run-with-root-env.mjs', 'npm', 'run', 'seed', '-w', 'packages/db']);
+  await runCommand(
+    'node',
+    ['./scripts/run-with-root-env.mjs', 'npm', 'run', 'migrate', '-w', 'packages/db'],
+    resetEnv,
+  );
+  await runCommand(
+    'node',
+    ['./scripts/run-with-root-env.mjs', 'npm', 'run', 'seed', '-w', 'packages/db'],
+    resetEnv,
+  );
 };
 
 reset().catch((error) => {

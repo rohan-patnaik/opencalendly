@@ -44,6 +44,7 @@ Populate required values in `.env` once, up front:
 | Variable                   | How to get it                                                                                      |
 | -------------------------- | -------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`             | Neon dashboard -> project -> connection details -> direct Postgres URL (`*.neon.tech`)             |
+| `RESET_DATABASE_URL`       | Optional dedicated Neon URL for `npm run db:reset:local`. Point this at a disposable local-only branch/database. |
 | `SESSION_SECRET`           | Run `openssl rand -hex 32`                                                                         |
 | `APP_BASE_URL`             | Local web URL (`http://localhost:3000`)                                                            |
 | `API_BASE_URL`             | Local API URL (`http://127.0.0.1:8787`)                                                            |
@@ -93,6 +94,8 @@ For a fully repeatable local E2E reset:
 ```bash
 CONFIRM_LOCAL_DB_RESET=yes npm run db:reset:local
 ```
+
+`db:reset:local` requires `RESET_DATABASE_URL` and will refuse to run against the normal app `DATABASE_URL`.
 
 ### 5) Start API and web
 

@@ -1,7 +1,11 @@
-const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1']);
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+
+const normalizeHostname = (hostname: string): string => {
+  return hostname.trim().toLowerCase().replace(/^\[(.*)\]$/, '$1');
+};
 
 const isLocalHostname = (hostname: string): boolean => {
-  return LOCAL_HOSTNAMES.has(hostname.trim().toLowerCase());
+  return LOCAL_HOSTNAMES.has(normalizeHostname(hostname));
 };
 
 const parseUrlHostname = (value: string | null): string | null => {
@@ -10,7 +14,7 @@ const parseUrlHostname = (value: string | null): string | null => {
   }
 
   try {
-    return new URL(value).hostname.trim().toLowerCase();
+    return normalizeHostname(new URL(value).hostname);
   } catch {
     return null;
   }
