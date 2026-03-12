@@ -4999,17 +4999,19 @@ app.post('/v0/calendar/writeback/run', async (context) => {
 
     if (outcome.processed > 0) {
       try {
-        await consumeDemoFeatureCredits(db, context.env, authedUser, {
-          featureKey: 'writeback_run',
-          sourceKey: buildDemoFeatureSourceKey('writeback_run', {
-            rowIds: dueRows.map((row) => row.id).sort(),
-            limit,
-          }),
-          metadata: {
-            processed: outcome.processed,
-            limit,
-          },
-          now,
+        await db.transaction(async (transaction) => {
+          await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+            featureKey: 'writeback_run',
+            sourceKey: buildDemoFeatureSourceKey('writeback_run', {
+              rowIds: dueRows.map((row) => row.id).sort(),
+              limit,
+            }),
+            metadata: {
+              processed: outcome.processed,
+              limit,
+            },
+            now,
+          });
         });
       } catch (error) {
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
@@ -5238,17 +5240,19 @@ app.post('/v0/notifications/run', async (context) => {
 
     if (dueRows.length > 0) {
       try {
-        await consumeDemoFeatureCredits(db, context.env, authedUser, {
-          featureKey: 'notification_run',
-          sourceKey: buildDemoFeatureSourceKey('notification_run', {
-            rowIds: dueRows.map((row) => row.id).sort(),
-            limit,
-          }),
-          metadata: {
-            processed: dueRows.length,
-            limit,
-          },
-          now,
+        await db.transaction(async (transaction) => {
+          await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+            featureKey: 'notification_run',
+            sourceKey: buildDemoFeatureSourceKey('notification_run', {
+              rowIds: dueRows.map((row) => row.id).sort(),
+              limit,
+            }),
+            metadata: {
+              processed: dueRows.length,
+              limit,
+            },
+            now,
+          });
         });
       } catch (error) {
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
@@ -5618,17 +5622,19 @@ app.post('/v0/webhooks/deliveries/run', async (context) => {
 
     if (dueRows.length > 0) {
       try {
-        await consumeDemoFeatureCredits(db, context.env, authedUser, {
-          featureKey: 'webhook_run',
-          sourceKey: buildDemoFeatureSourceKey('webhook_run', {
-            deliveryIds: dueRows.map((row) => row.id).sort(),
-            limit,
-          }),
-          metadata: {
-            processed: dueRows.length,
-            limit,
-          },
-          now,
+        await db.transaction(async (transaction) => {
+          await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+            featureKey: 'webhook_run',
+            sourceKey: buildDemoFeatureSourceKey('webhook_run', {
+              deliveryIds: dueRows.map((row) => row.id).sort(),
+              limit,
+            }),
+            metadata: {
+              processed: dueRows.length,
+              limit,
+            },
+            now,
+          });
         });
       } catch (error) {
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {

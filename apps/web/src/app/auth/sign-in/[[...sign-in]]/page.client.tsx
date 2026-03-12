@@ -10,10 +10,25 @@ import uiStyles from '../../../../components/ui/primitives.module.css';
 import styles from '../../shared.module.css';
 
 const sanitizeRedirectPath = (value: string | null): string => {
-  if (!value || !value.startsWith('/')) {
+  if (
+    !value ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('\\') ||
+    value.includes('://')
+  ) {
     return '/dashboard';
   }
-  return value;
+
+  try {
+    const url = new URL(value, 'https://opencalendly.local');
+    if (url.origin !== 'https://opencalendly.local') {
+      return '/dashboard';
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return '/dashboard';
+  }
 };
 
 export default function SignInPageClient() {
