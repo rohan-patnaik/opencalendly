@@ -23,7 +23,7 @@ packages/
 
 ### 1) Prerequisites
 
-- Node.js 20+ (Node 22 tested)
+- Node.js 24+ (Node 24 tested)
 - npm 11+
 - Neon account + Neon Postgres project (Neon is required)
 
