@@ -730,6 +730,21 @@ Acceptance criteria:
 - Validation passes:
   - `npm run env:check`
   - workflow file remains parseable and reviewed
+### Feature 40: Re-license repository from AGPL-3.0 to GPL-3.0
+
+Scope:
+- Change the repository license from GNU AGPL v3.0 to GNU GPL v3.0.
+- Keep the change scoped to the legal/license surface only: license text, package metadata, and top-level docs references.
+
+Acceptance criteria:
+
+- Root `LICENSE` file contains the GNU GPL v3.0 text instead of the GNU AGPL v3.0 text.
+- Root package metadata reflects `GPL-3.0-only`.
+- Top-level docs references that describe the repository license are updated from AGPL to GPL and no longer claim network-use source disclosure.
+- No product/runtime/API behavior changes are introduced.
+- Validation passes:
+  - `npm run env:check`
+  - repo-wide search shows no stale AGPL license references outside historical Git metadata or lockfile history comments
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
