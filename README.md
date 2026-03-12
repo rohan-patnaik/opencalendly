@@ -288,6 +288,6 @@ Calendar sync + writeback endpoints (authenticated, Feature 7):
 
 ## License
 
-This project is licensed under **GNU AGPL v3.0**. See [LICENSE](LICENSE).
+This project is licensed under **GNU GPL v3.0**. See [LICENSE](LICENSE).
 
-Forks and modified versions must preserve license and copyright notices and make source available when used over a network (AGPL requirement).
+Forks and modified versions must preserve license and copyright notices. Distributed modified versions must make source available under the GPL.
