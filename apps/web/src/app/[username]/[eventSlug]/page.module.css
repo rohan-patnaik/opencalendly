@@ -1,9 +1,9 @@
 .page {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 2.2rem 1.15rem 4rem;
+  padding: 1.4rem 1rem 3rem;
   display: grid;
-  gap: 1rem;
+  gap: 0.65rem;
 }
 
 .heroCard,

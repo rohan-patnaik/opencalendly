@@ -663,6 +663,31 @@ Acceptance criteria:
   - `/auth/sign-up`
 - GitHub `Deploy Production` can publish `main` to Cloudflare Pages without the duplicated `apps/web/apps/web/.next` path failure.
 
+### Feature 37: Dense amber UI refinement pass
+
+Scope:
+- Tighten the current amber UI across homepage, public booking pages, organizer surfaces, and shared chrome without changing booking/API behavior.
+- Keep the change scoped to spacing, radius, header density, hero composition, and shared primitive styling so it can ship as a pure frontend refinement PR.
+
+Acceptance criteria:
+
+- Shared density tokens in `apps/web/src/app/globals.css` are refined for a more compact UI:
+  - smaller app header height
+  - tighter radius scale
+  - denser background grid spacing
+- Homepage hero and marketing sections in `apps/web/src/app/page.tsx` and `apps/web/src/app/page.module.css` render with tighter spacing, smaller cards, and reduced visual bulk while preserving existing routes/CTAs/content structure.
+- Public booking, team booking, booking action, dashboard, organizer, and embed pages keep the same functionality while adopting the tighter panel/card spacing defined in their CSS modules.
+- Shared chrome and primitive styles stay visually consistent with the denser homepage treatment:
+  - `apps/web/src/components/app-chrome.module.css`
+  - `apps/web/src/components/ui/primitives.module.css`
+  - `apps/web/src/components/calendar-connect-callback.module.css`
+- No API/schema/docs contract changes are introduced outside this scoped UI refinement.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+  - `npm run build -w apps/web`
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:

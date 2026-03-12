@@ -1,12 +1,12 @@
 .pageShell {
-  width: min(1160px, 100% - 2.4rem);
+  width: min(1160px, 100% - 2rem);
   margin: 0 auto;
-  padding: 2.4rem 0 4rem;
+  padding: 1.6rem 0 3rem;
 }
 
 .pageStack {
   display: grid;
-  gap: 1rem;
+  gap: 0.65rem;
 }
 
 .pageIntro {
@@ -26,7 +26,7 @@
 .pageTitle {
   margin: 0;
   font-family: var(--font-space-grotesk);
-  font-size: clamp(1.8rem, 3vw, 2.75rem);
+  font-size: clamp(1.5rem, 2.6vw, 2.2rem);
   font-weight: 700;
   letter-spacing: -0.03em;
 }
@@ -115,18 +115,21 @@
 }
 
 .buttonSecondary {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
 }
 
 .buttonSecondary:hover:not(:disabled) {
   background: var(--bg-hover);
-  border-color: var(--border-hover);
+  border-color: var(--brand-primary-hover);
+  color: var(--brand-primary-hover);
 }
 
 .buttonSecondary:active:not(:disabled) {
   background: var(--bg-pressed);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
 }
 
 .buttonGhost {
@@ -137,7 +140,7 @@
 
 .buttonGhost:hover:not(:disabled) {
   background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--brand-primary-hover);
   border-color: var(--border-default);
 }
 

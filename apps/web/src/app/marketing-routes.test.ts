@@ -11,16 +11,16 @@ describe('marketing route surface', () => {
   it('homepage includes parity sections and product route links', () => {
     const source = readAppFile('page.tsx');
 
-    expect(source).toContain('Calendly-grade scheduling UX, fully owned by your stack.');
+    expect(source).toContain('Open scheduling, quietly opinionated.');
     expect(source).toContain('How teams run OpenCalendly');
-    expect(source).toContain('Integrations + platform');
-    expect(source).toContain('Pricing clarity before scale');
-    expect(source).toContain('Ready to own your scheduling stack?');
+    expect(source).toContain('Built for practical ownership');
+    expect(source).toContain('Pricing clarity before any team scales usage');
+    expect(source).toContain('Use the public demos, then step into the operator surfaces.');
 
-    expect(source).toContain("href=\"/features\"");
-    expect(source).toContain("href=\"/solutions\"");
-    expect(source).toContain("href=\"/pricing\"");
-    expect(source).toContain("href=\"/resources\"");
+    expect(source).toContain('href="/features"');
+    expect(source).toContain('href="/solutions"');
+    expect(source).toContain('href="/pricing"');
+    expect(source).toContain('href="/resources"');
     expect(source).toContain("href: '/demo/intro-call'");
     expect(source).toContain("href: '/team/demo-team/team-intro-call'");
     expect(source).toContain("href: '/embed/playground'");
