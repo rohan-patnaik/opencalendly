@@ -647,6 +647,22 @@ Acceptance criteria:
   - `https://opencalendly.com/auth/sign-in`
   - `https://opencalendly.com/auth/verify`
 
+### Feature 36: Pages deploy monorepo root build parity
+
+Scope:
+- Fix Cloudflare Pages production deploys that stopped publishing `main` because `next-on-pages`/Vercel were building the monorepo from the wrong working directory.
+- Keep the change scoped to deploy/build compatibility for the existing Next.js app.
+
+Acceptance criteria:
+
+- Pages build runs from the repository root while telling Vercel the app root is `apps/web`.
+- `npm run pages:build -w apps/web` succeeds locally in the monorepo.
+- `npm run deploy:web:production` succeeds locally when required deploy env vars are present.
+- Clerk auth entry routes required by Pages export edge runtime:
+  - `/auth/sign-in`
+  - `/auth/sign-up`
+- GitHub `Deploy Production` can publish `main` to Cloudflare Pages without the duplicated `apps/web/apps/web/.next` path failure.
+
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
