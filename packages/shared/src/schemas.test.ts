@@ -9,6 +9,7 @@ import {
   calendarSyncRequestSchema,
   calendarWritebackRunSchema,
   clerkAuthExchangeRequestSchema,
+  devAuthBootstrapRequestSchema,
   analyticsRangeQuerySchema,
   analyticsTrackFunnelEventSchema,
   bookingCreateSchema,
@@ -167,6 +168,18 @@ describe('shared schemas', () => {
     const result = clerkAuthExchangeRequestSchema.safeParse({
       clerkToken: 'short',
       username: 'Invalid Spaces',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts empty dev auth bootstrap payloads', () => {
+    expect(devAuthBootstrapRequestSchema.parse({})).toEqual({});
+  });
+
+  it('rejects invalid dev auth bootstrap emails', () => {
+    const result = devAuthBootstrapRequestSchema.safeParse({
+      email: 'not-an-email',
     });
 
     expect(result.success).toBe(false);

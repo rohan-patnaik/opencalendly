@@ -57,13 +57,14 @@ Populate required values in `.env` once, up front:
 | `RESEND_FROM_EMAIL`        | Resend dashboard -> verified sender identity                                                       |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk dashboard -> API Keys -> Publishable key                                          |
 | `CLERK_SECRET_KEY`         | Clerk dashboard -> API Keys -> Secret key                                                          |
+| `ENABLE_DEV_AUTH_BOOTSTRAP` | Optional local-only flag. Set `true` to enable `POST /v0/dev/auth/bootstrap` for local E2E runs  |
 | `GOOGLE_CLIENT_ID`         | Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID (Web application)    |
 | `GOOGLE_CLIENT_SECRET`     | Same Google OAuth credential as above                                                              |
 | `MICROSOFT_CLIENT_ID`      | Microsoft Entra -> App registrations -> Application (client) ID                                    |
 | `MICROSOFT_CLIENT_SECRET`  | Microsoft Entra -> App registrations -> client secret                                              |
 | `DEMO_DAILY_ACCOUNT_LIMIT` | Optional integer daily cap for admitted demo accounts (default `15`)                               |
 | `DEMO_DAILY_CREDIT_LIMIT`  | Optional integer daily credit budget per admitted account (default `20`)                           |
-| `DEMO_CREDIT_BYPASS_EMAILS` | Optional comma-separated allowlist for dev/internal bypass accounts                                |
+| `DEMO_CREDIT_BYPASS_EMAILS` | Optional comma-separated allowlist for dev/internal bypass accounts. For local E2E, set `demo@opencalendly.dev`. |
 
 Google OAuth setup note (for local dev):
 
@@ -85,6 +86,12 @@ npm run env:check
 npm run db:generate
 npm run db:migrate
 npm run db:seed
+```
+
+For a fully repeatable local E2E reset:
+
+```bash
+CONFIRM_LOCAL_DB_RESET=yes npm run db:reset:local
 ```
 
 ### 5) Start API and web
@@ -113,6 +120,7 @@ npm run dev:web
 2. Complete Clerk sign-in with email or Google.
 3. Confirm redirect to `http://localhost:3000/dashboard` and analytics load without manual token paste.
 4. Open `http://localhost:3000/auth/verify` and confirm it redirects back to `/auth/sign-in`.
+5. Optional for local Playwright-authenticated runs: set `ENABLE_DEV_AUTH_BOOTSTRAP=true`, then call `POST http://127.0.0.1:8787/v0/dev/auth/bootstrap` to mint a local session for `demo@opencalendly.dev`.
 
 ### 7.1) Feature 15 app shell smoke test
 

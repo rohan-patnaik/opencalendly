@@ -9,6 +9,7 @@ node_modules/
 dist/
 coverage/
 .wrangler/
+output/playwright/
 apps/api/.dev.vars
 apps/api/.dev.vars.*
 

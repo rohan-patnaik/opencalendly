@@ -772,6 +772,36 @@ Acceptance criteria:
   - `npm run test:smoke`
   - `npm run typecheck`
   - `npm run build -w apps/web`
+### Feature 42: Local Playwright auth bootstrap + DB reset foundation
+
+Scope:
+- Add a local-only auth bootstrap route so Playwright can exercise authenticated surfaces without manual Clerk interaction.
+- Add a deterministic local database reset script for repeatable E2E runs.
+- Keep the change scoped to local development/test tooling and explicit dev-only API behavior.
+
+Acceptance criteria:
+
+- `POST /v0/dev/auth/bootstrap` exists as a local-only endpoint when `ENABLE_DEV_AUTH_BOOTSTRAP=true`.
+- The bootstrap route:
+  - accepts an optional `email`
+  - defaults to seeded `demo@opencalendly.dev`
+  - reuses the normal session issuance model
+  - rejects non-local hosts/origins
+  - returns `404` when the feature flag is disabled
+- Root tooling includes `npm run db:reset:local`.
+- The local DB reset script:
+  - requires explicit confirmation via `CONFIRM_LOCAL_DB_RESET=yes`
+  - validates local app/API URLs before destructive work
+  - resets schema contents, reruns migrations, and reruns seed data
+- Local env/docs plumbing exists for:
+  - `ENABLE_DEV_AUTH_BOOTSTRAP`
+  - `DEMO_CREDIT_BYPASS_EMAILS=demo@opencalendly.dev` guidance for repeatable local automation
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - local Node 24 smoke run for bootstrap + reset flow
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:

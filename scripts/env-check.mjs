@@ -23,6 +23,8 @@ const OPTIONAL = {
     'Cloudflare Pages project name used by npm run deploy:web:production.',
   CLOUDFLARE_PAGES_PRODUCTION_BRANCH:
     'Optional production branch for Pages deploy (defaults to main).',
+  ENABLE_DEV_AUTH_BOOTSTRAP:
+    'Optional local-only flag. Set to true to enable POST /v0/dev/auth/bootstrap during local development.',
   DEMO_DAILY_ACCOUNT_LIMIT: 'Optional integer daily cap for admitted demo accounts (default 15).',
   DEMO_DAILY_CREDIT_LIMIT: 'Optional integer daily credit budget per admitted account (default 20).',
   DEMO_CREDIT_BYPASS_EMAILS:
