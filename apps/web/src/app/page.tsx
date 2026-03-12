@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useId } from 'react';
 import { LinkButton } from '../components/ui/button';
+import { HomepageTimezoneBadge } from './homepage-timezone-badge';
 import styles from './page.module.css';
 
 const heroSignals = [
@@ -146,24 +147,6 @@ function CalendarDotArt() {
         }),
       )}
 
-      <path
-        d="M 430 90 C 460 120 475 165 475 210 C 475 270 450 310 410 345"
-        fill="none"
-        stroke="var(--text-muted)"
-        strokeOpacity="0.72"
-        strokeWidth="10"
-        strokeLinecap="round"
-      />
-      <circle cx="400" cy="230" r="6" fill="var(--brand-primary)" />
-      <path
-        d="M 395 230 L 399 234 L 407 224"
-        fill="none"
-        stroke="var(--bg-base)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
       {/* Extra ambient dot fields to fill more space */}
       <rect x="420" y="40" width="120" height="140" rx="6" fill={`url(#${baseId})`} opacity="0.5" />
       <rect x="420" y="200" width="120" height="120" rx="6" fill={`url(#${accentId})`} opacity="0.25" />
@@ -215,10 +198,7 @@ export default function HomePage() {
 
           <div className={styles.heroArtPanel} aria-hidden="true">
             <div className={styles.artFrame}>
-              <div className={styles.artHeader}>
-                <span className={styles.artEyebrow}>Calendar sketch</span>
-                <span className={styles.artBadge}>UTC aware</span>
-              </div>
+              <HomepageTimezoneBadge />
               <CalendarDotArt />
               <div className={styles.artLegend}>
                 <div>
