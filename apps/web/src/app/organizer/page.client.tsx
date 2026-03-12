@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useClerk } from '@clerk/nextjs';
 import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 
+import { DemoQuotaCard } from '../../components/demo-quota-card';
 import { Button, Card, LinkButton, PageShell, Toast } from '../../components/ui';
 import { authedGetJson } from '../../lib/api-client';
+import { useDemoQuota } from '../../lib/demo-quota';
 import {
   organizerApi,
   type AvailabilityOverride,
@@ -219,6 +221,16 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
   const [webhooks, setWebhooks] = useState<OrganizerWebhook[]>([]);
   const [calendarStatuses, setCalendarStatuses] = useState<CalendarProviderStatus[]>([]);
   const [writebackStatus, setWritebackStatus] = useState<WritebackStatus | null>(null);
+  const {
+    status: demoQuotaStatus,
+    loading: demoQuotaLoading,
+    error: demoQuotaError,
+    refresh: refreshDemoQuota,
+  } = useDemoQuota({
+    apiBaseUrl,
+    session,
+    enabled: Boolean(session),
+  });
 
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -348,6 +360,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     setGlobalError(null);
 
     try {
+      const refreshDemoQuotaPromise = refreshDemoQuota();
       const [
         eventTypePayload,
         availabilityPayload,
@@ -365,6 +378,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         organizerApi.getCalendarSyncStatus(apiBaseUrl, session),
         organizerApi.getWritebackStatus(apiBaseUrl, session),
       ]);
+      await refreshDemoQuotaPromise;
 
       setEventTypes(eventTypePayload.eventTypes);
       setAvailabilityRules(availabilityPayload.rules);
@@ -421,7 +435,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     } finally {
       setIsRefreshing(false);
     }
-  }, [apiBaseUrl, session]);
+  }, [apiBaseUrl, refreshDemoQuota, session]);
 
   const refreshTeamDetails = useCallback(
     async (teamId: string) => {
@@ -1351,7 +1365,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         <Card>
           {authError ? <Toast variant="error">{authError}</Toast> : null}
           <div className={styles.rowActions}>
-            <LinkButton href="/auth/sign-in" variant="primary">
+            <LinkButton href="/auth/sign-in?redirect_url=%2Forganizer" variant="primary">
               Sign in
             </LinkButton>
             <LinkButton href="/demo/intro-call" variant="secondary">
@@ -1397,6 +1411,20 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         {globalError ? <Toast variant="error">{globalError}</Toast> : null}
         {panelError ? <Toast variant="error">{panelError}</Toast> : null}
         {panelMessage ? <Toast variant="success">{panelMessage}</Toast> : null}
+      </section>
+
+      <section className={styles.card}>
+        <DemoQuotaCard
+          apiBaseUrl={apiBaseUrl}
+          session={session}
+          status={demoQuotaStatus}
+          loading={demoQuotaLoading}
+          error={demoQuotaError}
+          waitlistSource="organizer-console"
+          title="Launch usage budget"
+          description="Track the shared launch pool and your personal daily credits while operating the app."
+          onStatusChange={refreshDemoQuota}
+        />
       </section>
 
       <div className={styles.consoleLayout}>

@@ -10,7 +10,6 @@
 
 - Auth uses bearer sessions: `Authorization: Bearer <sessionToken>`.
 - Primary session tokens are issued via Clerk exchange flow.
-- Magic-link session issuance remains available for backward compatibility (deprecated for web UI).
 - Protected routes return `401` on missing/invalid/expired token.
 
 ## Endpoints
@@ -22,19 +21,6 @@ Response:
 ```json
 {
   "status": "ok"
-}
-```
-
-### `GET /v0/db/ping`
-
-Purpose: verify Worker -> Hyperdrive -> Postgres connectivity.
-
-Success response:
-
-```json
-{
-  "ok": true,
-  "now": "2026-02-24 18:06:00+00"
 }
 ```
 
@@ -74,63 +60,6 @@ Success response:
     "username": "demo",
     "displayName": "Demo Organizer",
     "timezone": "Asia/Kolkata"
-  }
-}
-```
-
-### `POST /v0/auth/magic-link`
-
-Deprecated for web UI. Retained for backward compatibility during transition window.
-
-Request:
-
-```json
-{
-  "email": "demo@opencalendly.dev",
-  "username": "demo",
-  "displayName": "Demo Organizer",
-  "timezone": "America/New_York"
-}
-```
-
-Notes:
-
-- `username`, `displayName`, and `timezone` are optional for existing users.
-- For first-time users, `username` and `displayName` are required.
-
-Success response:
-
-```json
-{
-  "ok": true,
-  "expiresAt": "2026-02-26T15:04:05.000Z",
-  "magicLinkToken": "raw-token-for-verify-step"
-}
-```
-
-### `POST /v0/auth/verify`
-
-Request:
-
-```json
-{
-  "token": "raw-token-for-verify-step"
-}
-```
-
-Success response:
-
-```json
-{
-  "ok": true,
-  "sessionToken": "session-token",
-  "expiresAt": "2026-03-28T15:04:05.000Z",
-  "user": {
-    "id": "d8bdbf6d-aed7-4c84-a67f-a2c54f7c4f4a",
-    "email": "demo@opencalendly.dev",
-    "username": "demo",
-    "displayName": "Demo Organizer",
-    "timezone": "America/New_York"
   }
 }
 ```
@@ -522,6 +451,10 @@ Success response:
 
 Public endpoint for booking page details.
 
+Note:
+
+- The seeded launch demo organizer (`username = demo`) requires bearer auth.
+
 Success response:
 
 ```json
@@ -549,6 +482,10 @@ Success response:
 ### `GET /v0/users/:username/event-types/:slug/availability`
 
 Public endpoint for slot picker.
+
+Note:
+
+- The seeded launch demo organizer (`username = demo`) requires bearer auth.
 
 Query params:
 
@@ -728,6 +665,10 @@ Rate-limit response (`429`):
 ### `GET /v0/bookings/actions/:token`
 
 Public endpoint used by cancel/reschedule action pages to resolve a token into booking context.
+
+Note:
+
+- Demo booking action tokens require bearer auth when the booking belongs to the seeded launch demo surfaces.
 
 Success response:
 
@@ -986,7 +927,7 @@ Behavior:
 
 ### `GET /v0/demo-credits/status`
 
-Public endpoint returning current daily pass usage.
+Returns launch-demo admission state plus the authenticated account’s daily credit state when a bearer session is present.
 
 Success response:
 
@@ -994,57 +935,38 @@ Success response:
 {
   "ok": true,
   "date": "2026-02-26",
-  "dailyLimit": 25,
-  "used": 10,
-  "remaining": 15,
-  "isExhausted": false
+  "resetAt": "2026-02-27T00:00:00.000Z",
+  "admissions": {
+    "date": "2026-02-26",
+    "dailyLimit": 15,
+    "admittedCount": 4,
+    "remaining": 11,
+    "isExhausted": false
+  },
+  "account": {
+    "admitted": true,
+    "isBypass": false,
+    "creditsLimit": 20,
+    "creditsUsed": 7,
+    "remaining": 13,
+    "isExhausted": false,
+    "admittedAt": "2026-02-26T06:00:00.000Z",
+    "lastActivityAt": "2026-02-26T07:10:00.000Z"
+  },
+  "featureCosts": [
+    {
+      "key": "one_on_one_booking",
+      "label": "Book one-on-one demo",
+      "cost": 4
+    },
+    {
+      "key": "team_booking",
+      "label": "Book team demo",
+      "cost": 5
+    }
+  ]
 }
 ```
-
-### `POST /v0/demo-credits/consume`
-
-Public endpoint to consume one daily demo pass.
-
-Request:
-
-```json
-{
-  "email": "pat@example.com"
-}
-```
-
-Success response:
-
-```json
-{
-  "ok": true,
-  "consumed": true,
-  "email": "pat@example.com",
-  "date": "2026-02-26",
-  "dailyLimit": 25,
-  "used": 11,
-  "remaining": 14
-}
-```
-
-Exhausted response (`429`):
-
-```json
-{
-  "ok": false,
-  "error": "Daily demo passes are exhausted.",
-  "email": "pat@example.com",
-  "date": "2026-02-26",
-  "dailyLimit": 25,
-  "used": 25,
-  "remaining": 0
-}
-```
-
-Behavior:
-
-- Must be transaction-safe under concurrency so one request consumes exactly one pass.
-- Must reset usage by UTC date boundary.
 
 ### `POST /v0/waitlist`
 
@@ -1082,7 +1004,7 @@ Idempotent duplicate response:
 
 ### `POST /v0/dev/demo-credits/reset`
 
-Protected dev/admin endpoint to reset today’s usage counters.
+Protected dev/admin endpoint to reset today’s admission + credit counters.
 
 Auth:
 
@@ -1094,9 +1016,33 @@ Success response:
 ```json
 {
   "ok": true,
+  "resetDate": "2026-02-26",
   "date": "2026-02-26",
-  "used": 0,
-  "remaining": 25
+  "resetAt": "2026-02-27T00:00:00.000Z",
+  "admissions": {
+    "date": "2026-02-26",
+    "dailyLimit": 15,
+    "admittedCount": 0,
+    "remaining": 15,
+    "isExhausted": false
+  },
+  "account": {
+    "admitted": false,
+    "isBypass": false,
+    "creditsLimit": 20,
+    "creditsUsed": 0,
+    "remaining": 20,
+    "isExhausted": false,
+    "admittedAt": null,
+    "lastActivityAt": null
+  },
+  "featureCosts": [
+    {
+      "key": "one_on_one_booking",
+      "label": "Book one-on-one demo",
+      "cost": 4
+    }
+  ]
 }
 ```
 
@@ -1462,6 +1408,10 @@ Success response:
 
 Public endpoint returning team event metadata for the booking page.
 
+Note:
+
+- The seeded launch demo team (`teamSlug = demo-team`) requires bearer auth.
+
 Success response:
 
 ```json
@@ -1507,6 +1457,10 @@ Notes:
 ### `GET /v0/teams/:teamSlug/event-types/:eventSlug/availability`
 
 Public availability endpoint for team event types.
+
+Note:
+
+- The seeded launch demo team (`teamSlug = demo-team`) requires bearer auth.
 
 Query params:
 

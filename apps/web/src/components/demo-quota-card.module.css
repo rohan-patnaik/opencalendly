@@ -1,0 +1,102 @@
+.card {
+  display: grid;
+  gap: 1rem;
+}
+
+.metrics {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.metric {
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: rgba(248, 250, 252, 0.85);
+}
+
+.metricLabel {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(15, 23, 42, 0.64);
+}
+
+.metricValue {
+  margin: 0.35rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: rgba(15, 23, 42, 0.92);
+}
+
+.metricHint {
+  margin: 0.35rem 0 0;
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 0.92rem;
+}
+
+.helper {
+  margin: 0;
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.costList {
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0;
+  margin: 0;
+}
+
+.costItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.85rem;
+  background: rgba(241, 245, 249, 0.8);
+}
+
+.costName {
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.88);
+}
+
+.costValue {
+  font-variant-numeric: tabular-nums;
+  color: rgba(15, 23, 42, 0.68);
+}
+
+.waitlistForm {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.waitlistField {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.waitlistField label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.input {
+  width: 100%;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  background: white;
+  padding: 0.8rem 0.9rem;
+  color: rgba(15, 23, 42, 0.92);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}

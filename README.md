@@ -61,12 +61,9 @@ Populate required values in `.env` once, up front:
 | `GOOGLE_CLIENT_SECRET`     | Same Google OAuth credential as above                                                              |
 | `MICROSOFT_CLIENT_ID`      | Microsoft Entra -> App registrations -> Application (client) ID                                    |
 | `MICROSOFT_CLIENT_SECRET`  | Microsoft Entra -> App registrations -> client secret                                              |
-| `DEMO_DAILY_PASS_LIMIT`    | Optional integer daily cap for Feature 3 demo credits (default `25`)                               |
-
-Optional (not required for current feature set):
-
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
+| `DEMO_DAILY_ACCOUNT_LIMIT` | Optional integer daily cap for admitted demo accounts (default `15`)                               |
+| `DEMO_DAILY_CREDIT_LIMIT`  | Optional integer daily credit budget per admitted account (default `20`)                           |
+| `DEMO_CREDIT_BYPASS_EMAILS` | Optional comma-separated allowlist for dev/internal bypass accounts                                |
 
 Google OAuth setup note (for local dev):
 
@@ -106,6 +103,7 @@ npm run dev:web
 
 ### 6) Feature 1 smoke test
 
+- Sign in at `http://localhost:3000/auth/sign-in`
 - Open `http://localhost:3000/demo/intro-call`
 - Use the timezone picker, select an available slot, and submit a booking.
 
@@ -141,7 +139,7 @@ npm run dev:web
 
 ### 9) Feature 13 public parity smoke test
 
-1. Open one-on-one booking: `http://localhost:3000/demo/intro-call`
+1. Sign in once, then open one-on-one booking: `http://localhost:3000/demo/intro-call`
 2. Open team booking: `http://localhost:3000/team/demo-team/team-intro-call`
 3. After creating a booking, open the action link `http://localhost:3000/bookings/actions/<token>` and test cancel/reschedule flows.
 4. Open embed playground: `http://localhost:3000/embed/playground` and verify script preview renders.
@@ -157,9 +155,9 @@ npm run dev:web
 - `/` modern product homepage
 - `/auth/sign-in` Clerk sign-in page (email + Google options)
 - `/auth/verify` legacy route redirecting to Clerk sign-in
-- `/demo/intro-call` public one-on-one booking demo
-- `/team/demo-team/team-intro-call` public team booking demo
-- `/bookings/actions/[token]` public cancel/reschedule action page
+- `/demo/intro-call` launch demo one-on-one booking page (sign-in required)
+- `/team/demo-team/team-intro-call` launch demo team booking page (sign-in required)
+- `/bookings/actions/[token]` booking cancel/reschedule page (demo tokens require sign-in)
 - `/embed/playground` embed script generator + live preview
 - `/features` marketing feature matrix page
 - `/solutions` marketing solutions page
@@ -209,17 +207,19 @@ Details: [docs/STACK.md](docs/STACK.md), [docs/PROD_DEPLOY_CHECKLIST.md](docs/PR
 
 ## Demo Credits Pool (Feature 3)
 
-To keep usage within free-tier limits, OpenCalendly will enforce a Demo Credits Pool:
+To keep usage within free-tier limits, OpenCalendly enforces a launch-phase demo quota:
 
-- A fixed number of daily passes is available per UTC day.
-- Trial actions consume one pass each.
-- When passes are exhausted, users see a waitlist/come-back flow.
-- Passes reset daily and can be manually reset via admin/dev route.
+- A fixed number of demo accounts can be admitted per UTC day.
+- Each admitted account receives a daily credit budget.
+- Meaningful feature actions consume feature-weighted credits.
+- The seeded launch demo booking routes (`/demo/intro-call`, `/team/demo-team/team-intro-call`, `/bookings/actions/:token` for demo bookings) require sign-in so anonymous traffic cannot consume quota.
+- When the admission pool is exhausted, users can join the waitlist.
+- Dev/internal allowlisted accounts bypass both admission and credit deductions.
+- Quota resets daily and can be manually reset via the dev route.
 
 Feature 3 API endpoints:
 
 - `GET /v0/demo-credits/status`
-- `POST /v0/demo-credits/consume`
 - `POST /v0/waitlist`
 - `POST /v0/dev/demo-credits/reset` (authenticated)
 

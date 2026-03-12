@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { DemoQuotaCard } from '../../../../components/demo-quota-card';
+import { buildEmailDeliveryMessage } from '../../../../lib/booking-outcome';
+import { getAuthHeader } from '../../../../lib/auth-session';
+import { useDemoQuota } from '../../../../lib/demo-quota';
 import {
   COMMON_TIMEZONES,
   createIdempotencyKey,
@@ -9,7 +13,7 @@ import {
   getBrowserTimezone,
   groupSlotsByDay,
 } from '../../../../lib/public-booking';
-import { buildEmailDeliveryMessage } from '../../../../lib/booking-outcome';
+import { useAuthSession } from '../../../../lib/use-auth-session';
 import styles from './page.module.css';
 
 type TeamEventResponse = {
@@ -111,6 +115,8 @@ export default function TeamBookingPageClient({
   eventSlug,
   apiBaseUrl,
 }: TeamBookingPageClientProps) {
+  const { session, ready } = useAuthSession();
+  const isLaunchDemoPage = teamSlug.trim().toLowerCase() === 'demo-team';
   const [timezone, setTimezone] = useState('UTC');
   const [teamEvent, setTeamEvent] = useState<TeamEventResponse | null>(null);
   const [slots, setSlots] = useState<
@@ -131,6 +137,22 @@ export default function TeamBookingPageClient({
     cancelPageUrl?: string;
     reschedulePageUrl?: string;
   } | null>(null);
+  const {
+    status: demoQuotaStatus,
+    loading: demoQuotaLoading,
+    error: demoQuotaError,
+    refresh: refreshDemoQuota,
+  } = useDemoQuota({
+    apiBaseUrl,
+    session,
+    enabled: isLaunchDemoPage,
+  });
+
+  const signInHref = useMemo(() => {
+    return `/auth/sign-in?redirect_url=${encodeURIComponent(
+      `/team/${encodeURIComponent(teamSlug)}/${encodeURIComponent(eventSlug)}`,
+    )}`;
+  }, [eventSlug, teamSlug]);
 
   const timezoneOptions = useMemo(() => {
     return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
@@ -148,13 +170,24 @@ export default function TeamBookingPageClient({
   }, [selectedSlot, slots]);
 
   const loadTeamEvent = useCallback(async () => {
+    if (isLaunchDemoPage && !session) {
+      setTeamEvent(null);
+      setLoadingEvent(false);
+      return;
+    }
+
     setLoadingEvent(true);
     setError(null);
 
     try {
       const response = await fetch(
         `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}`,
-        { cache: 'no-store' },
+        {
+          cache: 'no-store',
+          headers: {
+            ...getAuthHeader(session),
+          },
+        },
       );
       const payload = (await response.json()) as TeamEventResponse;
       if (!response.ok || !payload.ok) {
@@ -171,9 +204,15 @@ export default function TeamBookingPageClient({
     } finally {
       setLoadingEvent(false);
     }
-  }, [apiBaseUrl, eventSlug, teamSlug]);
+  }, [apiBaseUrl, eventSlug, isLaunchDemoPage, session, teamSlug]);
 
   const loadAvailability = useCallback(async () => {
+    if (isLaunchDemoPage && !session) {
+      setSlots([]);
+      setLoadingSlots(false);
+      return;
+    }
+
     setLoadingSlots(true);
     setError(null);
 
@@ -185,7 +224,12 @@ export default function TeamBookingPageClient({
       });
       const response = await fetch(
         `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
-        { cache: 'no-store' },
+        {
+          cache: 'no-store',
+          headers: {
+            ...getAuthHeader(session),
+          },
+        },
       );
       const payload = (await response.json()) as TeamAvailabilityResponse;
       if (!response.ok || !payload.ok) {
@@ -204,22 +248,28 @@ export default function TeamBookingPageClient({
     } finally {
       setLoadingSlots(false);
     }
-  }, [apiBaseUrl, eventSlug, teamSlug, timezone]);
+  }, [apiBaseUrl, eventSlug, isLaunchDemoPage, session, teamSlug, timezone]);
 
   useEffect(() => {
     setTimezone(getBrowserTimezone());
   }, []);
 
   useEffect(() => {
+    if (isLaunchDemoPage && !ready) {
+      return;
+    }
     void loadTeamEvent();
-  }, [loadTeamEvent]);
+  }, [isLaunchDemoPage, loadTeamEvent, ready]);
 
   useEffect(() => {
     if (!teamEvent) {
       return;
     }
+    if (isLaunchDemoPage && !session) {
+      return;
+    }
     void loadAvailability();
-  }, [loadAvailability, teamEvent]);
+  }, [isLaunchDemoPage, loadAvailability, session, teamEvent]);
 
   useEffect(() => {
     if (!selectedSlot) {
@@ -258,6 +308,7 @@ export default function TeamBookingPageClient({
       const response = await fetch(`${apiBaseUrl}/v0/team-bookings`, {
         method: 'POST',
         headers: {
+          ...getAuthHeader(session),
           'Content-Type': 'application/json',
           'Idempotency-Key': requestIdempotencyKey,
         },
@@ -279,6 +330,9 @@ export default function TeamBookingPageClient({
         setError(payload.error || 'Team booking failed. Please pick another slot.');
         if (response.status === 409) {
           void loadAvailability();
+        }
+        if (response.status === 429 && isLaunchDemoPage) {
+          void refreshDemoQuota();
         }
         return;
       }
@@ -309,6 +363,9 @@ export default function TeamBookingPageClient({
       setBookingRequestKey('');
       setAnswers(buildInitialAnswers(teamEvent?.eventType.questions ?? []));
       void loadAvailability();
+      if (isLaunchDemoPage) {
+        void refreshDemoQuota();
+      }
     } catch {
       setError('Team booking failed. Please try again.');
     } finally {
@@ -316,12 +373,38 @@ export default function TeamBookingPageClient({
     }
   };
 
-  if (loadingEvent) {
+  if (loadingEvent || (isLaunchDemoPage && !ready)) {
     return (
       <main className={styles.page}>
         <section className={styles.heroCard}>
           <p className={styles.kicker}>Team booking</p>
           <h1>Loading team event...</h1>
+        </section>
+      </main>
+    );
+  }
+
+  if (isLaunchDemoPage && !session) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.heroCard}>
+          <p className={styles.kicker}>Launch demo</p>
+          <h1>Sign in to book the team demo</h1>
+          <p>Team demo traffic is gated during launch so anonymous users cannot burn the shared pool.</p>
+        </section>
+
+        <section className={styles.layout}>
+          <DemoQuotaCard
+            apiBaseUrl={apiBaseUrl}
+            session={session}
+            status={demoQuotaStatus}
+            loading={demoQuotaLoading}
+            error={demoQuotaError}
+            signInHref={signInHref}
+            waitlistSource="demo-team-booking"
+            featureKeys={['team_booking']}
+            onStatusChange={refreshDemoQuota}
+          />
         </section>
       </main>
     );
@@ -412,6 +495,19 @@ export default function TeamBookingPageClient({
           ) : (
             <p className={styles.selection}>Select a slot to continue.</p>
           )}
+
+          {isLaunchDemoPage ? (
+            <DemoQuotaCard
+              apiBaseUrl={apiBaseUrl}
+              session={session}
+              status={demoQuotaStatus}
+              loading={demoQuotaLoading}
+              error={demoQuotaError}
+              waitlistSource="demo-team-booking"
+              featureKeys={['team_booking']}
+              onStatusChange={refreshDemoQuota}
+            />
+          ) : null}
 
           <form className={styles.form} onSubmit={submitTeamBooking}>
             <label className={styles.label} htmlFor="team-invitee-name">

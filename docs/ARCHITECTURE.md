@@ -33,6 +33,10 @@ flowchart LR
 - `analytics_funnel_events`: page/slot/booking funnel stages keyed by organizer + event type.
 - `email_deliveries`: best-effort delivery telemetry for confirmation/cancellation/reschedule emails.
 - `idempotency_requests`: request dedupe records for booking mutations (`scope + key hash + request hash + replay payload`).
+- `demo_admissions_daily`: UTC-day admission counter for launch demo accounts.
+- `demo_account_daily_usage`: per-account UTC-day credit ledger with bypass metadata.
+- `demo_credit_events`: idempotent feature-charge rows keyed by `(date + user + source key)`.
+- `waitlist_entries`: UTC-day waitlist joins for exhausted launch-demo admission days.
 
 ## Frontend architecture (post-v1 parity track)
 
@@ -51,8 +55,8 @@ flowchart LR
   - shared hook to observe/update session across tabs via storage + custom events
   - bootstrap validation through `GET /v0/auth/me` before loading authenticated dashboard data
 - Auth route shells:
-  - `/auth/sign-in` requests one-time token via `POST /v0/auth/magic-link`
-  - `/auth/verify` exchanges token via `POST /v0/auth/verify`, stores session, then redirects
+  - `/auth/sign-in` completes Clerk sign-in, then exchanges the Clerk session via `POST /v0/auth/clerk/exchange`
+  - `/auth/verify` is a legacy route that redirects back to Clerk sign-in
 - Organizer console shell:
   - `/organizer` is the authenticated operational UI over organizer APIs:
     - left-rail section navigation (`#event-types`, `#availability`, `#teams`, `#webhooks`, `#calendars`, `#writeback`)
@@ -73,6 +77,7 @@ flowchart LR
   - `/team/:teamSlug/:eventSlug` team booking UX over team availability/booking APIs
   - `/bookings/actions/:token` cancel/reschedule UX with token state handling (`404`, `410`, `409` conflict)
   - `/embed/playground` script generator + live widget preview for `/v0/embed/widget.js`
+  - seeded launch demo routes (`/demo/*`, `/team/demo-team/*`, demo booking actions) are auth-gated and show shared quota state
 - Marketing shells:
   - `/` product homepage with proof strip, workflow blocks, integration highlights, and route CTAs
   - `/pricing`, `/features`, `/solutions`, `/resources` for top-level product information architecture
@@ -160,6 +165,14 @@ flowchart LR
 3. API stores idempotency claim/replay state in `idempotency_requests`.
 4. Repeated identical requests replay stored response; mismatched payload reuse returns `409`.
 5. Branch protection enforces required checks + PR-only merges on `main`.
+
+### Launch demo quota (Feature 3 refresh)
+
+1. `GET /v0/demo-credits/status` returns the daily global admission pool plus the authenticated account’s credit budget.
+2. Feature routes charge credits inside the real mutation path, not via a client-side preflight endpoint.
+3. New accounts are admitted lazily on their first successful paid action if today’s admission pool still has room.
+4. Allowlisted dev/internal emails bypass both admission counting and credit deductions.
+5. Exhausted days keep waitlist capture active so interest can be queued without over-consuming provider limits.
 
 ## Correctness and idempotency notes
 
