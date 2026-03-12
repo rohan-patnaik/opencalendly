@@ -71,8 +71,9 @@ const clampPositiveInteger = (input: {
   min: number;
   max: number;
 }): number => {
-  const parsed = input.rawValue ? Number.parseInt(input.rawValue, 10) : Number.NaN;
-  if (!Number.isFinite(parsed)) {
+  const normalized = input.rawValue?.trim();
+  const parsed = normalized && /^\d+$/.test(normalized) ? Number(normalized) : Number.NaN;
+  if (!Number.isSafeInteger(parsed)) {
     return input.fallback;
   }
 

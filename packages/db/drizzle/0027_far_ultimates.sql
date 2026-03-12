@@ -1,1 +1,1 @@
-DROP TABLE "demo_credits_daily" CASCADE;
+DROP TABLE "demo_credits_daily";

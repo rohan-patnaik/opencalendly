@@ -80,7 +80,6 @@ const passThroughVarKeys = [
   'RESEND_FROM_EMAIL',
   'DEMO_DAILY_ACCOUNT_LIMIT',
   'DEMO_DAILY_CREDIT_LIMIT',
-  'DEMO_CREDIT_BYPASS_EMAILS',
   'GOOGLE_CLIENT_ID',
   'MICROSOFT_CLIENT_ID',
 ];
@@ -88,6 +87,7 @@ const passThroughVarKeys = [
 // Security: keep secrets out of CLI args (`--var`) to avoid leaking in process listings.
 // Secret bindings (SESSION_SECRET, RESEND_API_KEY, GOOGLE_CLIENT_SECRET, MICROSOFT_CLIENT_SECRET)
 // should be sourced from Wrangler's secure local config (`.dev.vars`) or remote secrets.
+// `DEMO_CREDIT_BYPASS_EMAILS` is an allowlist and must stay in env files instead of `--var`.
 
 for (const key of passThroughVarKeys) {
   const value = process.env[key]?.trim();

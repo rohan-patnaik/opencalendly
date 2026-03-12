@@ -103,7 +103,8 @@ describe('demo quota client helpers', () => {
   });
 
   it('posts waitlist joins with the expected payload', async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe('https://api.example.com/v0/waitlist');
       expect(init?.method).toBe('POST');
       expect(init?.headers).toMatchObject({
         'Content-Type': 'application/json',

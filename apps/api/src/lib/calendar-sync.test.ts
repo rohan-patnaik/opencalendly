@@ -194,6 +194,18 @@ describe('calendar-sync', () => {
     ).toThrow('Microsoft sync range must be less than 62 days.');
   });
 
+  it('keeps Microsoft validation errors provider-specific above the Google cap', () => {
+    const now = new Date('2026-03-02T00:00:00.000Z');
+
+    expect(() =>
+      resolveMicrosoftSyncRange(
+        now,
+        '2026-03-02T00:00:00.000Z',
+        '2026-06-15T00:00:00.000Z',
+      ),
+    ).toThrow('Microsoft sync range must be less than 62 days.');
+  });
+
   it('rejects Microsoft sync ranges that exceed provider limits', async () => {
     await expect(
       syncMicrosoftBusyWindows(

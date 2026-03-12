@@ -33,6 +33,11 @@ describe('demo quota helpers', () => {
     expect(parseDemoDailyCreditLimit(undefined)).toBe(DEFAULT_DEMO_DAILY_CREDIT_LIMIT);
   });
 
+  it('falls back when daily quota env values are malformed', () => {
+    expect(parseDemoDailyAccountLimit('20foo')).toBe(DEFAULT_DEMO_DAILY_ACCOUNT_LIMIT);
+    expect(parseDemoDailyCreditLimit('1e3')).toBe(DEFAULT_DEMO_DAILY_CREDIT_LIMIT);
+  });
+
   it('parses bypass emails as a lowercase trimmed set', () => {
     expect(parseDemoBypassEmails(' Dev@One.com,ops@example.com , ')).toEqual(
       new Set(['dev@one.com', 'ops@example.com']),

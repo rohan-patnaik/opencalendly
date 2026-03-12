@@ -45,19 +45,20 @@ Scope:
 
 - Replace the coarse daily demo-pass model with daily account admission plus per-account credits.
 - Enforce launch-demo quota inside real feature routes instead of a public preflight consume endpoint.
-- Gate seeded launch demo booking surfaces behind authentication and keep the waitlist flow for exhausted days.
+- Gate seeded launch-demo booking surfaces behind authentication and keep the waitlist flow for exhausted days.
 - Keep the change scoped to launch quota control, operator visibility, and related cleanup of deprecated quota/auth compatibility paths.
 
 Acceptance criteria:
 
 - System supports configurable daily demo-account admission limit and per-account daily credit limit without code changes.
 - `GET /v0/demo-credits/status` returns both global admissions state and authenticated-account credit state.
-- Meaningful feature routes deduct feature-weighted credits only on successful completion.
+- Feature routes deduct feature-weighted credits only on successful completion, including `POST /v0/bookings`, `POST /v0/team-bookings`, `POST /v0/bookings/actions/:token/reschedule`, organizer mutation routes, and calendar sync/writeback routes.
 - Demo admission and credits reset by UTC date boundary.
 - Dev/internal allowlisted accounts bypass both admission counting and credit deduction.
-- Seeded launch demo booking surfaces require sign-in so anonymous traffic cannot consume quota.
+- Seeded launch-demo booking surfaces require sign-in so anonymous traffic cannot consume quota.
 - Exhausted path supports waitlist capture (email + optional metadata) with deduping per day/email.
 - A protected dev/admin endpoint can reset today's admission + credit state for local/demo operations.
+- Deprecated compatibility paths are removed: legacy magic-link auth endpoints, the public `/v0/demo-credits/consume` endpoint, dead GitHub OAuth config, and the `demo_credits_daily` table.
 - Feature includes tests for quota helper logic, waitlist dedupe, deprecated consume endpoint behavior, and route-level quota/auth regressions.
 - `docs/API.md`, `README.md`, and `docs/PRD.md` are updated for operator setup and product behavior notes.
 

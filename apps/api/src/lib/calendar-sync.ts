@@ -21,12 +21,13 @@ export type CalendarTokenResolution = {
 
 const REFRESH_SKEW_SECONDS = 60;
 const MICROSOFT_SYNC_MAX_RANGE_DAYS = 62;
+const GOOGLE_SYNC_MAX_RANGE_DAYS = 90;
 
-export const resolveGoogleSyncRange = (
+const resolveBaseSyncRange = (
   now: Date,
   requestedStartIso?: string,
   requestedEndIso?: string,
-): { startIso: string; endIso: string } => {
+): { start: DateTime; end: DateTime; startIso: string; endIso: string } => {
   const defaultStart = DateTime.fromJSDate(now, { zone: 'utc' });
 
   const start = requestedStartIso
@@ -44,18 +45,30 @@ export const resolveGoogleSyncRange = (
     throw new Error('Sync range end must be after start.');
   }
 
-  const maxRangeDays = 90;
-  if (end.diff(start, 'days').days > maxRangeDays) {
-    throw new Error(`Sync range cannot exceed ${maxRangeDays} days.`);
-  }
-
   const startIso = start.toUTC().toISO();
   const endIso = end.toUTC().toISO();
   if (!startIso || !endIso) {
     throw new Error('Failed to normalize sync range.');
   }
 
-  return { startIso, endIso };
+  return { start, end, startIso, endIso };
+};
+
+export const resolveGoogleSyncRange = (
+  now: Date,
+  requestedStartIso?: string,
+  requestedEndIso?: string,
+): { startIso: string; endIso: string } => {
+  const range = resolveBaseSyncRange(now, requestedStartIso, requestedEndIso);
+
+  if (range.end.diff(range.start, 'days').days > GOOGLE_SYNC_MAX_RANGE_DAYS) {
+    throw new Error(`Sync range cannot exceed ${GOOGLE_SYNC_MAX_RANGE_DAYS} days.`);
+  }
+
+  return {
+    startIso: range.startIso,
+    endIso: range.endIso,
+  };
 };
 
 export const resolveMicrosoftSyncRange = (
@@ -63,19 +76,16 @@ export const resolveMicrosoftSyncRange = (
   requestedStartIso?: string,
   requestedEndIso?: string,
 ): { startIso: string; endIso: string } => {
-  const range = resolveGoogleSyncRange(now, requestedStartIso, requestedEndIso);
-  const start = DateTime.fromISO(range.startIso, { zone: 'utc' });
-  const end = DateTime.fromISO(range.endIso, { zone: 'utc' });
+  const range = resolveBaseSyncRange(now, requestedStartIso, requestedEndIso);
 
-  if (!start.isValid || !end.isValid || end.toMillis() <= start.toMillis()) {
-    throw new Error('Sync range start/end is invalid.');
-  }
-
-  if (end.diff(start, 'days').days >= MICROSOFT_SYNC_MAX_RANGE_DAYS) {
+  if (range.end.diff(range.start, 'days').days >= MICROSOFT_SYNC_MAX_RANGE_DAYS) {
     throw new Error('Microsoft sync range must be less than 62 days.');
   }
 
-  return range;
+  return {
+    startIso: range.startIso,
+    endIso: range.endIso,
+  };
 };
 
 export const resolveGoogleAccessToken = async (
@@ -207,21 +217,14 @@ export const syncMicrosoftBusyWindows = async (
   },
   fetchImpl: FetchLike = fetch,
 ): Promise<Array<{ startsAt: Date; endsAt: Date }>> => {
-  const start = DateTime.fromISO(input.startIso, { zone: 'utc' });
-  const end = DateTime.fromISO(input.endIso, { zone: 'utc' });
-  if (!start.isValid || !end.isValid || end.toMillis() <= start.toMillis()) {
-    throw new Error('Sync range start/end is invalid.');
-  }
-  if (end.diff(start, 'days').days >= MICROSOFT_SYNC_MAX_RANGE_DAYS) {
-    throw new Error('Microsoft sync range must be less than 62 days.');
-  }
+  const range = resolveMicrosoftSyncRange(new Date(), input.startIso, input.endIso);
 
   const windows = await fetchMicrosoftBusyWindows(
     {
       accessToken: input.accessToken,
       scheduleSmtp: input.scheduleSmtp,
-      startIso: input.startIso,
-      endIso: input.endIso,
+      startIso: range.startIso,
+      endIso: range.endIso,
     },
     fetchImpl,
   );
