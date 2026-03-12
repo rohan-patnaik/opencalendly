@@ -32,9 +32,9 @@ npm run test
 
 ## Review Notes
 
-- Greptile summary:
+- Greptile summary (if active):
   - 
-- CodeRabbit summary:
+- CodeRabbit summary (trigger + comments if any):
   - 
 
 ## IST Timestamp

@@ -71,10 +71,13 @@ Useful references:
 ## Platform hardening decisions (Feature 9)
 
 - Branch protection is enabled on `main` with:
-  - required checks: `lint-test-typecheck`, `Greptile Review`, `CodeRabbit`, `GitGuardian Security Checks`, `trigger-coderabbit-review`
-  - required PR reviews: 1 approval
+  - required checks: `lint-test-typecheck`, `GitGuardian Security Checks`, `trigger-coderabbit-review`
+  - required PR reviews: 0 approvals
   - required conversation resolution: enabled
   - direct pushes blocked by branch protection policy
+- Third-party review apps remain informational:
+  - Greptile comments are handled when the integration is active, but `Greptile Review` is not a required status check while billing/config is inactive.
+  - CodeRabbit review is still auto-triggered on PR updates, but the raw `CodeRabbit` status is not a required merge check because it can remain pending even after a successful trigger.
 - `@cloudflare/next-on-pages` deprecation handling decision:
   - keep current adapter for now to avoid mid-feature deployment churn
   - plan migration to OpenNext before `v1.0.0` with dedicated validation checklist (preview deploy parity, env parity, rollback path)

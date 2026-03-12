@@ -32,19 +32,19 @@
 4) Reviews (mandatory order)
    - Codex self-review checklist
    - Mark Draft PR ready for review when acceptance criteria are implemented
-   - Greptile PR review must run (auto-trigger expected)
-   - If Greptile status check does not appear within 5 minutes of PR update, trigger Greptile manually from dashboard and continue waiting for review
-   - Resolve all Greptile review comments before merge
-   - CodeRabbit review must run (not skipped) before merge
-   - If CodeRabbit shows "Review skipped", treat it as unmet review gate:
-     - verify CodeRabbit dashboard repo settings for auto review
-     - trigger `@coderabbitai review` on the PR after config fix
-   - Resolve all CodeRabbit review comments before merge
+   - Greptile review is best-effort when the app is installed and billing/config are active.
+   - If Greptile comments arrive, resolve them before merge.
+   - CodeRabbit trigger workflow must run on every PR update.
+   - If CodeRabbit does not appear within 5 minutes of PR update:
+     - rerun `.github/workflows/coderabbit-review-trigger.yml`, or
+     - comment `/coderabbit-review` on the PR as a maintainer
+   - If CodeRabbit posts actionable comments, resolve them before merge.
+   - If the raw `CodeRabbit` status remains pending after a successful trigger but no actionable comments arrive, do not block indefinitely; document the stuck status in the PR and continue once CI is green and comments are resolved.
    - After each Greptile/CodeRabbit comment batch, provide a concise in-chat summary:
      - what each reviewer asked to change
      - what change will be made in response
 5) Merge
-   - Merge PR only after Greptile and CodeRabbit reviews have run and all comments are resolved
+   - Merge PR only after CI is green, required repo-owned checks pass, and actionable bot comments are resolved
    - Do not delete the source feature branch after merge
    - Update docs/PRD.md and docs/ARCHITECTURE.md only if the feature changes plan/architecture
 6) Handoff
@@ -58,19 +58,25 @@
 ## Greptile config
 - Greptile is configured via greptile.json at repo root (or .greptile/ directory config).
 - greptile.json is read from the source branch of each PR.
+- Greptile is not a required `main` branch status check while billing/config is inactive.
 
 ## CodeRabbit config
 - CodeRabbit behavior is configured via `.coderabbit.yaml` in repo root.
 - Auto review is enabled (`reviews.auto_review.enabled: true`).
 - GitHub Action `.github/workflows/coderabbit-review-trigger.yml` posts `@coderabbitai review` on every PR open/update/ready-for-review event to force review trigger even when dashboard auto settings are restrictive.
+- Maintainers can re-trigger CodeRabbit with either:
+  - a manual workflow dispatch of `.github/workflows/coderabbit-review-trigger.yml`, or
+  - a PR comment containing `/coderabbit-review`
 - One-time setup requirement (GitHub side):
   - CodeRabbit GitHub App must be installed for this repository.
   - Repository access must include this repo for PR review events.
   - In CodeRabbit repository settings, if `Use Organization Settings` is enabled and org-level auto review is disabled, disable `Use Organization Settings` and apply repository-level settings.
 - Per-PR verification:
-  - Confirm a CodeRabbit status/check appears on the PR.
+  - Confirm the `trigger-coderabbit-review` workflow succeeds on the PR.
+  - Confirm a CodeRabbit status/check or review comment appears on the PR.
   - If no CodeRabbit status/check appears within 5 minutes of PR creation/update, verify app installation/access and trigger a re-check from CodeRabbit dashboard if available.
-  - If CodeRabbit status is present but review is skipped, fix dashboard/repo config and re-trigger review with `@coderabbitai review`.
+  - If CodeRabbit status is present but review is skipped, fix dashboard/repo config and re-trigger review.
+  - The raw `CodeRabbit` GitHub status is not a required `main` branch merge check.
 
 ## Definition of Done
 - Feature works end-to-end in dev

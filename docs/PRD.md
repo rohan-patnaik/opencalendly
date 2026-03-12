@@ -48,5 +48,5 @@ Build a practical open-source scheduling platform for solo creators, consultants
 ### Done definition for app-first parity track
 
 - Feature 15 through Feature 18 are merged to `main` with CI green.
-- CodeRabbit and Greptile review gates are satisfied for each feature PR.
+- Required repo-owned checks pass for each feature PR, and actionable CodeRabbit/Greptile comments are resolved when those integrations respond.
 - Frontend architecture and route documentation stay in sync with shipped UX.

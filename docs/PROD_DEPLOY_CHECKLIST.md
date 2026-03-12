@@ -6,10 +6,9 @@ Last updated: 28 Feb 2026 (IST)
 
 - [ ] `main` is green on required checks:
   - `lint-test-typecheck`
-  - `CodeRabbit`
-  - `Greptile Review`
   - `GitGuardian Security Checks`
   - `trigger-coderabbit-review`
+- [ ] If CodeRabbit or Greptile posted actionable PR comments, they are resolved before merge.
 - [ ] All PR review threads are resolved.
 - [ ] `npm run env:check` passes in deployment environment.
 - [ ] Neon `DATABASE_URL` points to production branch/database.
