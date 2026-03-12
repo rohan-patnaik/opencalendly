@@ -47,6 +47,7 @@ import {
   bookingCreateSchema,
   bookingRescheduleSchema,
   clerkAuthExchangeRequestSchema,
+  devAuthBootstrapRequestSchema,
   eventQuestionsSchema,
   eventTypeCreateSchema,
   eventTypeUpdateSchema,
@@ -165,6 +166,10 @@ import {
   type DemoQuotaStatus,
 } from './lib/demo-credits';
 import {
+  isDevAuthBootstrapEnabled,
+  isLocalBootstrapRequest,
+} from './lib/dev-auth';
+import {
   WEBHOOK_DEFAULT_MAX_ATTEMPTS,
   buildWebhookEvent,
   buildWebhookSignatureHeader,
@@ -211,6 +216,7 @@ type Bindings = {
   MICROSOFT_CLIENT_SECRET?: string;
   CLERK_SECRET_KEY?: string;
   CLERK_ALLOWED_AUDIENCES?: string;
+  ENABLE_DEV_AUTH_BOOTSTRAP?: string;
 };
 
 type ContextLike = {
@@ -226,6 +232,14 @@ type DemoQuotaDb = Database | DatabaseTransaction;
 type QueryableDb = Pick<Database, 'select'>;
 
 type AuthenticatedUser = {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string;
+  timezone: string;
+};
+
+type SessionUserRecord = {
   id: string;
   email: string;
   username: string;
@@ -2696,6 +2710,55 @@ const resolveAuthenticatedUser = async (
   };
 };
 
+const issueSessionForUser = async (
+  db: Database,
+  userRecord: SessionUserRecord,
+): Promise<{
+  sessionToken: string;
+  expiresAt: Date;
+  user: SessionUserRecord;
+} | null> => {
+  const now = new Date();
+  await maybeCleanupExpiredSessions(db, now);
+
+  const sessionToken = createRawToken();
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+  const insertedSession = await db.transaction(async (transaction) => {
+    const lockedUser = await transaction.execute<{ id: string }>(
+      sql`select id from users where id = ${userRecord.id} for update`,
+    );
+    if (!lockedUser.rows[0]) {
+      return null;
+    }
+
+    await transaction.delete(sessions).where(eq(sessions.userId, userRecord.id));
+    const [inserted] = await transaction
+      .insert(sessions)
+      .values({
+        userId: userRecord.id,
+        tokenHash: hashToken(sessionToken),
+        expiresAt,
+      })
+      .returning({ id: sessions.id });
+
+    return inserted ?? null;
+  });
+
+  if (!insertedSession) {
+    return null;
+  }
+
+  return {
+    sessionToken,
+    expiresAt,
+    user: {
+      ...userRecord,
+      timezone: normalizeTimezone(userRecord.timezone),
+    },
+  };
+};
+
 const resolveDemoDailyAccountLimit = (env: Bindings): number => {
   return parseDemoDailyAccountLimit(env.DEMO_DAILY_ACCOUNT_LIMIT?.trim());
 };
@@ -3132,6 +3195,67 @@ app.get('/health', (context) => {
   return context.json(healthCheckSchema.parse({ status: 'ok' }));
 });
 
+app.post('/v0/dev/auth/bootstrap', async (context) => {
+  if (!isDevAuthBootstrapEnabled(context.env.ENABLE_DEV_AUTH_BOOTSTRAP?.trim())) {
+    return jsonError(context, 404, 'Not found.');
+  }
+
+  if (!isLocalBootstrapRequest(context.req.raw)) {
+    return jsonError(context, 403, 'Local development access only.');
+  }
+
+  return withDatabase(context, async (db) => {
+    const body = await context.req.json().catch(() => null);
+    if (body === null) {
+      return jsonError(context, 400, 'Malformed JSON body.');
+    }
+    const parsed = devAuthBootstrapRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
+    }
+
+    const requestedEmail = parsed.data.email?.trim().toLowerCase() ?? 'demo@opencalendly.dev';
+    const [userRecord] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        username: users.username,
+        displayName: users.displayName,
+        timezone: users.timezone,
+      })
+      .from(users)
+      .where(eq(users.email, requestedEmail))
+      .limit(1);
+
+    if (!userRecord) {
+      return jsonError(
+        context,
+        404,
+        'Bootstrap user not found. Run npm run db:seed or provide an existing account email.',
+      );
+    }
+
+    const issuedSession = await issueSessionForUser(db, userRecord);
+    if (!issuedSession) {
+      return jsonError(context, 500, 'Unable to create session.');
+    }
+
+    return context.json({
+      ok: true,
+      issuer: 'dev' as const,
+      sessionToken: issuedSession.sessionToken,
+      expiresAt: issuedSession.expiresAt.toISOString(),
+      user: {
+        id: issuedSession.user.id,
+        email: issuedSession.user.email,
+        username: issuedSession.user.username,
+        displayName: issuedSession.user.displayName,
+        timezone: issuedSession.user.timezone,
+      },
+    });
+  });
+});
+
 app.post('/v0/auth/clerk/exchange', async (context) => {
   return withDatabase(context, async (db) => {
     const clientKey = resolveRateLimitClientKey(context.req.raw);
@@ -3317,15 +3441,7 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
       .where(eq(users.email, email))
       .limit(1);
 
-    let userRecord:
-      | {
-          id: string;
-          email: string;
-          username: string;
-          displayName: string;
-          timezone: string;
-        }
-      | null = null;
+    let userRecord: SessionUserRecord | null = null;
 
     if (existing) {
       const nextDisplayName = parsed.data.displayName ? resolvedDisplayName : existing.displayName;
@@ -3436,41 +3552,21 @@ app.post('/v0/auth/clerk/exchange', async (context) => {
       return jsonError(context, 500, 'Unable to create or resolve user account.');
     }
 
-    const now = new Date();
-    await maybeCleanupExpiredSessions(db, now);
-
-    const sessionToken = createRawToken();
-    const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
-
-    const [insertedSession] = await db.transaction(async (transaction) => {
-      await transaction.execute(sql`select id from users where id = ${userRecord.id} for update`);
-      await transaction.delete(sessions).where(eq(sessions.userId, userRecord.id));
-      return transaction
-        .insert(sessions)
-        .values({
-          userId: userRecord.id,
-          tokenHash: hashToken(sessionToken),
-          expiresAt,
-        })
-        .returning({
-          id: sessions.id,
-        });
-    });
-
-    if (!insertedSession) {
+    const issuedSession = await issueSessionForUser(db, userRecord);
+    if (!issuedSession) {
       return jsonError(context, 500, 'Unable to create session.');
     }
 
     return context.json({
       ok: true,
-      sessionToken,
-      expiresAt: expiresAt.toISOString(),
+      sessionToken: issuedSession.sessionToken,
+      expiresAt: issuedSession.expiresAt.toISOString(),
       user: {
-        id: userRecord.id,
-        email: userRecord.email,
-        username: userRecord.username,
-        displayName: userRecord.displayName,
-        timezone: normalizeTimezone(userRecord.timezone),
+        id: issuedSession.user.id,
+        email: issuedSession.user.email,
+        username: issuedSession.user.username,
+        displayName: issuedSession.user.displayName,
+        timezone: issuedSession.user.timezone,
       },
     });
   });

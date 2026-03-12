@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AuthSession } from './auth-session';
-import { buildClerkSyncKey, shouldExchangeClerkSession } from './clerk-session-bridge';
+import {
+  buildClerkSyncKey,
+  shouldExchangeClerkSession,
+  shouldPreserveSignedOutSession,
+} from './clerk-session-bridge';
 
 const buildSession = (email: string): AuthSession => ({
   sessionToken: 'session-token',
@@ -51,5 +55,12 @@ describe('clerk session bridge helpers', () => {
 
     expect(decision.shouldExchange).toBe(true);
     expect(decision.syncKey).toBe('sess_123:demo@example.com');
+  });
+
+  it('preserves manually bootstrapped sessions while clerk is signed out', () => {
+    expect(shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'legacy' })).toBe(true);
+    expect(shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'dev' })).toBe(true);
+    expect(shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'clerk' })).toBe(false);
+    expect(shouldPreserveSignedOutSession(null)).toBe(false);
   });
 });

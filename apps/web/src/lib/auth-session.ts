@@ -9,7 +9,7 @@ export type AuthUser = {
 export type AuthSession = {
   sessionToken: string;
   expiresAt: string;
-  issuer?: 'legacy' | 'clerk';
+  issuer?: 'legacy' | 'clerk' | 'dev';
   user: AuthUser;
 };
 
@@ -57,7 +57,10 @@ export const readAuthSession = (): AuthSession | null => {
       !parsed ||
       typeof parsed.sessionToken !== 'string' ||
       typeof parsed.expiresAt !== 'string' ||
-      (parsed.issuer !== undefined && parsed.issuer !== 'legacy' && parsed.issuer !== 'clerk') ||
+      (parsed.issuer !== undefined &&
+        parsed.issuer !== 'legacy' &&
+        parsed.issuer !== 'clerk' &&
+        parsed.issuer !== 'dev') ||
       !parsed.user ||
       typeof parsed.user.id !== 'string' ||
       typeof parsed.user.email !== 'string' ||

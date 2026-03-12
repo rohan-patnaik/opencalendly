@@ -51,6 +51,11 @@ export const clerkAuthExchangeRequestSchema = z.object({
   timezone: timezoneSchema.optional(),
 });
 
+export const devAuthBootstrapRequestSchema = z.object({
+  email: emailSchema.optional(),
+});
+export type DevAuthBootstrapRequest = z.infer<typeof devAuthBootstrapRequestSchema>;
+
 export const bookingActionTokenSchema = z.string().min(32).max(256);
 export const bookingActionTypeSchema = z.enum(['cancel', 'reschedule']);
 

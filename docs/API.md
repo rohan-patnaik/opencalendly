@@ -1046,6 +1046,43 @@ Success response:
 }
 ```
 
+### `POST /v0/dev/auth/bootstrap`
+
+Local-only development endpoint. Disabled unless `ENABLE_DEV_AUTH_BOOTSTRAP=true`.
+
+Behavior:
+
+- rejects non-local hosts and non-local `Origin`/`Referer` headers
+- defaults to seeded `demo@opencalendly.dev` when `email` is omitted
+- reuses the normal bearer session issuance path
+- returns `issuer: "dev"` so the payload can be written directly to `localStorage["opencalendly.auth.session"]` for local browser automation
+
+Request:
+
+```json
+{
+  "email": "demo@opencalendly.dev"
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "issuer": "dev",
+  "sessionToken": "session-token",
+  "expiresAt": "2026-04-11T14:00:00.000Z",
+  "user": {
+    "id": "d8bdbf6d-aed7-4c84-a67f-a2c54f7c4f4a",
+    "email": "demo@opencalendly.dev",
+    "username": "demo",
+    "displayName": "Demo Organizer",
+    "timezone": "UTC"
+  }
+}
+```
+
 ## Feature 4 Endpoints (Embeds + Webhooks v1)
 
 ### `GET /v0/embed/widget.js`
