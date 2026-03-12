@@ -3199,7 +3199,10 @@ app.post('/v0/dev/auth/bootstrap', async (context) => {
       return jsonError(context, 403, 'Local development access only.');
     }
 
-    const body = await context.req.json().catch(() => ({}));
+    const body = await context.req.json().catch(() => null);
+    if (body === null) {
+      return jsonError(context, 400, 'Malformed JSON body.');
+    }
     const parsed = devAuthBootstrapRequestSchema.safeParse(body);
     if (!parsed.success) {
       return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');

@@ -115,7 +115,6 @@ if (!NEON_HOST_PATTERN.test(databaseUrl)) {
 
 const client = new Client({
   connectionString: databaseUrl,
-  ssl: { rejectUnauthorized: false },
 });
 
 const reset = async () => {
