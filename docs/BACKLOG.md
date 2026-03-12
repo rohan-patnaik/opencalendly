@@ -825,6 +825,27 @@ Acceptance criteria:
   - `npm run typecheck`
   - local browser smoke confirms `/demo/intro-call` no longer surfaces the SQL syntax error
   - local browser smoke confirms `/team/demo-team/team-intro-call` no longer surfaces the SQL syntax error
+### Feature 44: Booking action token date coercion
+
+Scope:
+- Fix cancel and reschedule action-link flows so booking-action token timestamps loaded through the transaction lock path are handled safely.
+- Keep the change scoped to booking-action token evaluation without changing the action-link API contract.
+
+Acceptance criteria:
+
+- Booking action token evaluation accepts timestamp strings returned by the database lock query and normalizes them before expiry checks.
+- These action-link mutations no longer fail with `500` and `input.expiresAt.getTime is not a function` during normal use:
+  - `POST /v0/bookings/actions/:token/cancel`
+  - `POST /v0/bookings/actions/:token/reschedule`
+- Existing action-link behavior is preserved:
+  - active confirmed bookings remain usable
+  - expired links still return gone
+  - consumed cancel/reschedule links still replay idempotently when appropriate
+- Validation passes:
+  - `npm run test -- apps/api/src/lib/booking-actions.test.ts`
+  - `npm run lint`
+  - `npm run typecheck`
+  - local browser smoke confirms cancel and reschedule action-link flows complete without a server error
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
