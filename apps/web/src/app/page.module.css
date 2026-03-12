@@ -13,7 +13,7 @@
 .pricingPanel,
 .ctaBand,
 .footer {
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
@@ -89,7 +89,7 @@
 .integrationCard,
 .pricingCard,
 .workflowCard {
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
   background: var(--bg-elevated);
   box-shadow: var(--shadow-sm);
@@ -124,7 +124,7 @@
 .artFrame {
   width: 100%;
   min-height: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-strong);
   background: var(--surface-panel);
   box-shadow: inset 0 0 0 1px var(--brand-glow);
@@ -369,7 +369,7 @@
 }
 
 .footerLinks a {
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
   background: var(--bg-elevated);
   color: var(--text-primary);

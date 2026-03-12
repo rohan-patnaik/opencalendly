@@ -8,7 +8,7 @@
 
 .heroCard,
 .card {
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
   box-shadow: var(--shadow-soft);
@@ -76,7 +76,7 @@
 .select {
   width: 100%;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   color: var(--text-primary);
   padding: 0.62rem 0.7rem;
@@ -93,7 +93,7 @@
   display: block;
   width: 100%;
   margin-top: 0.35rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-default);
   background: var(--bg-elevated);
   color: var(--text-primary);
@@ -160,7 +160,6 @@
 }
 
 @media (max-width: 960px) {
-
   .layout,
   .grid {
     grid-template-columns: 1fr;
