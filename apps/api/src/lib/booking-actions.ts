@@ -103,10 +103,12 @@ export const parseBookingMetadata = (
 export const evaluateBookingActionToken = (input: {
   actionType: BookingActionType;
   bookingStatus: string;
-  expiresAt: Date;
-  consumedAt: Date | null;
+  expiresAt: Date | string;
+  consumedAt: Date | string | null;
   now: Date;
 }): BookingActionTokenState => {
+  const expiresAt = coerceBookingActionDate(input.expiresAt, 'Booking action token expiry');
+
   const replayable =
     (input.actionType === 'cancel' && input.bookingStatus === 'canceled') ||
     (input.actionType === 'reschedule' && input.bookingStatus === 'rescheduled');
@@ -115,7 +117,7 @@ export const evaluateBookingActionToken = (input: {
     return 'idempotent-replay';
   }
 
-  if (input.expiresAt.getTime() <= input.now.getTime()) {
+  if (expiresAt.getTime() <= input.now.getTime()) {
     return 'gone';
   }
 
@@ -132,6 +134,15 @@ export const evaluateBookingActionToken = (input: {
   }
 
   return 'gone';
+};
+
+export const coerceBookingActionDate = (value: Date | string, label: string): Date => {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new TypeError(`${label} must be a valid date.`);
+  }
+
+  return parsed;
 };
 
 export const resolveRequestedRescheduleSlot = (input: {

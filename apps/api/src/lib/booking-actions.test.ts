@@ -43,6 +43,18 @@ describe('booking action helpers', () => {
     expect(state).toBe('gone');
   });
 
+  it('accepts ISO timestamp strings for action token expiry', () => {
+    const state = evaluateBookingActionToken({
+      actionType: 'cancel',
+      bookingStatus: 'confirmed',
+      expiresAt: '2026-04-01T00:00:00.000Z',
+      consumedAt: null,
+      now: new Date('2026-03-01T00:00:00.000Z'),
+    });
+
+    expect(state).toBe('usable');
+  });
+
   it('extracts booking metadata answers and timezone safely', () => {
     const parsed = parseBookingMetadata(
       JSON.stringify({

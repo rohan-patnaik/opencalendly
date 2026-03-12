@@ -100,6 +100,7 @@ import {
 } from './lib/calendar-sync';
 import { processCalendarWriteback } from './lib/calendar-writeback';
 import {
+  coerceBookingActionDate,
   evaluateBookingActionToken,
   parseBookingMetadata,
   resolveRequestedRescheduleSlot,
@@ -3165,7 +3166,18 @@ const lockActionToken = async (
     for update
   `);
 
-  return locked.rows[0] ?? null;
+  const row = locked.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    ...row,
+    expiresAt: coerceBookingActionDate(row.expiresAt, 'Booking action token expiry'),
+    consumedAt: row.consumedAt
+      ? coerceBookingActionDate(row.consumedAt, 'Booking action token consumption')
+      : null,
+  };
 };
 
 const lockBooking = async (
@@ -3188,7 +3200,16 @@ const lockBooking = async (
     for update
   `);
 
-  return locked.rows[0] ?? null;
+  const row = locked.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    ...row,
+    startsAt: coerceBookingActionDate(row.startsAt, 'Booking start time'),
+    endsAt: coerceBookingActionDate(row.endsAt, 'Booking end time'),
+  };
 };
 
 app.get('/health', (context) => {
