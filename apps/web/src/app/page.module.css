@@ -141,7 +141,9 @@
 }
 
 .artHeader {
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
   gap: 0.55rem;
 }
 
@@ -161,6 +163,12 @@
   font-weight: 700;
 }
 
+.artTimezoneText {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+
 .calendarArt {
   display: block;
   width: 100%;
@@ -171,10 +179,11 @@
 }
 
 .artLegend {
-  justify-content: flex-start;
+  justify-content: center;
   gap: 1rem;
   color: var(--text-primary);
   font-size: 0.72rem;
+  text-align: center;
 }
 
 .artLegend>div {

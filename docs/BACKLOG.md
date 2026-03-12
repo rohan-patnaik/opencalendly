@@ -846,6 +846,22 @@ Acceptance criteria:
   - `npm run lint`
   - `npm run typecheck`
   - local browser smoke confirms cancel and reschedule action-link flows complete without a server error
+### Feature 45: Homepage hero personal-timezone badge alignment
+
+Scope:
+- Replace the static hero art badge copy with a browser-aware personal-timezone presentation on the homepage.
+- Center the hero art badge block and legend row inside the right-side art panel without changing the rest of the homepage layout.
+
+Acceptance criteria:
+
+- The homepage hero art badge reads `Personal timezone aware`.
+- The hero art panel shows which timezone is being followed based on the visitor's browser, with a safe fallback when the browser timezone cannot be resolved.
+- The personal-timezone badge block is centered in the right-side art panel.
+- The `open slots` / `selected flow` legend is centered in the right-side art panel.
+- Validation passes:
+  - `npm run lint`
+  - `npm run typecheck`
+  - local browser smoke confirms the homepage hero renders the centered badge and centered legend with browser timezone text
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
