@@ -3233,6 +3233,7 @@ app.post('/v0/dev/auth/bootstrap', async (context) => {
 
     return context.json({
       ok: true,
+      issuer: 'dev' as const,
       sessionToken: issuedSession.sessionToken,
       expiresAt: issuedSession.expiresAt.toISOString(),
       user: {

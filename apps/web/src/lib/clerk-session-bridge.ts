@@ -43,3 +43,11 @@ export const shouldExchangeClerkSession = (input: {
 
   return { shouldExchange: true, syncKey };
 };
+
+export const shouldPreserveSignedOutSession = (session: AuthSession | null): boolean => {
+  if (!session) {
+    return false;
+  }
+
+  return session.issuer === 'legacy' || session.issuer === 'dev';
+};

@@ -120,7 +120,7 @@ npm run dev:web
 2. Complete Clerk sign-in with email or Google.
 3. Confirm redirect to `http://localhost:3000/dashboard` and analytics load without manual token paste.
 4. Open `http://localhost:3000/auth/verify` and confirm it redirects back to `/auth/sign-in`.
-5. Optional for local Playwright-authenticated runs: set `ENABLE_DEV_AUTH_BOOTSTRAP=true`, then call `POST http://127.0.0.1:8787/v0/dev/auth/bootstrap` to mint a local session for `demo@opencalendly.dev`.
+5. Optional for local Playwright-authenticated runs: set `ENABLE_DEV_AUTH_BOOTSTRAP=true`, then call `POST http://127.0.0.1:8787/v0/dev/auth/bootstrap` to mint a local session for `demo@opencalendly.dev`. The response includes `issuer: "dev"` so it can be written directly into `localStorage["opencalendly.auth.session"]`.
 
 ### 7.1) Feature 15 app shell smoke test
 

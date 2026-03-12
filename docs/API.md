@@ -1055,6 +1055,7 @@ Behavior:
 - rejects non-local hosts and non-local `Origin`/`Referer` headers
 - defaults to seeded `demo@opencalendly.dev` when `email` is omitted
 - reuses the normal bearer session issuance path
+- returns `issuer: "dev"` so the payload can be written directly to `localStorage["opencalendly.auth.session"]` for local browser automation
 
 Request:
 
@@ -1069,6 +1070,7 @@ Success response:
 ```json
 {
   "ok": true,
+  "issuer": "dev",
   "sessionToken": "session-token",
   "expiresAt": "2026-04-11T14:00:00.000Z",
   "user": {

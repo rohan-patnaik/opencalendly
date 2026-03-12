@@ -5,7 +5,11 @@ import { useEffect, useRef, useState } from 'react';
 
 import { resolveApiBaseUrl } from '../lib/api-base-url';
 import { clearAuthSession, readAuthSession, writeAuthSession } from '../lib/auth-session';
-import { resolveBrowserTimezone, shouldExchangeClerkSession } from '../lib/clerk-session-bridge';
+import {
+  resolveBrowserTimezone,
+  shouldExchangeClerkSession,
+  shouldPreserveSignedOutSession,
+} from '../lib/clerk-session-bridge';
 
 type ClerkExchangeResponse = {
   ok: boolean;
@@ -45,7 +49,7 @@ export default function AuthSessionBridge() {
       lastSyncKeyRef.current = '';
       inFlightSyncKeyRef.current = null;
       retryStateRef.current = { syncKey: '', attempts: 0 };
-      if (!existingSession || existingSession.issuer !== 'legacy') {
+      if (!shouldPreserveSignedOutSession(existingSession)) {
         clearAuthSession();
       }
       return;
