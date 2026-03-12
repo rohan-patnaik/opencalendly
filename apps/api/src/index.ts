@@ -665,7 +665,7 @@ const clampNotificationRunBatchLimit = (rawLimit: number | string | undefined): 
 };
 
 const isPublicAnalyticsRateLimited = async (
-  db: Pick<Database, 'delete' | 'execute'>,
+  db: Pick<Database, 'delete' | 'insert'>,
   input: {
   clientKey: string;
   username: string;
@@ -694,7 +694,7 @@ const isPublicAnalyticsRateLimited = async (
 };
 
 const isPublicBookingRateLimited = async (
-  db: Pick<Database, 'delete' | 'execute'>,
+  db: Pick<Database, 'delete' | 'insert'>,
   input: {
   clientKey: string;
   scope: string;
@@ -723,7 +723,7 @@ const isPublicBookingRateLimited = async (
 };
 
 const isClerkExchangeRateLimited = async (
-  db: Pick<Database, 'delete' | 'execute'>,
+  db: Pick<Database, 'delete' | 'insert'>,
   input: {
   clientKey: string;
   },

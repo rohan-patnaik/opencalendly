@@ -9,7 +9,7 @@ void createDbTypeAnchor;
 
 type Database = ReturnType<typeof createDbTypeAnchor>['db'];
 
-export type RateLimitDb = Pick<Database, 'delete' | 'execute'>;
+export type RateLimitDb = Pick<Database, 'delete' | 'insert'>;
 
 const DEFAULT_WINDOW_MS = 60_000;
 const MIN_RETENTION_MS = 60 * 60_000;
@@ -128,23 +128,31 @@ export const consumePersistedRateLimit = async (
 
   await maybeCleanupExpiredRateLimits(db, now, windowMs);
 
-  const result = await db.execute<{ count: number }>(sql`
-    insert into ${requestRateLimits} (
-      ${requestRateLimits.scope},
-      ${requestRateLimits.keyHash},
-      ${requestRateLimits.windowStartsAt},
-      ${requestRateLimits.count},
-      ${requestRateLimits.updatedAt}
-    )
-    values (${input.scope}, ${keyHash}, ${windowStartsAt}, 1, ${now})
-    on conflict (${requestRateLimits.scope}, ${requestRateLimits.keyHash}, ${requestRateLimits.windowStartsAt})
-    do update
-      set ${requestRateLimits.count} = ${requestRateLimits.count} + 1,
-          ${requestRateLimits.updatedAt} = ${now}
-    returning ${requestRateLimits.count} as "count"
-  `);
+  const [result] = await db
+    .insert(requestRateLimits)
+    .values({
+      scope: input.scope,
+      keyHash,
+      windowStartsAt,
+      count: 1,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        requestRateLimits.scope,
+        requestRateLimits.keyHash,
+        requestRateLimits.windowStartsAt,
+      ],
+      set: {
+        count: sql`${requestRateLimits.count} + 1`,
+        updatedAt: now,
+      },
+    })
+    .returning({
+      count: requestRateLimits.count,
+    });
 
-  const count = result.rows[0]?.count ?? 1;
+  const count = result?.count ?? 1;
 
   return {
     limited: count > input.maxRequests,
