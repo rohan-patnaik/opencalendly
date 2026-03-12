@@ -16,7 +16,7 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- Magic-link auth works end-to-end (`/v0/auth/magic-link`, `/v0/auth/verify`) and authenticated routes reject missing/expired bearer sessions.
+- Authenticated routes reject missing or expired bearer sessions.
 - Authenticated organizer routes can create and edit one-on-one event types with `name`, `slug`, `durationMinutes`, `location`, and `questions`.
 - Organizer availability rules support weekly schedule windows plus date overrides and per-rule buffers.
 - Public booking URL `/<username>/<event-slug>` renders event details with a timezone-aware availability picker.
@@ -39,19 +39,20 @@ Acceptance criteria:
 - Feature adds unit/integration tests for token validation, cancel, reschedule success, and conflict/error paths.
 - `docs/API.md` is updated with reschedule/cancel token contracts and response examples.
 
-## Feature 3 (PR#5): Demo Credits Pool (daily passes) + waitlist
+## Feature 3 (PR#5): Launch Demo Admission + Daily Credits + waitlist
 
 Acceptance criteria:
 
-- System supports a configurable per-day pass limit (`DEMO_DAILY_PASS_LIMIT`) without code changes.
-- A public trial action endpoint atomically consumes exactly one pass and returns remaining passes.
-- Daily usage resets by date boundary (UTC day) and does not carry yesterday's usage into today.
-- When passes are exhausted, trial action returns a deterministic exhausted response and does not over-consume.
+- System supports configurable daily demo-account admission limit and per-account daily credit limit without code changes.
+- `GET /v0/demo-credits/status` returns both global admissions state and authenticated-account credit state.
+- Meaningful feature routes deduct feature-weighted credits only on successful completion.
+- Demo admission and credits reset by UTC date boundary.
+- Dev/internal allowlisted accounts bypass both admission counting and credit deduction.
+- Seeded launch demo booking surfaces require sign-in so anonymous traffic cannot consume quota.
 - Exhausted path supports waitlist capture (email + optional metadata) with deduping per day/email.
-- A protected dev/admin endpoint can reset today's pass usage for local/demo operations.
-- Feature includes tests for consume success, exhaustion behavior, race safety, reset flow, and waitlist dedupe.
-- `docs/API.md` is updated with credits + waitlist contracts.
-- `README.md` and `docs/PRD.md` are updated for operator setup and product behavior notes.
+- A protected dev/admin endpoint can reset today's admission + credit state for local/demo operations.
+- Feature includes tests for quota helper logic, waitlist dedupe, deprecated consume endpoint behavior, and route-level quota/auth regressions.
+- `docs/API.md`, `README.md`, and `docs/PRD.md` are updated for operator setup and product behavior notes.
 
 ## Feature 4 (PR#6): Embeds + Webhooks v1
 
@@ -255,8 +256,8 @@ Acceptance criteria:
 - Homepage (`/`) ships a modern product surface with links to implemented product routes.
 - Shared UI foundation exists for app chrome/navigation and reusable card/CTA patterns.
 - Global theme toggle supports persisted `light`, `dark`, and `system` preferences.
-- `/auth/sign-in` requests magic-link tokens via `POST /v0/auth/magic-link`.
-- `/auth/verify` verifies tokens via `POST /v0/auth/verify` and stores session client-side.
+- `/auth/sign-in` completes Clerk sign-in and exchanges the Clerk session for an OpenCalendly API session.
+- `/auth/verify` is a compatibility redirect back to `/auth/sign-in`.
 - Dashboard session bootstrap uses managed auth state + `GET /v0/auth/me` (no manual token paste flow).
 - Tests cover new session/theme utility logic.
 - `README.md`, `docs/PRD.md`, and `docs/ARCHITECTURE.md` reflect the UI/auth foundation.
@@ -582,7 +583,7 @@ Acceptance criteria:
   - `POST /v0/auth/clerk/exchange` validates Clerk token server-side and issues OpenCalendly session token
   - First-time Clerk users are provisioned/upserted in `users` with deterministic defaults (`timezone`, profile fields)
 - Organizer and dashboard pages continue to use existing API session flows after successful Clerk exchange (no regression in current protected routes).
-- Existing magic-link endpoints remain non-breaking for one release window but are marked deprecated in docs.
+- Legacy magic-link APIs are removed; `/auth/verify` remains only as a safe redirect route.
 - Environment contracts include Clerk keys (required/optional split documented and validated).
 - Tests cover:
   - exchange endpoint success/failure
@@ -675,4 +676,28 @@ Acceptance criteria:
   - `npm run lint`
   - `npm run typecheck`
   - `npm run test`
+  - `npm run build -w apps/web`
+
+### Feature 33: Calendar hero art + amber text/button theme refinement
+
+Scope:
+- Refine the current dark grid visual system to the requested amber-and-light-text palette.
+- Increase page grid sizing to a medium square that reads closer to the provided reference.
+- Rebuild the homepage hero around a custom dot-and-space calendar artwork treatment.
+- Keep product behavior unchanged; this feature is styling and homepage presentation only.
+
+Acceptance criteria:
+
+- Global web theme tokens in `apps/web/src/app/globals.css` are updated so that:
+  - main heading color is approximately `#D9A066`
+  - standard body text color is approximately `#E0E0E0`
+  - primary and secondary button styling consistently use the amber accent, with shared hover and active states aligned to the same token family
+- Background grid squares use a medium step sized roughly to two lines of hero-heading height on desktop.
+- Shared chrome/navigation remains readable and aligned with the updated token palette.
+- Homepage hero is redesigned with a custom dot-and-space calendar illustration inspired by the provided reference style, implemented in code (no external image dependency).
+- Homepage CTA and shared secondary buttons match the revised palette without breaking route links or existing content structure.
+- No booking, auth, API, or organizer behavior changes are introduced by this feature.
+- Validation passes:
+  - `npm run lint`
+  - `npm run typecheck`
   - `npm run build -w apps/web`

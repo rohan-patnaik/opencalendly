@@ -1,161 +1,34 @@
 'use client';
 
-import { SignIn, useAuth, useClerk } from '@clerk/nextjs';
+import { SignIn, useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 
 import { Card, LinkButton, PageShell, Toast } from '../../../../components/ui';
-import { resolveApiBaseUrl } from '../../../../lib/api-base-url';
 import { useAuthSession } from '../../../../lib/use-auth-session';
 import uiStyles from '../../../../components/ui/primitives.module.css';
 import styles from '../../shared.module.css';
 
-type LegacyVerifyResponse = {
-  ok: boolean;
-  sessionToken: string;
-  expiresAt: string;
-  user: {
-    id: string;
-    email: string;
-    username: string;
-    displayName: string;
-    timezone: string;
-  };
-  error?: string;
+const sanitizeRedirectPath = (value: string | null): string => {
+  if (!value || !value.startsWith('/')) {
+    return '/dashboard';
+  }
+  return value;
 };
 
 export default function SignInPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isLoaded, isSignedIn } = useAuth();
-  const { signOut } = useClerk();
-  const { ready: sessionReady, session, save } = useAuthSession();
+  const { ready: sessionReady, session } = useAuthSession();
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
-  const apiBaseUrl = resolveApiBaseUrl('Auth sign-in page');
-  const legacyToken = searchParams.get('token')?.trim() ?? '';
-  const handledLegacyTokenRef = useRef('');
-  const [legacyRetryNonce, setLegacyRetryNonce] = useState(0);
-  const [legacyVerifying, setLegacyVerifying] = useState(false);
-  const [legacyError, setLegacyError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!sessionReady) {
-      return;
-    }
-    const verificationKey = `${legacyToken}:${legacyRetryNonce}`;
-    if (!legacyToken || session || handledLegacyTokenRef.current === verificationKey) {
-      return;
-    }
-    handledLegacyTokenRef.current = verificationKey;
-    setLegacyVerifying(true);
-    setLegacyError(null);
-
-    let cancelled = false;
-    const abortController = new AbortController();
-    let requestTimeout: ReturnType<typeof setTimeout> | null = null;
-    const verifyLegacyToken = async () => {
-      if (isLoaded && isSignedIn) {
-        await signOut();
-      }
-
-      let response: Response;
-      try {
-        requestTimeout = setTimeout(() => {
-          abortController.abort();
-        }, 15_000);
-        response = await fetch(`${apiBaseUrl}/v0/auth/verify`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-          signal: abortController.signal,
-          body: JSON.stringify({ token: legacyToken }),
-        });
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('Legacy sign-in request timed out. Please retry.');
-        }
-        throw error;
-      } finally {
-        if (requestTimeout) {
-          clearTimeout(requestTimeout);
-          requestTimeout = null;
-        }
-      }
-
-      const payload = (await response.json().catch(() => null)) as LegacyVerifyResponse | null;
-      const maybeUser = payload?.user;
-      const hasValidPayload =
-        Boolean(payload) &&
-        payload?.ok === true &&
-        typeof payload.sessionToken === 'string' &&
-        payload.sessionToken.length > 0 &&
-        typeof payload.expiresAt === 'string' &&
-        !Number.isNaN(new Date(payload.expiresAt).getTime()) &&
-        maybeUser !== null &&
-        typeof maybeUser === 'object' &&
-        typeof maybeUser.id === 'string' &&
-        typeof maybeUser.email === 'string' &&
-        typeof maybeUser.username === 'string' &&
-        typeof maybeUser.displayName === 'string' &&
-        typeof maybeUser.timezone === 'string';
-
-      if (!response.ok || !hasValidPayload) {
-        throw new Error(payload?.error || 'Legacy sign-in token is invalid or expired.');
-      }
-
-      if (cancelled) {
-        return;
-      }
-
-      save({
-        sessionToken: payload.sessionToken,
-        expiresAt: payload.expiresAt,
-        issuer: 'legacy',
-        user: payload.user,
-      });
-      router.replace('/dashboard');
-    };
-
-    void verifyLegacyToken()
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-        setLegacyError(error instanceof Error ? error.message : 'Unable to verify legacy token.');
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLegacyVerifying(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      abortController.abort();
-      if (requestTimeout) {
-        clearTimeout(requestTimeout);
-      }
-    };
-  }, [
-    apiBaseUrl,
-    isLoaded,
-    isSignedIn,
-    legacyRetryNonce,
-    legacyToken,
-    router,
-    save,
-    session,
-    sessionReady,
-    signOut,
-  ]);
+  const redirectPath = sanitizeRedirectPath(searchParams.get('redirect_url'));
 
   useEffect(() => {
     if (isLoaded && isSignedIn && sessionReady && session) {
-      router.replace('/dashboard');
+      router.replace(redirectPath);
     }
-  }, [isLoaded, isSignedIn, router, session, sessionReady]);
+  }, [isLoaded, isSignedIn, redirectPath, router, session, sessionReady]);
 
   if (!clerkPublishableKey) {
     return (
@@ -181,29 +54,13 @@ export default function SignInPageClient() {
       description="Use email or Google sign-in to start your OpenCalendly session."
     >
       <Card>
-        {legacyVerifying ? <Toast variant="info">Verifying legacy sign-in token…</Toast> : null}
-        {legacyError ? (
-          <Toast variant="error">
-            {legacyError}{' '}
-            <button
-              type="button"
-              className={uiStyles.inlineActionButton}
-              onClick={() => {
-                setLegacyError(null);
-                setLegacyRetryNonce((current) => current + 1);
-              }}
-            >
-              Retry
-            </button>
-          </Toast>
-        ) : null}
         <div className={styles.clerkContainer}>
           <SignIn
             path="/auth/sign-in"
             routing="path"
             signUpUrl="/auth/sign-up"
-            forceRedirectUrl="/auth/sign-in"
-            fallbackRedirectUrl="/auth/sign-in"
+            forceRedirectUrl={redirectPath}
+            fallbackRedirectUrl={redirectPath}
           />
         </div>
         {isLoaded && isSignedIn && sessionReady && !session ? (

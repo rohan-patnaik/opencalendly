@@ -4,6 +4,7 @@ import { decryptSecret, encryptSecret } from './calendar-crypto';
 import {
   resolveGoogleAccessToken,
   resolveGoogleSyncRange,
+  resolveMicrosoftSyncRange,
   resolveMicrosoftAccessToken,
   syncGoogleBusyWindows,
   syncMicrosoftBusyWindows,
@@ -179,6 +180,18 @@ describe('calendar-sync', () => {
 
     expect(windows).toHaveLength(1);
     expect(windows[0]?.startsAt.toISOString()).toBe('2026-03-02T09:00:00.000Z');
+  });
+
+  it('rejects Microsoft sync ranges before the provider call', () => {
+    const now = new Date('2026-03-02T00:00:00.000Z');
+
+    expect(() =>
+      resolveMicrosoftSyncRange(
+        now,
+        '2026-03-02T00:00:00.000Z',
+        '2026-05-10T00:00:00.000Z',
+      ),
+    ).toThrow('Microsoft sync range must be less than 62 days.');
   });
 
   it('rejects Microsoft sync ranges that exceed provider limits', async () => {

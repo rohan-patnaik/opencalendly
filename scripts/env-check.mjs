@@ -23,13 +23,14 @@ const OPTIONAL = {
     'Cloudflare Pages project name used by npm run deploy:web:production.',
   CLOUDFLARE_PAGES_PRODUCTION_BRANCH:
     'Optional production branch for Pages deploy (defaults to main).',
-  DEMO_DAILY_PASS_LIMIT: 'Optional integer daily pass limit (Feature 3).',
+  DEMO_DAILY_ACCOUNT_LIMIT: 'Optional integer daily cap for admitted demo accounts (default 15).',
+  DEMO_DAILY_CREDIT_LIMIT: 'Optional integer daily credit budget per admitted account (default 20).',
+  DEMO_CREDIT_BYPASS_EMAILS:
+    'Optional comma-separated email allowlist for dev/internal accounts that bypass demo quota.',
   TELEMETRY_HMAC_KEY:
     'Recommended dedicated secret for telemetry HMAC. If unset, email delivery telemetry writes are skipped.',
   MICROSOFT_CLIENT_ID: 'Microsoft Entra -> App registrations -> client ID (Feature 7).',
   MICROSOFT_CLIENT_SECRET: 'Microsoft Entra -> App registrations -> client secret (Feature 7).',
-  GITHUB_CLIENT_ID: 'GitHub Developer Settings -> OAuth Apps.',
-  GITHUB_CLIENT_SECRET: 'GitHub Developer Settings -> OAuth Apps.',
 };
 
 const PLACEHOLDER_PATTERN = /(replace-with|your[_-]|changeme|todo|example\.com|YOUR_|dummy|sample)/i;
@@ -104,11 +105,19 @@ if (publicApiBaseUrl && !/^https?:\/\/.+/i.test(publicApiBaseUrl)) {
   errors.push('NEXT_PUBLIC_API_BASE_URL must be an absolute http(s) URL.');
 }
 
-const demoDailyPassLimit = parsed.DEMO_DAILY_PASS_LIMIT;
-if (demoDailyPassLimit) {
-  const parsedLimit = Number.parseInt(demoDailyPassLimit, 10);
+const demoDailyAccountLimit = parsed.DEMO_DAILY_ACCOUNT_LIMIT;
+if (demoDailyAccountLimit) {
+  const parsedLimit = Number.parseInt(demoDailyAccountLimit, 10);
   if (!Number.isFinite(parsedLimit) || parsedLimit < 1) {
-    errors.push('DEMO_DAILY_PASS_LIMIT must be an integer >= 1 when provided.');
+    errors.push('DEMO_DAILY_ACCOUNT_LIMIT must be an integer >= 1 when provided.');
+  }
+}
+
+const demoDailyCreditLimit = parsed.DEMO_DAILY_CREDIT_LIMIT;
+if (demoDailyCreditLimit) {
+  const parsedLimit = Number.parseInt(demoDailyCreditLimit, 10);
+  if (!Number.isFinite(parsedLimit) || parsedLimit < 1) {
+    errors.push('DEMO_DAILY_CREDIT_LIMIT must be an integer >= 1 when provided.');
   }
 }
 

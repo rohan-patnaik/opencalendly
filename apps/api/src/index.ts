@@ -14,7 +14,9 @@ import {
   calendarBusyWindows,
   calendarConnections,
   createDb,
-  demoCreditsDaily,
+  demoAccountDailyUsage,
+  demoAdmissionsDaily,
+  demoCreditEvents,
   emailDeliveries,
   eventTypes,
   idempotencyRequests,
@@ -45,12 +47,10 @@ import {
   bookingCreateSchema,
   bookingRescheduleSchema,
   clerkAuthExchangeRequestSchema,
-  demoCreditsConsumeSchema,
   eventQuestionsSchema,
   eventTypeCreateSchema,
   eventTypeUpdateSchema,
   healthCheckSchema,
-  magicLinkRequestSchema,
   notificationsRunSchema,
   setAvailabilityOverridesSchema,
   setAvailabilityRulesSchema,
@@ -65,7 +65,6 @@ import {
   webhookEventSchema,
   webhookSubscriptionCreateSchema,
   webhookSubscriptionUpdateSchema,
-  verifyMagicLinkRequestSchema,
   type EventQuestion,
   type TeamSchedulingMode,
   type WebhookEvent,
@@ -73,7 +72,6 @@ import {
 } from '@opencalendly/shared';
 
 import {
-  MAGIC_LINK_TTL_MINUTES,
   SESSION_TTL_DAYS,
   createRawToken,
   getBearerToken,
@@ -94,6 +92,7 @@ import { createCalendarOAuthState, verifyCalendarOAuthState } from './lib/calend
 import {
   resolveGoogleAccessToken,
   resolveGoogleSyncRange,
+  resolveMicrosoftSyncRange,
   resolveMicrosoftAccessToken,
   syncGoogleBusyWindows,
   syncMicrosoftBusyWindows,
@@ -152,10 +151,18 @@ import {
 } from './lib/microsoft-calendar';
 import { buildHolidayTimeOffWindows } from './lib/holidays';
 import {
-  buildDemoCreditsStatus,
-  consumeDemoCreditFromState,
-  parseDemoDailyPassLimit,
+  buildDemoAccountStatus,
+  buildDemoAdmissionsStatus,
+  buildDemoQuotaStatus,
+  getDemoFeatureCost,
+  isLaunchDemoTeamSlug,
+  isLaunchDemoUsername,
+  parseDemoBypassEmails,
+  parseDemoDailyAccountLimit,
+  parseDemoDailyCreditLimit,
   toUtcDateKey,
+  type DemoFeatureKey,
+  type DemoQuotaStatus,
 } from './lib/demo-credits';
 import {
   WEBHOOK_DEFAULT_MAX_ATTEMPTS,
@@ -178,6 +185,10 @@ import {
   summarizeTeamAnalytics,
   type AnalyticsFunnelStage,
 } from './lib/analytics';
+import {
+  consumePersistedRateLimit,
+  resolveRateLimitClientKey,
+} from './lib/rate-limit';
 
 type HyperdriveBinding = {
   connectionString: string;
@@ -191,7 +202,9 @@ type Bindings = {
   TELEMETRY_HMAC_KEY?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
-  DEMO_DAILY_PASS_LIMIT?: string;
+  DEMO_DAILY_ACCOUNT_LIMIT?: string;
+  DEMO_DAILY_CREDIT_LIMIT?: string;
+  DEMO_CREDIT_BYPASS_EMAILS?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   MICROSOFT_CLIENT_ID?: string;
@@ -208,6 +221,8 @@ type ContextLike = {
 type IdempotencyScope = 'booking_create' | 'team_booking_create' | 'booking_reschedule';
 
 type Database = ReturnType<typeof createDb>['db'];
+type DatabaseTransaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+type DemoQuotaDb = Database | DatabaseTransaction;
 type QueryableDb = Pick<Database, 'select'>;
 
 type AuthenticatedUser = {
@@ -265,10 +280,21 @@ type EventTypeProfile = {
   isActive: boolean;
 };
 
-type DemoCreditsDailyRow = {
+type DemoAdmissionsDailyRow = {
   dateKey: string;
-  used: number;
+  admittedCount: number;
   dailyLimit: number;
+};
+
+type DemoAccountDailyUsageRow = {
+  id: string;
+  dateKey: string;
+  userId: string;
+  creditsLimit: number;
+  creditsUsed: number;
+  isBypass: boolean;
+  admittedAt: Date;
+  lastActivityAt: Date;
 };
 
 type WebhookSubscriptionRecord = {
@@ -395,6 +421,9 @@ app.use('*', async (context, next) => {
 
 class BookingActionNotFoundError extends Error {}
 class BookingActionGoneError extends Error {}
+class LaunchDemoAuthError extends Error {}
+class DemoQuotaAdmissionError extends Error {}
+class DemoQuotaCreditsError extends Error {}
 
 type ConnectionConfig =
   | {
@@ -570,24 +599,12 @@ const SESSION_EXPIRED_CLEANUP_INTERVAL = 50;
 const PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS = 60_000;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE = 120;
 const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP = 300;
-const PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS = 5_000;
-const PUBLIC_ANALYTICS_RATE_LIMIT_CLEANUP_INTERVAL = 50;
 const PUBLIC_BOOKING_RATE_LIMIT_WINDOW_MS = 60_000;
 const PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE = 120;
 const PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE = 30;
 const PUBLIC_BOOKING_RATE_LIMIT_MAX_REQUESTS_PER_IP = 180;
-const PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS = 8_000;
-const PUBLIC_BOOKING_RATE_LIMIT_CLEANUP_INTERVAL = 50;
 const CLERK_EXCHANGE_RATE_LIMIT_WINDOW_MS = 60_000;
 const CLERK_EXCHANGE_RATE_LIMIT_MAX_REQUESTS_PER_IP = 40;
-const CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS = 4_000;
-const CLERK_EXCHANGE_RATE_LIMIT_CLEANUP_INTERVAL = 50;
-const publicAnalyticsRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
-let publicAnalyticsRateLimitRequestCounter = 0;
-const publicBookingRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
-let publicBookingRateLimitRequestCounter = 0;
-const clerkExchangeRateLimitState = new Map<string, { windowStartMs: number; count: number }>();
-let clerkExchangeRateLimitRequestCounter = 0;
 let idempotencyCleanupRequestCounter = 0;
 let sessionCleanupRequestCounter = 0;
 
@@ -633,188 +650,78 @@ const clampNotificationRunBatchLimit = (rawLimit: number | string | undefined): 
   return Math.max(1, Math.min(NOTIFICATION_RUN_BATCH_LIMIT_MAX, parsed));
 };
 
-const resolveClientIp = (request: Request): string => {
-  const cloudflareIp = request.headers.get('cf-connecting-ip')?.trim();
-  if (cloudflareIp) {
-    return cloudflareIp;
-  }
-  return 'unknown';
-};
-
-const isPublicAnalyticsRateLimited = (input: {
-  ip: string;
+const isPublicAnalyticsRateLimited = async (
+  db: Pick<Database, 'delete' | 'execute'>,
+  input: {
+  clientKey: string;
   username: string;
   eventSlug: string;
-  nowMs?: number;
-}): boolean => {
-  const nowMs = input.nowMs ?? Date.now();
-  const cutoffMs = nowMs - PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS;
+  },
+): Promise<boolean> => {
+  const ipBucket = await consumePersistedRateLimit(db, {
+    scope: 'public_analytics_ip',
+    key: input.clientKey,
+    maxRequests: PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP,
+    windowMs: PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS,
+  });
 
-  const pruneRateLimitState = () => {
-    const shouldCleanup =
-      publicAnalyticsRateLimitState.size > PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS ||
-      publicAnalyticsRateLimitRequestCounter % PUBLIC_ANALYTICS_RATE_LIMIT_CLEANUP_INTERVAL === 0;
-    if (!shouldCleanup) {
-      return;
-    }
-
-    for (const [key, state] of publicAnalyticsRateLimitState) {
-      if (state.windowStartMs < cutoffMs) {
-        publicAnalyticsRateLimitState.delete(key);
-      }
-    }
-
-    if (publicAnalyticsRateLimitState.size > PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS) {
-      const overflow = publicAnalyticsRateLimitState.size - PUBLIC_ANALYTICS_RATE_LIMIT_MAX_KEYS;
-      let removed = 0;
-      for (const key of publicAnalyticsRateLimitState.keys()) {
-        publicAnalyticsRateLimitState.delete(key);
-        removed += 1;
-        if (removed >= overflow) {
-          break;
-        }
-      }
-    }
-  };
-
-  const consumeRateLimitKey = (key: string, maxRequests: number): boolean => {
-    const existing = publicAnalyticsRateLimitState.get(key);
-    if (!existing || existing.windowStartMs < cutoffMs) {
-      publicAnalyticsRateLimitState.set(key, {
-        windowStartMs: nowMs,
-        count: 1,
-      });
-      return false;
-    }
-
-    if (existing.count >= maxRequests) {
-      return true;
-    }
-
-    existing.count += 1;
-    return false;
-  };
-
-  publicAnalyticsRateLimitRequestCounter += 1;
-  pruneRateLimitState();
-
-  const ipKey = `ip:${input.ip}`;
-  if (consumeRateLimitKey(ipKey, PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_IP)) {
+  if (ipBucket.limited) {
     return true;
   }
 
-  const scopedKey = `scope:${input.ip}|${input.username}|${input.eventSlug}`;
-  return consumeRateLimitKey(scopedKey, PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE);
+  const scopedBucket = await consumePersistedRateLimit(db, {
+    scope: 'public_analytics_scope',
+    key: `${input.clientKey}|${input.username}|${input.eventSlug}`,
+    maxRequests: PUBLIC_ANALYTICS_RATE_LIMIT_MAX_REQUESTS_PER_SCOPE,
+    windowMs: PUBLIC_ANALYTICS_RATE_LIMIT_WINDOW_MS,
+  });
+
+  return scopedBucket.limited;
 };
 
-const isPublicBookingRateLimited = (input: {
-  ip: string;
+const isPublicBookingRateLimited = async (
+  db: Pick<Database, 'delete' | 'execute'>,
+  input: {
+  clientKey: string;
   scope: string;
   perScopeLimit: number;
-  nowMs?: number;
-}): boolean => {
-  const nowMs = input.nowMs ?? Date.now();
-  const cutoffMs = nowMs - PUBLIC_BOOKING_RATE_LIMIT_WINDOW_MS;
+  },
+): Promise<boolean> => {
+  const ipBucket = await consumePersistedRateLimit(db, {
+    scope: 'public_booking_ip',
+    key: input.clientKey,
+    maxRequests: PUBLIC_BOOKING_RATE_LIMIT_MAX_REQUESTS_PER_IP,
+    windowMs: PUBLIC_BOOKING_RATE_LIMIT_WINDOW_MS,
+  });
 
-  const shouldCleanup =
-    publicBookingRateLimitState.size > PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS ||
-    publicBookingRateLimitRequestCounter % PUBLIC_BOOKING_RATE_LIMIT_CLEANUP_INTERVAL === 0;
-  if (shouldCleanup) {
-    for (const [key, state] of publicBookingRateLimitState) {
-      if (state.windowStartMs < cutoffMs) {
-        publicBookingRateLimitState.delete(key);
-      }
-    }
-
-    if (publicBookingRateLimitState.size > PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS) {
-      const overflow = publicBookingRateLimitState.size - PUBLIC_BOOKING_RATE_LIMIT_MAX_KEYS;
-      let removed = 0;
-      for (const key of publicBookingRateLimitState.keys()) {
-        publicBookingRateLimitState.delete(key);
-        removed += 1;
-        if (removed >= overflow) {
-          break;
-        }
-      }
-    }
-  }
-
-  const consumeRateLimitKey = (key: string, maxRequests: number): boolean => {
-    const existing = publicBookingRateLimitState.get(key);
-    if (!existing || existing.windowStartMs < cutoffMs) {
-      publicBookingRateLimitState.set(key, {
-        windowStartMs: nowMs,
-        count: 1,
-      });
-      return false;
-    }
-
-    if (existing.count >= maxRequests) {
-      return true;
-    }
-
-    existing.count += 1;
-    return false;
-  };
-
-  publicBookingRateLimitRequestCounter += 1;
-
-  const ipKey = `ip:${input.ip}`;
-  if (consumeRateLimitKey(ipKey, PUBLIC_BOOKING_RATE_LIMIT_MAX_REQUESTS_PER_IP)) {
+  if (ipBucket.limited) {
     return true;
   }
 
-  const scopedKey = `scope:${input.ip}|${input.scope}`;
-  return consumeRateLimitKey(scopedKey, input.perScopeLimit);
+  const scopedBucket = await consumePersistedRateLimit(db, {
+    scope: 'public_booking_scope',
+    key: `${input.clientKey}|${input.scope}`,
+    maxRequests: input.perScopeLimit,
+    windowMs: PUBLIC_BOOKING_RATE_LIMIT_WINDOW_MS,
+  });
+
+  return scopedBucket.limited;
 };
 
-const isClerkExchangeRateLimited = (input: {
-  ip: string;
-  nowMs?: number;
-}): boolean => {
-  const nowMs = input.nowMs ?? Date.now();
-  const cutoffMs = nowMs - CLERK_EXCHANGE_RATE_LIMIT_WINDOW_MS;
+const isClerkExchangeRateLimited = async (
+  db: Pick<Database, 'delete' | 'execute'>,
+  input: {
+  clientKey: string;
+  },
+): Promise<boolean> => {
+  const ipBucket = await consumePersistedRateLimit(db, {
+    scope: 'clerk_exchange_ip',
+    key: input.clientKey,
+    maxRequests: CLERK_EXCHANGE_RATE_LIMIT_MAX_REQUESTS_PER_IP,
+    windowMs: CLERK_EXCHANGE_RATE_LIMIT_WINDOW_MS,
+  });
 
-  const shouldCleanup =
-    clerkExchangeRateLimitState.size > CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS ||
-    clerkExchangeRateLimitRequestCounter % CLERK_EXCHANGE_RATE_LIMIT_CLEANUP_INTERVAL === 0;
-  if (shouldCleanup) {
-    for (const [key, state] of clerkExchangeRateLimitState) {
-      if (state.windowStartMs < cutoffMs) {
-        clerkExchangeRateLimitState.delete(key);
-      }
-    }
-
-    if (clerkExchangeRateLimitState.size > CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS) {
-      const overflow = clerkExchangeRateLimitState.size - CLERK_EXCHANGE_RATE_LIMIT_MAX_KEYS;
-      let removed = 0;
-      for (const key of clerkExchangeRateLimitState.keys()) {
-        clerkExchangeRateLimitState.delete(key);
-        removed += 1;
-        if (removed >= overflow) {
-          break;
-        }
-      }
-    }
-  }
-
-  clerkExchangeRateLimitRequestCounter += 1;
-  const key = `ip:${input.ip}`;
-  const existing = clerkExchangeRateLimitState.get(key);
-  if (!existing || existing.windowStartMs < cutoffMs) {
-    clerkExchangeRateLimitState.set(key, {
-      windowStartMs: nowMs,
-      count: 1,
-    });
-    return false;
-  }
-
-  if (existing.count >= CLERK_EXCHANGE_RATE_LIMIT_MAX_REQUESTS_PER_IP) {
-    return true;
-  }
-
-  existing.count += 1;
-  return false;
+  return ipBucket.limited;
 };
 
 const parseIdempotencyKey = (request: Request): { key: string } | { error: string } => {
@@ -2004,6 +1911,13 @@ const hashIdempotencyRequestPayload = (input: Record<string, unknown>): string =
   return hashToken(toCanonicalJson(input));
 };
 
+const buildDemoFeatureSourceKey = (
+  featureKey: DemoFeatureKey,
+  payload: Record<string, unknown>,
+): string => {
+  return `${featureKey}:${hashIdempotencyRequestPayload(payload)}`;
+};
+
 const buildInProgressIdempotencyExpiry = (from: Date): Date => {
   return new Date(from.getTime() + IDEMPOTENCY_IN_PROGRESS_TTL_MINUTES * 60 * 1000);
 };
@@ -2782,8 +2696,339 @@ const resolveAuthenticatedUser = async (
   };
 };
 
-const resolveDemoDailyPassLimit = (env: Bindings): number => {
-  return parseDemoDailyPassLimit(env.DEMO_DAILY_PASS_LIMIT?.trim());
+const resolveDemoDailyAccountLimit = (env: Bindings): number => {
+  return parseDemoDailyAccountLimit(env.DEMO_DAILY_ACCOUNT_LIMIT?.trim());
+};
+
+const resolveDemoDailyCreditLimit = (env: Bindings): number => {
+  return parseDemoDailyCreditLimit(env.DEMO_DAILY_CREDIT_LIMIT?.trim());
+};
+
+const resolveDemoBypassEmailSet = (env: Bindings): Set<string> => {
+  return parseDemoBypassEmails(env.DEMO_CREDIT_BYPASS_EMAILS?.trim());
+};
+
+const isDemoQuotaBypassUser = (env: Bindings, authedUser: AuthenticatedUser): boolean => {
+  return resolveDemoBypassEmailSet(env).has(authedUser.email.trim().toLowerCase());
+};
+
+const requiresLaunchDemoAuthForUserRoute = (username: string): boolean => {
+  return isLaunchDemoUsername(username);
+};
+
+const requiresLaunchDemoAuthForTeamRoute = (teamSlug: string): boolean => {
+  return isLaunchDemoTeamSlug(teamSlug);
+};
+
+const isLaunchDemoBookingContext = (input: {
+  organizerUsername?: string | null;
+  teamSlug?: string | null;
+}): boolean => {
+  return (
+    (input.organizerUsername ? requiresLaunchDemoAuthForUserRoute(input.organizerUsername) : false) ||
+    (input.teamSlug ? requiresLaunchDemoAuthForTeamRoute(input.teamSlug) : false)
+  );
+};
+
+const loadDemoAdmissionsRow = async (
+  db: DemoQuotaDb,
+  dateKey: string,
+): Promise<DemoAdmissionsDailyRow | null> => {
+  const row = await db.execute<DemoAdmissionsDailyRow>(sql`
+    select
+      date_key as "dateKey",
+      admitted_count as "admittedCount",
+      daily_limit as "dailyLimit"
+    from demo_admissions_daily
+    where date_key = ${dateKey}
+    limit 1
+  `);
+
+  return row.rows[0] ?? null;
+};
+
+const loadDemoAccountDailyUsageRow = async (
+  db: DemoQuotaDb,
+  input: {
+    dateKey: string;
+    userId: string;
+  },
+): Promise<DemoAccountDailyUsageRow | null> => {
+  const row = await db.execute<DemoAccountDailyUsageRow>(sql`
+    select
+      id,
+      date_key as "dateKey",
+      user_id as "userId",
+      credits_limit as "creditsLimit",
+      credits_used as "creditsUsed",
+      is_bypass as "isBypass",
+      admitted_at as "admittedAt",
+      last_activity_at as "lastActivityAt"
+    from demo_account_daily_usage
+    where date_key = ${input.dateKey} and user_id = ${input.userId}
+    limit 1
+  `);
+
+  return row.rows[0] ?? null;
+};
+
+const loadDemoQuotaStatus = async (
+  db: DemoQuotaDb,
+  env: Bindings,
+  authedUser: AuthenticatedUser | null,
+  now: Date = new Date(),
+): Promise<DemoQuotaStatus> => {
+  const dateKey = toUtcDateKey(now);
+  const admissionsRow = await loadDemoAdmissionsRow(db, dateKey);
+  const admissions = buildDemoAdmissionsStatus({
+    date: dateKey,
+    dailyLimit: admissionsRow?.dailyLimit ?? resolveDemoDailyAccountLimit(env),
+    admittedCount: admissionsRow?.admittedCount ?? 0,
+  });
+
+  if (!authedUser) {
+    return buildDemoQuotaStatus({
+      date: dateKey,
+      admissions,
+      account: null,
+    });
+  }
+
+  if (isDemoQuotaBypassUser(env, authedUser)) {
+    return buildDemoQuotaStatus({
+      date: dateKey,
+      admissions,
+      account: buildDemoAccountStatus({
+        admitted: true,
+        isBypass: true,
+        creditsLimit: null,
+        creditsUsed: 0,
+      }),
+    });
+  }
+
+  const usage = await loadDemoAccountDailyUsageRow(db, {
+    dateKey,
+    userId: authedUser.id,
+  });
+
+  return buildDemoQuotaStatus({
+    date: dateKey,
+    admissions,
+    account: buildDemoAccountStatus({
+      admitted: usage !== null,
+      isBypass: false,
+      creditsLimit: usage?.creditsLimit ?? resolveDemoDailyCreditLimit(env),
+      creditsUsed: usage?.creditsUsed ?? 0,
+      admittedAt: usage?.admittedAt ?? null,
+      lastActivityAt: usage?.lastActivityAt ?? null,
+    }),
+  });
+};
+
+const assertDemoFeatureAvailable = async (
+  db: DemoQuotaDb,
+  env: Bindings,
+  authedUser: AuthenticatedUser,
+  featureKey: DemoFeatureKey,
+  now: Date = new Date(),
+): Promise<DemoQuotaStatus> => {
+  const status = await loadDemoQuotaStatus(db, env, authedUser, now);
+  const featureCost = getDemoFeatureCost(featureKey);
+
+  if (!status.account || status.account.isBypass || featureCost <= 0) {
+    return status;
+  }
+
+  if (!status.account.admitted && status.admissions.isExhausted) {
+    throw new DemoQuotaAdmissionError('Daily demo account pool is exhausted. Join the waitlist or try again tomorrow.');
+  }
+
+  const remainingCredits = status.account.remaining ?? resolveDemoDailyCreditLimit(env);
+  if (remainingCredits < featureCost) {
+    throw new DemoQuotaCreditsError(
+      `You have used all ${status.account.creditsLimit ?? resolveDemoDailyCreditLimit(env)} demo credits for today.`,
+    );
+  }
+
+  return status;
+};
+
+const consumeDemoFeatureCredits = async (
+  db: DemoQuotaDb,
+  env: Bindings,
+  authedUser: AuthenticatedUser,
+  input: {
+    featureKey: DemoFeatureKey;
+    sourceKey: string;
+    metadata?: Record<string, unknown>;
+    now?: Date;
+  },
+): Promise<DemoQuotaStatus> => {
+  const now = input.now ?? new Date();
+  const dateKey = toUtcDateKey(now);
+  const featureCost = getDemoFeatureCost(input.featureKey);
+
+  if (featureCost <= 0) {
+    return loadDemoQuotaStatus(db, env, authedUser, now);
+  }
+
+  if (isDemoQuotaBypassUser(env, authedUser)) {
+    return loadDemoQuotaStatus(db, env, authedUser, now);
+  }
+
+  const dailyAccountLimit = resolveDemoDailyAccountLimit(env);
+  const dailyCreditLimit = resolveDemoDailyCreditLimit(env);
+
+  await db
+    .insert(demoAdmissionsDaily)
+    .values({
+      dateKey,
+      admittedCount: 0,
+      dailyLimit: dailyAccountLimit,
+      updatedAt: now,
+      createdAt: now,
+    })
+    .onConflictDoNothing({ target: demoAdmissionsDaily.dateKey });
+
+  const lockedAdmissions = await db.execute<DemoAdmissionsDailyRow>(sql`
+    select
+      date_key as "dateKey",
+      admitted_count as "admittedCount",
+      daily_limit as "dailyLimit"
+    from demo_admissions_daily
+    where date_key = ${dateKey}
+    for update
+  `);
+
+  const admissionsRow = lockedAdmissions.rows[0];
+  if (!admissionsRow) {
+    throw new Error('Unable to resolve demo admissions row.');
+  }
+
+  const existingUsageRow = await db.execute<DemoAccountDailyUsageRow>(sql`
+    select
+      id,
+      date_key as "dateKey",
+      user_id as "userId",
+      credits_limit as "creditsLimit",
+      credits_used as "creditsUsed",
+      is_bypass as "isBypass",
+      admitted_at as "admittedAt",
+      last_activity_at as "lastActivityAt"
+    from demo_account_daily_usage
+    where date_key = ${dateKey} and user_id = ${authedUser.id}
+    for update
+  `);
+
+  let usageRow = existingUsageRow.rows[0] ?? null;
+  if (!usageRow) {
+    if (admissionsRow.admittedCount >= admissionsRow.dailyLimit) {
+      throw new DemoQuotaAdmissionError(
+        'Daily demo account pool is exhausted. Join the waitlist or try again tomorrow.',
+      );
+    }
+
+    const [insertedUsage] = await db
+      .insert(demoAccountDailyUsage)
+      .values({
+        dateKey,
+        userId: authedUser.id,
+        creditsLimit: dailyCreditLimit,
+        creditsUsed: 0,
+        isBypass: false,
+        admittedAt: now,
+        lastActivityAt: now,
+        updatedAt: now,
+        createdAt: now,
+      })
+      .returning({
+        id: demoAccountDailyUsage.id,
+        dateKey: demoAccountDailyUsage.dateKey,
+        userId: demoAccountDailyUsage.userId,
+        creditsLimit: demoAccountDailyUsage.creditsLimit,
+        creditsUsed: demoAccountDailyUsage.creditsUsed,
+        isBypass: demoAccountDailyUsage.isBypass,
+        admittedAt: demoAccountDailyUsage.admittedAt,
+        lastActivityAt: demoAccountDailyUsage.lastActivityAt,
+      });
+
+    if (!insertedUsage) {
+      throw new Error('Unable to create demo usage row.');
+    }
+
+    usageRow = insertedUsage;
+
+    await db
+      .update(demoAdmissionsDaily)
+      .set({
+        admittedCount: admissionsRow.admittedCount + 1,
+        dailyLimit: dailyAccountLimit,
+        updatedAt: now,
+      })
+      .where(eq(demoAdmissionsDaily.dateKey, dateKey));
+  }
+
+  const existingEvent = await db
+    .select({
+      id: demoCreditEvents.id,
+    })
+    .from(demoCreditEvents)
+    .where(
+      and(
+        eq(demoCreditEvents.dateKey, dateKey),
+        eq(demoCreditEvents.userId, authedUser.id),
+        eq(demoCreditEvents.sourceKey, input.sourceKey),
+      ),
+    )
+    .limit(1);
+
+  if (!existingEvent[0]) {
+    if (usageRow.creditsUsed + featureCost > usageRow.creditsLimit) {
+      throw new DemoQuotaCreditsError(
+        `You have used all ${usageRow.creditsLimit} demo credits for today.`,
+      );
+    }
+
+    await db.insert(demoCreditEvents).values({
+      dateKey,
+      userId: authedUser.id,
+      featureKey: input.featureKey,
+      cost: featureCost,
+      sourceKey: input.sourceKey,
+      metadata: input.metadata ?? {},
+      createdAt: now,
+    });
+
+    await db
+      .update(demoAccountDailyUsage)
+      .set({
+        creditsUsed: usageRow.creditsUsed + featureCost,
+        lastActivityAt: now,
+        updatedAt: now,
+      })
+      .where(eq(demoAccountDailyUsage.id, usageRow.id));
+  }
+
+  return loadDemoQuotaStatus(db, env, authedUser, now);
+};
+
+const jsonDemoQuotaError = async (
+  context: ContextLike,
+  db: DemoQuotaDb,
+  env: Bindings,
+  authedUser: AuthenticatedUser | null,
+  error: DemoQuotaAdmissionError | DemoQuotaCreditsError,
+): Promise<Response> => {
+  const status = await loadDemoQuotaStatus(db, env, authedUser, new Date());
+  return context.json(
+    {
+      ok: false,
+      error: error.message,
+      demoQuota: status,
+    },
+    429,
+  );
 };
 
 const actionTokenMap = (
@@ -2887,171 +3132,16 @@ app.get('/health', (context) => {
   return context.json(healthCheckSchema.parse({ status: 'ok' }));
 });
 
-app.get('/v0/db/ping', async (context) => {
-  return withDatabase(context, async (db) => {
-    const result = await db.execute<{ now: string }>(sql`select now()::text as now`);
-    const now = result.rows[0]?.now ?? null;
-    return context.json({ ok: true, now });
-  });
-});
-
-app.post('/v0/auth/magic-link', async (context) => {
-  return withDatabase(context, async (db) => {
-    const body = await context.req.json().catch(() => null);
-    const parsed = magicLinkRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
-    }
-
-    const payload = parsed.data;
-    const email = payload.email.trim().toLowerCase();
-    const username = payload.username?.trim().toLowerCase();
-    const displayName = payload.displayName?.trim();
-    const timezone = normalizeTimezone(payload.timezone);
-
-    const [existing] = await db
-      .select({
-        id: users.id,
-        username: users.username,
-        displayName: users.displayName,
-        timezone: users.timezone,
-      })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-
-    let userId = existing?.id ?? '';
-
-    if (!existing) {
-      if (!username || !displayName) {
-        return jsonError(
-          context,
-          400,
-          'username and displayName are required when creating a new account.',
-        );
-      }
-
-      try {
-        const [inserted] = await db
-          .insert(users)
-          .values({
-            email,
-            username,
-            displayName,
-            timezone,
-          })
-          .returning({ id: users.id });
-
-        userId = inserted?.id ?? '';
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          return jsonError(context, 409, 'A user with that username or email already exists.');
-        }
-        throw error;
-      }
-    } else if (payload.timezone || payload.displayName) {
-      await db
-        .update(users)
-        .set({
-          timezone,
-          displayName: displayName || existing.displayName,
-        })
-        .where(eq(users.id, existing.id));
-      userId = existing.id;
-    }
-
-    if (!userId) {
-      return jsonError(context, 500, 'Unable to create or resolve user account.');
-    }
-
-    const now = new Date();
-    await maybeCleanupExpiredSessions(db, now);
-
-    const magicLinkToken = createRawToken();
-    const expiresAt = new Date(now.getTime() + MAGIC_LINK_TTL_MINUTES * 60_000);
-
-    await db.insert(sessions).values({
-      userId,
-      tokenHash: hashToken(magicLinkToken),
-      expiresAt,
-    });
-
-    return context.json({
-      ok: true,
-      magicLinkToken,
-      expiresAt: expiresAt.toISOString(),
-    });
-  });
-});
-
-app.post('/v0/auth/verify', async (context) => {
-  return withDatabase(context, async (db) => {
-    const body = await context.req.json().catch(() => null);
-    const parsed = verifyMagicLinkRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
-    }
-
-    const tokenHash = hashToken(parsed.data.token);
-    const now = new Date();
-    const [row] = await db
-      .select({
-        sessionId: sessions.id,
-        userId: users.id,
-        email: users.email,
-        username: users.username,
-        displayName: users.displayName,
-        timezone: users.timezone,
-      })
-      .from(sessions)
-      .innerJoin(users, eq(users.id, sessions.userId))
-      .where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, now)))
-      .limit(1);
-
-    if (!row) {
-      return jsonError(context, 401, 'Magic link token is invalid or expired.');
-    }
-
-    await maybeCleanupExpiredSessions(db, now);
-
-    const sessionToken = createRawToken();
-    const expiresAt = new Date(now.getTime() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
-
-    await db
-      .update(sessions)
-      .set({
-        tokenHash: hashToken(sessionToken),
-        expiresAt,
-      })
-      .where(eq(sessions.id, row.sessionId));
-
-    return context.json({
-      ok: true,
-      sessionToken,
-      expiresAt: expiresAt.toISOString(),
-      user: {
-        id: row.userId,
-        email: row.email,
-        username: row.username,
-        displayName: row.displayName,
-        timezone: normalizeTimezone(row.timezone),
-      },
-    });
-  });
-});
-
 app.post('/v0/auth/clerk/exchange', async (context) => {
-  const requestIp = resolveClientIp(context.req.raw);
-  if (isClerkExchangeRateLimited({ ip: requestIp })) {
-    console.warn('clerk_exchange_rate_limited', {
-      ipHash: hashToken(requestIp),
-    });
-    return jsonError(context, 429, 'Too many requests. Please retry shortly.');
-  }
-
   return withDatabase(context, async (db) => {
+    const clientKey = resolveRateLimitClientKey(context.req.raw);
+    if (await isClerkExchangeRateLimited(db, { clientKey })) {
+      console.warn('clerk_exchange_rate_limited', {
+        ipHash: hashToken(clientKey),
+      });
+      return jsonError(context, 429, 'Too many requests. Please retry shortly.');
+    }
+
     const clerkSecretKey = resolveClerkSecretKey(context.env);
     if (!clerkSecretKey) {
       return jsonError(context, 503, 'Clerk is not configured on the API runtime.');
@@ -3971,6 +4061,15 @@ app.post('/v0/calendar/google/connect/complete', async (context) => {
     }
 
     try {
+      await assertDemoFeatureAvailable(db, context.env, authedUser, 'calendar_connect');
+    } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
+      throw error;
+    }
+
+    try {
       const tokenPayload = await exchangeGoogleOAuthCode({
         clientId: googleConfig.clientId,
         clientSecret: googleConfig.clientSecret,
@@ -4009,23 +4108,12 @@ app.post('/v0/calendar/google/connect/complete', async (context) => {
       const now = new Date();
       const accessTokenExpiresAt = new Date(now.getTime() + tokenPayload.expires_in * 1000);
 
-      await db
-        .insert(calendarConnections)
-        .values({
-          userId: authedUser.id,
-          provider: GOOGLE_CALENDAR_PROVIDER,
-          externalAccountId: profile.sub,
-          externalEmail: profile.email ?? null,
-          accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
-          refreshTokenEncrypted,
-          accessTokenExpiresAt,
-          scope: tokenPayload.scope ?? null,
-          lastError: null,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [calendarConnections.userId, calendarConnections.provider],
-          set: {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .insert(calendarConnections)
+          .values({
+            userId: authedUser.id,
+            provider: GOOGLE_CALENDAR_PROVIDER,
             externalAccountId: profile.sub,
             externalEmail: profile.email ?? null,
             accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
@@ -4034,8 +4122,33 @@ app.post('/v0/calendar/google/connect/complete', async (context) => {
             scope: tokenPayload.scope ?? null,
             lastError: null,
             updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: [calendarConnections.userId, calendarConnections.provider],
+            set: {
+              externalAccountId: profile.sub,
+              externalEmail: profile.email ?? null,
+              accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
+              refreshTokenEncrypted,
+              accessTokenExpiresAt,
+              scope: tokenPayload.scope ?? null,
+              lastError: null,
+              updatedAt: now,
+            },
+          });
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'calendar_connect',
+          sourceKey: buildDemoFeatureSourceKey('calendar_connect', {
+            provider: GOOGLE_CALENDAR_PROVIDER,
+            state: parsed.data.state,
+          }),
+          metadata: {
+            provider: GOOGLE_CALENDAR_PROVIDER,
           },
+          now,
         });
+      });
 
       const [connection] = await db
         .select({
@@ -4069,6 +4182,9 @@ app.post('/v0/calendar/google/connect/complete', async (context) => {
         }),
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       const message = error instanceof Error ? error.message : 'Google OAuth exchange failed.';
       return jsonError(context, 502, message);
     }
@@ -4190,6 +4306,15 @@ app.post('/v0/calendar/google/sync', async (context) => {
     }
 
     try {
+      await assertDemoFeatureAvailable(db, context.env, authedUser, 'calendar_sync', now);
+    } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
+      throw error;
+    }
+
+    try {
       const token = await resolveGoogleAccessToken({
         connection,
         encryptionSecret,
@@ -4250,6 +4375,20 @@ app.post('/v0/calendar/google/sync', async (context) => {
             updatedAt: now,
           })
           .where(eq(calendarConnections.id, connection.id));
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'calendar_sync',
+          sourceKey: buildDemoFeatureSourceKey('calendar_sync', {
+            provider: GOOGLE_CALENDAR_PROVIDER,
+            startIso: range.startIso,
+            endIso: range.endIso,
+          }),
+          metadata: {
+            provider: GOOGLE_CALENDAR_PROVIDER,
+            busyWindowCount: dedupedBusyWindows.length,
+          },
+          now,
+        });
       });
 
       return context.json({
@@ -4262,6 +4401,9 @@ app.post('/v0/calendar/google/sync', async (context) => {
         nextSyncAt: nextSyncAt.toISOString(),
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       const message = (error instanceof Error ? error.message : 'Calendar sync failed.').slice(0, 1000);
       const nextSyncAt = new Date(now.getTime() + CALENDAR_SYNC_NEXT_MINUTES * 60_000);
 
@@ -4366,6 +4508,15 @@ app.post('/v0/calendar/microsoft/connect/complete', async (context) => {
     }
 
     try {
+      await assertDemoFeatureAvailable(db, context.env, authedUser, 'calendar_connect');
+    } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
+      throw error;
+    }
+
+    try {
       const tokenPayload = await exchangeMicrosoftOAuthCode({
         clientId: microsoftConfig.clientId,
         clientSecret: microsoftConfig.clientSecret,
@@ -4404,23 +4555,12 @@ app.post('/v0/calendar/microsoft/connect/complete', async (context) => {
       const now = new Date();
       const accessTokenExpiresAt = new Date(now.getTime() + tokenPayload.expires_in * 1000);
 
-      await db
-        .insert(calendarConnections)
-        .values({
-          userId: authedUser.id,
-          provider: MICROSOFT_CALENDAR_PROVIDER,
-          externalAccountId: profile.sub,
-          externalEmail: profile.email ?? null,
-          accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
-          refreshTokenEncrypted,
-          accessTokenExpiresAt,
-          scope: tokenPayload.scope ?? null,
-          lastError: null,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [calendarConnections.userId, calendarConnections.provider],
-          set: {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .insert(calendarConnections)
+          .values({
+            userId: authedUser.id,
+            provider: MICROSOFT_CALENDAR_PROVIDER,
             externalAccountId: profile.sub,
             externalEmail: profile.email ?? null,
             accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
@@ -4429,8 +4569,33 @@ app.post('/v0/calendar/microsoft/connect/complete', async (context) => {
             scope: tokenPayload.scope ?? null,
             lastError: null,
             updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: [calendarConnections.userId, calendarConnections.provider],
+            set: {
+              externalAccountId: profile.sub,
+              externalEmail: profile.email ?? null,
+              accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
+              refreshTokenEncrypted,
+              accessTokenExpiresAt,
+              scope: tokenPayload.scope ?? null,
+              lastError: null,
+              updatedAt: now,
+            },
+          });
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'calendar_connect',
+          sourceKey: buildDemoFeatureSourceKey('calendar_connect', {
+            provider: MICROSOFT_CALENDAR_PROVIDER,
+            state: parsed.data.state,
+          }),
+          metadata: {
+            provider: MICROSOFT_CALENDAR_PROVIDER,
           },
+          now,
         });
+      });
 
       const [connection] = await db
         .select({
@@ -4464,6 +4629,9 @@ app.post('/v0/calendar/microsoft/connect/complete', async (context) => {
         }),
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       const message = error instanceof Error ? error.message : 'Microsoft OAuth exchange failed.';
       return jsonError(context, 502, message);
     }
@@ -4577,10 +4745,19 @@ app.post('/v0/calendar/microsoft/sync', async (context) => {
     const now = new Date();
     let range: { startIso: string; endIso: string };
     try {
-      range = resolveGoogleSyncRange(now, parsed.data.start, parsed.data.end);
+      range = resolveMicrosoftSyncRange(now, parsed.data.start, parsed.data.end);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sync range is invalid.';
       return jsonError(context, 400, message);
+    }
+
+    try {
+      await assertDemoFeatureAvailable(db, context.env, authedUser, 'calendar_sync', now);
+    } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
+      throw error;
     }
 
     try {
@@ -4645,6 +4822,20 @@ app.post('/v0/calendar/microsoft/sync', async (context) => {
             updatedAt: now,
           })
           .where(eq(calendarConnections.id, connection.id));
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'calendar_sync',
+          sourceKey: buildDemoFeatureSourceKey('calendar_sync', {
+            provider: MICROSOFT_CALENDAR_PROVIDER,
+            startIso: range.startIso,
+            endIso: range.endIso,
+          }),
+          metadata: {
+            provider: MICROSOFT_CALENDAR_PROVIDER,
+            busyWindowCount: dedupedBusyWindows.length,
+          },
+          now,
+        });
       });
 
       return context.json({
@@ -4657,6 +4848,9 @@ app.post('/v0/calendar/microsoft/sync', async (context) => {
         nextSyncAt: nextSyncAt.toISOString(),
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       const message = (error instanceof Error ? error.message : 'Calendar sync failed.').slice(0, 1000);
       const nextSyncAt = new Date(now.getTime() + CALENDAR_SYNC_NEXT_MINUTES * 60_000);
 
@@ -4771,10 +4965,59 @@ app.post('/v0/calendar/writeback/run', async (context) => {
     }
 
     const limit = clampCalendarWritebackBatchLimit(parsed.data.limit ?? context.req.query('limit'));
+    const now = new Date();
+    const dueRows = await db
+      .select({
+        id: bookingExternalEvents.id,
+      })
+      .from(bookingExternalEvents)
+      .where(
+        and(
+          eq(bookingExternalEvents.organizerId, authedUser.id),
+          eq(bookingExternalEvents.status, 'pending'),
+          lte(bookingExternalEvents.nextAttemptAt, now),
+        ),
+      )
+      .orderBy(asc(bookingExternalEvents.nextAttemptAt))
+      .limit(limit);
+
+    if (dueRows.length > 0) {
+      try {
+        await assertDemoFeatureAvailable(db, context.env, authedUser, 'writeback_run', now);
+      } catch (error) {
+        if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+          return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+        }
+        throw error;
+      }
+    }
+
     const outcome = await runCalendarWritebackBatch(db, context.env, {
       organizerId: authedUser.id,
       limit,
     });
+
+    if (outcome.processed > 0) {
+      try {
+        await consumeDemoFeatureCredits(db, context.env, authedUser, {
+          featureKey: 'writeback_run',
+          sourceKey: buildDemoFeatureSourceKey('writeback_run', {
+            rowIds: dueRows.map((row) => row.id).sort(),
+            limit,
+          }),
+          metadata: {
+            processed: outcome.processed,
+            limit,
+          },
+          now,
+        });
+      } catch (error) {
+        if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+          return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+        }
+        throw error;
+      }
+    }
 
     return context.json({
       ok: true,
@@ -4808,6 +5051,34 @@ app.post('/v0/notifications/run', async (context) => {
 
     const limit = clampNotificationRunBatchLimit(parsed.data.limit ?? context.req.query('limit'));
     const now = new Date();
+    const previewRows = await db
+      .select({
+        id: scheduledNotifications.id,
+      })
+      .from(scheduledNotifications)
+      .where(
+        and(
+          eq(scheduledNotifications.organizerId, authedUser.id),
+          inArray(scheduledNotifications.status, ['pending', 'failed']),
+          lt(scheduledNotifications.attemptCount, NOTIFICATION_RUN_MAX_ATTEMPTS),
+          lte(scheduledNotifications.sendAt, now),
+          sql`(${scheduledNotifications.leasedUntil} is null or ${scheduledNotifications.leasedUntil} <= ${now})`,
+        ),
+      )
+      .orderBy(asc(scheduledNotifications.sendAt))
+      .limit(limit);
+
+    if (previewRows.length > 0) {
+      try {
+        await assertDemoFeatureAvailable(db, context.env, authedUser, 'notification_run', now);
+      } catch (error) {
+        if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+          return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+        }
+        throw error;
+      }
+    }
+
     const claimedRowIds = await claimDueScheduledNotificationRowIds(db, {
       now,
       organizerId: authedUser.id,
@@ -4965,6 +5236,28 @@ app.post('/v0/notifications/run', async (context) => {
       });
     }
 
+    if (dueRows.length > 0) {
+      try {
+        await consumeDemoFeatureCredits(db, context.env, authedUser, {
+          featureKey: 'notification_run',
+          sourceKey: buildDemoFeatureSourceKey('notification_run', {
+            rowIds: dueRows.map((row) => row.id).sort(),
+            limit,
+          }),
+          metadata: {
+            processed: dueRows.length,
+            limit,
+          },
+          now,
+        });
+      } catch (error) {
+        if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+          return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+        }
+        throw error;
+      }
+    }
+
     return context.json({
       ok: true,
       limit,
@@ -5069,23 +5362,45 @@ app.post('/v0/webhooks', async (context) => {
     }
 
     try {
-      const [inserted] = await db
-        .insert(webhookSubscriptions)
-        .values({
-          userId: authedUser.id,
-          url: parsed.data.url,
-          secret: parsed.data.secret,
-          events: normalizeWebhookEvents(parsed.data.events),
-          isActive: true,
-        })
-        .returning({
-          id: webhookSubscriptions.id,
-          url: webhookSubscriptions.url,
-          events: webhookSubscriptions.events,
-          isActive: webhookSubscriptions.isActive,
-          createdAt: webhookSubscriptions.createdAt,
-          updatedAt: webhookSubscriptions.updatedAt,
+      const now = new Date();
+      const inserted = await db.transaction(async (transaction) => {
+        const [created] = await transaction
+          .insert(webhookSubscriptions)
+          .values({
+            userId: authedUser.id,
+            url: parsed.data.url,
+            secret: parsed.data.secret,
+            events: normalizeWebhookEvents(parsed.data.events),
+            isActive: true,
+          })
+          .returning({
+            id: webhookSubscriptions.id,
+            url: webhookSubscriptions.url,
+            events: webhookSubscriptions.events,
+            isActive: webhookSubscriptions.isActive,
+            createdAt: webhookSubscriptions.createdAt,
+            updatedAt: webhookSubscriptions.updatedAt,
+          });
+
+        if (!created) {
+          throw new Error('Failed to create webhook subscription.');
+        }
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'webhook_create',
+          sourceKey: buildDemoFeatureSourceKey('webhook_create', {
+            url: parsed.data.url,
+            events: parsed.data.events,
+          }),
+          metadata: {
+            webhookId: created.id,
+            url: created.url,
+          },
+          now,
         });
+
+        return created;
+      });
 
       if (!inserted) {
         return jsonError(context, 500, 'Failed to create webhook subscription.');
@@ -5103,6 +5418,9 @@ app.post('/v0/webhooks', async (context) => {
         },
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       if (isUniqueViolation(error, 'webhook_subscriptions_user_url_unique')) {
         return jsonError(context, 409, 'A webhook subscription with that URL already exists.');
       }
@@ -5124,8 +5442,9 @@ app.patch('/v0/webhooks/:id', async (context) => {
       return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
     }
 
+    const now = new Date();
     const updateValues: Partial<typeof webhookSubscriptions.$inferInsert> = {
-      updatedAt: new Date(),
+      updatedAt: now,
     };
     if (parsed.data.url !== undefined) {
       updateValues.url = parsed.data.url;
@@ -5141,20 +5460,40 @@ app.patch('/v0/webhooks/:id', async (context) => {
     }
 
     try {
-      const [updated] = await db
-        .update(webhookSubscriptions)
-        .set(updateValues)
-        .where(
-          and(eq(webhookSubscriptions.id, context.req.param('id')), eq(webhookSubscriptions.userId, authedUser.id)),
-        )
-        .returning({
-          id: webhookSubscriptions.id,
-          url: webhookSubscriptions.url,
-          events: webhookSubscriptions.events,
-          isActive: webhookSubscriptions.isActive,
-          createdAt: webhookSubscriptions.createdAt,
-          updatedAt: webhookSubscriptions.updatedAt,
+      const webhookId = context.req.param('id');
+      const updated = await db.transaction(async (transaction) => {
+        const [saved] = await transaction
+          .update(webhookSubscriptions)
+          .set(updateValues)
+          .where(and(eq(webhookSubscriptions.id, webhookId), eq(webhookSubscriptions.userId, authedUser.id)))
+          .returning({
+            id: webhookSubscriptions.id,
+            url: webhookSubscriptions.url,
+            events: webhookSubscriptions.events,
+            isActive: webhookSubscriptions.isActive,
+            createdAt: webhookSubscriptions.createdAt,
+            updatedAt: webhookSubscriptions.updatedAt,
+          });
+
+        if (!saved) {
+          return null;
+        }
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'webhook_update',
+          sourceKey: buildDemoFeatureSourceKey('webhook_update', {
+            webhookId,
+            changes: parsed.data,
+          }),
+          metadata: {
+            webhookId,
+            url: saved.url,
+          },
+          now,
         });
+
+        return saved;
+      });
 
       if (!updated) {
         return jsonError(context, 404, 'Webhook subscription not found.');
@@ -5172,6 +5511,9 @@ app.patch('/v0/webhooks/:id', async (context) => {
         },
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       if (isUniqueViolation(error, 'webhook_subscriptions_user_url_unique')) {
         return jsonError(context, 409, 'A webhook subscription with that URL already exists.');
       }
@@ -5188,6 +5530,7 @@ app.post('/v0/webhooks/deliveries/run', async (context) => {
     }
 
     const limit = clampWebhookDeliveryBatchLimit(context.req.query('limit'));
+    const now = new Date();
 
     const dueRows = await db
       .select({
@@ -5207,11 +5550,22 @@ app.post('/v0/webhooks/deliveries/run', async (context) => {
         and(
           eq(webhookSubscriptions.userId, authedUser.id),
           eq(webhookDeliveries.status, 'pending'),
-          lte(webhookDeliveries.nextAttemptAt, new Date()),
+          lte(webhookDeliveries.nextAttemptAt, now),
         ),
       )
       .orderBy(webhookDeliveries.nextAttemptAt)
       .limit(limit);
+
+    if (dueRows.length > 0) {
+      try {
+        await assertDemoFeatureAvailable(db, context.env, authedUser, 'webhook_run', now);
+      } catch (error) {
+        if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+          return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+        }
+        throw error;
+      }
+    }
 
     const deliveries: PendingWebhookDelivery[] = [];
     let failed = 0;
@@ -5262,6 +5616,28 @@ app.post('/v0/webhooks/deliveries/run', async (context) => {
       }
     }
 
+    if (dueRows.length > 0) {
+      try {
+        await consumeDemoFeatureCredits(db, context.env, authedUser, {
+          featureKey: 'webhook_run',
+          sourceKey: buildDemoFeatureSourceKey('webhook_run', {
+            deliveryIds: dueRows.map((row) => row.id).sort(),
+            limit,
+          }),
+          metadata: {
+            processed: dueRows.length,
+            limit,
+          },
+          now,
+        });
+      } catch (error) {
+        if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+          return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+        }
+        throw error;
+      }
+    }
+
     return context.json({
       ok: true,
       processed: dueRows.length,
@@ -5274,108 +5650,12 @@ app.post('/v0/webhooks/deliveries/run', async (context) => {
 
 app.get('/v0/demo-credits/status', async (context) => {
   return withDatabase(context, async (db) => {
-    const now = new Date();
-    const dateKey = toUtcDateKey(now);
-    const dailyLimit = resolveDemoDailyPassLimit(context.env);
-
-    const [row] = await db
-      .select({
-        used: demoCreditsDaily.used,
-      })
-      .from(demoCreditsDaily)
-      .where(eq(demoCreditsDaily.dateKey, dateKey))
-      .limit(1);
-
-    const status = buildDemoCreditsStatus({
-      date: dateKey,
-      dailyLimit,
-      used: row?.used ?? 0,
-    });
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+    const status = await loadDemoQuotaStatus(db, context.env, authedUser, new Date());
 
     return context.json({
       ok: true,
       ...status,
-    });
-  });
-});
-
-app.post('/v0/demo-credits/consume', async (context) => {
-  return withDatabase(context, async (db) => {
-    const body = await context.req.json().catch(() => null);
-    const parsed = demoCreditsConsumeSchema.safeParse(body);
-    if (!parsed.success) {
-      return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
-    }
-    const normalizedEmail = parsed.data.email.trim().toLowerCase();
-
-    const now = new Date();
-    const dateKey = toUtcDateKey(now);
-    const dailyLimit = resolveDemoDailyPassLimit(context.env);
-
-    const result = await db.transaction(async (transaction) => {
-      await transaction
-        .insert(demoCreditsDaily)
-        .values({
-          dateKey,
-          used: 0,
-          dailyLimit,
-        })
-        .onConflictDoNothing({ target: demoCreditsDaily.dateKey });
-
-      const locked = await transaction.execute<DemoCreditsDailyRow>(sql`
-        select
-          date_key as "dateKey",
-          used,
-          daily_limit as "dailyLimit"
-        from demo_credits_daily
-        where date_key = ${dateKey}
-        for update
-      `);
-
-      const row = locked.rows[0];
-      if (!row) {
-        throw new Error('Unable to resolve daily credits row.');
-      }
-
-      const consumed = consumeDemoCreditFromState({
-        date: dateKey,
-        dailyLimit,
-        used: row.used,
-      });
-
-      if (!consumed.consumed) {
-        return consumed;
-      }
-
-      await transaction
-        .update(demoCreditsDaily)
-        .set({
-          used: consumed.status.used,
-          dailyLimit,
-          updatedAt: now,
-        })
-        .where(eq(demoCreditsDaily.dateKey, dateKey));
-
-      return consumed;
-    });
-
-    if (!result.consumed) {
-      return context.json(
-        {
-          ok: false,
-          error: 'Daily demo passes are exhausted.',
-          email: normalizedEmail,
-          ...result.status,
-        },
-        429,
-      );
-    }
-
-    return context.json({
-      ok: true,
-      consumed: true,
-      email: normalizedEmail,
-      ...result.status,
     });
   });
 });
@@ -5421,36 +5701,43 @@ app.post('/v0/dev/demo-credits/reset', async (context) => {
 
     const now = new Date();
     const dateKey = toUtcDateKey(now);
-    const dailyLimit = resolveDemoDailyPassLimit(context.env);
+    const dailyAccountLimit = resolveDemoDailyAccountLimit(context.env);
 
     await db.transaction(async (transaction) => {
       await transaction
-        .insert(demoCreditsDaily)
-        .values({
-          dateKey,
-          used: 0,
-          dailyLimit,
-        })
-        .onConflictDoNothing({ target: demoCreditsDaily.dateKey });
+        .delete(demoCreditEvents)
+        .where(eq(demoCreditEvents.dateKey, dateKey));
 
       await transaction
-        .update(demoCreditsDaily)
+        .delete(demoAccountDailyUsage)
+        .where(eq(demoAccountDailyUsage.dateKey, dateKey));
+
+      await transaction
+        .insert(demoAdmissionsDaily)
+        .values({
+          dateKey,
+          admittedCount: 0,
+          dailyLimit: dailyAccountLimit,
+          updatedAt: now,
+          createdAt: now,
+        })
+        .onConflictDoNothing({ target: demoAdmissionsDaily.dateKey });
+
+      await transaction
+        .update(demoAdmissionsDaily)
         .set({
-          used: 0,
-          dailyLimit,
+          admittedCount: 0,
+          dailyLimit: dailyAccountLimit,
           updatedAt: now,
         })
-        .where(eq(demoCreditsDaily.dateKey, dateKey));
+        .where(eq(demoAdmissionsDaily.dateKey, dateKey));
     });
 
-    const status = buildDemoCreditsStatus({
-      date: dateKey,
-      dailyLimit,
-      used: 0,
-    });
+    const status = await loadDemoQuotaStatus(db, context.env, authedUser, now);
 
     return context.json({
       ok: true,
+      resetDate: dateKey,
       ...status,
     });
   });
@@ -5566,42 +5853,60 @@ app.put('/v0/event-types/:eventTypeId/notification-rules', async (context) => {
     }
 
     const now = new Date();
-    await db.transaction(async (transaction) => {
-      await transaction
-        .update(notificationRules)
-        .set({
-          isEnabled: false,
-          updatedAt: now,
-        })
-        .where(eq(notificationRules.eventTypeId, eventTypeId));
+    try {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .update(notificationRules)
+          .set({
+            isEnabled: false,
+            updatedAt: now,
+          })
+          .where(eq(notificationRules.eventTypeId, eventTypeId));
 
-      if (parsed.data.rules.length === 0) {
-        return;
-      }
+        if (parsed.data.rules.length > 0) {
+          await transaction
+            .insert(notificationRules)
+            .values(
+              parsed.data.rules.map((rule) => ({
+                eventTypeId,
+                notificationType: rule.notificationType,
+                offsetMinutes: rule.offsetMinutes,
+                isEnabled: rule.isEnabled,
+                updatedAt: now,
+              })),
+            )
+            .onConflictDoUpdate({
+              target: [
+                notificationRules.eventTypeId,
+                notificationRules.notificationType,
+                notificationRules.offsetMinutes,
+              ],
+              set: {
+                isEnabled: sql`excluded.is_enabled`,
+                updatedAt: now,
+              },
+            });
+        }
 
-      await transaction
-        .insert(notificationRules)
-        .values(
-          parsed.data.rules.map((rule) => ({
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'notification_rules_save',
+          sourceKey: buildDemoFeatureSourceKey('notification_rules_save', {
             eventTypeId,
-            notificationType: rule.notificationType,
-            offsetMinutes: rule.offsetMinutes,
-            isEnabled: rule.isEnabled,
-            updatedAt: now,
-          })),
-        )
-        .onConflictDoUpdate({
-          target: [
-            notificationRules.eventTypeId,
-            notificationRules.notificationType,
-            notificationRules.offsetMinutes,
-          ],
-          set: {
-            isEnabled: sql`excluded.is_enabled`,
-            updatedAt: now,
+            rules: parsed.data.rules,
+          }),
+          metadata: {
+            eventTypeId,
+            ruleCount: parsed.data.rules.length,
           },
+          now,
         });
-    });
+      });
+    } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
+      throw error;
+    }
 
     const rules = await listEventTypeNotificationRules(db, {
       eventTypeId,
@@ -6156,33 +6461,56 @@ app.post('/v0/event-types', async (context) => {
     const payload = parsed.data;
 
     try {
-      const [inserted] = await db
-        .insert(eventTypes)
-        .values({
-          userId: authedUser.id,
-          name: payload.name,
-          slug: payload.slug,
-          durationMinutes: payload.durationMinutes,
-          dailyBookingLimit: payload.dailyBookingLimit ?? null,
-          weeklyBookingLimit: payload.weeklyBookingLimit ?? null,
-          monthlyBookingLimit: payload.monthlyBookingLimit ?? null,
-          locationType: payload.locationType,
-          locationValue: payload.locationValue ?? null,
-          questions: payload.questions,
-        })
-        .returning({
-          id: eventTypes.id,
-          slug: eventTypes.slug,
-          name: eventTypes.name,
-          durationMinutes: eventTypes.durationMinutes,
-          dailyBookingLimit: eventTypes.dailyBookingLimit,
-          weeklyBookingLimit: eventTypes.weeklyBookingLimit,
-          monthlyBookingLimit: eventTypes.monthlyBookingLimit,
-          locationType: eventTypes.locationType,
-          locationValue: eventTypes.locationValue,
-          questions: eventTypes.questions,
-          isActive: eventTypes.isActive,
+      const now = new Date();
+      const inserted = await db.transaction(async (transaction) => {
+        const [created] = await transaction
+          .insert(eventTypes)
+          .values({
+            userId: authedUser.id,
+            name: payload.name,
+            slug: payload.slug,
+            durationMinutes: payload.durationMinutes,
+            dailyBookingLimit: payload.dailyBookingLimit ?? null,
+            weeklyBookingLimit: payload.weeklyBookingLimit ?? null,
+            monthlyBookingLimit: payload.monthlyBookingLimit ?? null,
+            locationType: payload.locationType,
+            locationValue: payload.locationValue ?? null,
+            questions: payload.questions,
+          })
+          .returning({
+            id: eventTypes.id,
+            slug: eventTypes.slug,
+            name: eventTypes.name,
+            durationMinutes: eventTypes.durationMinutes,
+            dailyBookingLimit: eventTypes.dailyBookingLimit,
+            weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+            monthlyBookingLimit: eventTypes.monthlyBookingLimit,
+            locationType: eventTypes.locationType,
+            locationValue: eventTypes.locationValue,
+            questions: eventTypes.questions,
+            isActive: eventTypes.isActive,
+          });
+
+        if (!created) {
+          throw new Error('Failed to create event type.');
+        }
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'event_type_create',
+          sourceKey: buildDemoFeatureSourceKey('event_type_create', {
+            slug: payload.slug,
+            name: payload.name,
+            durationMinutes: payload.durationMinutes,
+          }),
+          metadata: {
+            eventTypeId: created.id,
+            slug: created.slug,
+          },
+          now,
         });
+
+        return created;
+      });
 
       if (!inserted) {
         return jsonError(context, 500, 'Failed to create event type.');
@@ -6196,6 +6524,9 @@ app.post('/v0/event-types', async (context) => {
         },
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       if (isUniqueViolation(error, 'event_types_user_slug_unique')) {
         return jsonError(context, 409, 'An event type with that slug already exists.');
       }
@@ -6260,23 +6591,46 @@ app.patch('/v0/event-types/:id', async (context) => {
     }
 
     try {
-      const [updated] = await db
-        .update(eventTypes)
-        .set(updateValues)
-        .where(and(eq(eventTypes.id, context.req.param('id')), eq(eventTypes.userId, authedUser.id)))
-        .returning({
-          id: eventTypes.id,
-          slug: eventTypes.slug,
-          name: eventTypes.name,
-          durationMinutes: eventTypes.durationMinutes,
-          dailyBookingLimit: eventTypes.dailyBookingLimit,
-          weeklyBookingLimit: eventTypes.weeklyBookingLimit,
-          monthlyBookingLimit: eventTypes.monthlyBookingLimit,
-          locationType: eventTypes.locationType,
-          locationValue: eventTypes.locationValue,
-          questions: eventTypes.questions,
-          isActive: eventTypes.isActive,
+      const eventTypeId = context.req.param('id');
+      const now = new Date();
+      const updated = await db.transaction(async (transaction) => {
+        const [saved] = await transaction
+          .update(eventTypes)
+          .set(updateValues)
+          .where(and(eq(eventTypes.id, eventTypeId), eq(eventTypes.userId, authedUser.id)))
+          .returning({
+            id: eventTypes.id,
+            slug: eventTypes.slug,
+            name: eventTypes.name,
+            durationMinutes: eventTypes.durationMinutes,
+            dailyBookingLimit: eventTypes.dailyBookingLimit,
+            weeklyBookingLimit: eventTypes.weeklyBookingLimit,
+            monthlyBookingLimit: eventTypes.monthlyBookingLimit,
+            locationType: eventTypes.locationType,
+            locationValue: eventTypes.locationValue,
+            questions: eventTypes.questions,
+            isActive: eventTypes.isActive,
+          });
+
+        if (!saved) {
+          return null;
+        }
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'event_type_update',
+          sourceKey: buildDemoFeatureSourceKey('event_type_update', {
+            eventTypeId,
+            changes: payload,
+          }),
+          metadata: {
+            eventTypeId,
+            slug: saved.slug,
+          },
+          now,
         });
+
+        return saved;
+      });
 
       if (!updated) {
         return jsonError(context, 404, 'Event type not found.');
@@ -6290,6 +6644,9 @@ app.patch('/v0/event-types/:id', async (context) => {
         },
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       if (isUniqueViolation(error, 'event_types_user_slug_unique')) {
         return jsonError(context, 409, 'An event type with that slug already exists.');
       }
@@ -6319,28 +6676,46 @@ app.post('/v0/teams', async (context) => {
     }
 
     try {
-      const [team] = await db
-        .insert(teams)
-        .values({
-          ownerUserId: authedUser.id,
-          name: parsed.data.name,
-          slug: parsed.data.slug,
-        })
-        .returning({
-          id: teams.id,
-          ownerUserId: teams.ownerUserId,
-          name: teams.name,
-          slug: teams.slug,
+      const now = new Date();
+      const team = await db.transaction(async (transaction) => {
+        const [created] = await transaction
+          .insert(teams)
+          .values({
+            ownerUserId: authedUser.id,
+            name: parsed.data.name,
+            slug: parsed.data.slug,
+          })
+          .returning({
+            id: teams.id,
+            ownerUserId: teams.ownerUserId,
+            name: teams.name,
+            slug: teams.slug,
+          });
+
+        if (!created) {
+          throw new Error('Failed to create team.');
+        }
+
+        await transaction.insert(teamMembers).values({
+          teamId: created.id,
+          userId: authedUser.id,
+          role: 'owner',
         });
 
-      if (!team) {
-        return jsonError(context, 500, 'Failed to create team.');
-      }
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'team_create',
+          sourceKey: buildDemoFeatureSourceKey('team_create', {
+            slug: parsed.data.slug,
+            name: parsed.data.name,
+          }),
+          metadata: {
+            teamId: created.id,
+            slug: created.slug,
+          },
+          now,
+        });
 
-      await db.insert(teamMembers).values({
-        teamId: team.id,
-        userId: authedUser.id,
-        role: 'owner',
+        return created;
       });
 
       return context.json({
@@ -6348,6 +6723,9 @@ app.post('/v0/teams', async (context) => {
         team,
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       if (isUniqueViolation(error, 'teams_slug_unique')) {
         return jsonError(context, 409, 'A team with that slug already exists.');
       }
@@ -6409,18 +6787,41 @@ app.post('/v0/teams/:teamId/members', async (context) => {
     }
 
     try {
-      const [inserted] = await db
-        .insert(teamMembers)
-        .values({
-          teamId: team.id,
-          userId: parsed.data.userId,
-          role: parsed.data.role,
-        })
-        .returning({
-          teamId: teamMembers.teamId,
-          userId: teamMembers.userId,
-          role: teamMembers.role,
+      const now = new Date();
+      const inserted = await db.transaction(async (transaction) => {
+        const [created] = await transaction
+          .insert(teamMembers)
+          .values({
+            teamId: team.id,
+            userId: parsed.data.userId,
+            role: parsed.data.role,
+          })
+          .returning({
+            teamId: teamMembers.teamId,
+            userId: teamMembers.userId,
+            role: teamMembers.role,
+          });
+
+        if (!created) {
+          throw new Error('Failed to add team member.');
+        }
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'team_member_add',
+          sourceKey: buildDemoFeatureSourceKey('team_member_add', {
+            teamId: team.id,
+            userId: parsed.data.userId,
+            role: parsed.data.role,
+          }),
+          metadata: {
+            teamId: team.id,
+            userId: parsed.data.userId,
+          },
+          now,
         });
+
+        return created;
+      });
 
       if (!inserted) {
         return jsonError(context, 500, 'Failed to add team member.');
@@ -6434,6 +6835,9 @@ app.post('/v0/teams/:teamId/members', async (context) => {
         },
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       if (isUniqueViolation(error, 'team_members_team_user_unique')) {
         return jsonError(context, 409, 'User is already a team member.');
       }
@@ -6559,6 +6963,22 @@ app.post('/v0/team-event-types', async (context) => {
           })),
         );
 
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'team_event_type_create',
+          sourceKey: buildDemoFeatureSourceKey('team_event_type_create', {
+            teamId: team.id,
+            slug: payload.slug,
+            mode: payload.mode,
+            requiredMemberUserIds,
+          }),
+          metadata: {
+            teamId: team.id,
+            teamEventTypeId: teamEventType.id,
+            eventTypeId: eventType.id,
+          },
+          now: new Date(),
+        });
+
         return {
           teamEventType,
           eventType,
@@ -6580,6 +7000,9 @@ app.post('/v0/team-event-types', async (context) => {
         },
       });
     } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       if (isUniqueViolation(error, 'event_types_user_slug_unique')) {
         return jsonError(context, 409, 'An event type with that slug already exists.');
       }
@@ -6605,22 +7028,43 @@ app.put('/v0/me/availability/rules', async (context) => {
       return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
     }
 
-    await db.transaction(async (transaction) => {
-      await transaction.delete(availabilityRules).where(eq(availabilityRules.userId, authedUser.id));
+    const now = new Date();
+    try {
+      await db.transaction(async (transaction) => {
+        await transaction.delete(availabilityRules).where(eq(availabilityRules.userId, authedUser.id));
 
-      if (parsed.data.rules.length > 0) {
-        await transaction.insert(availabilityRules).values(
-          parsed.data.rules.map((rule) => ({
-            userId: authedUser.id,
-            dayOfWeek: rule.dayOfWeek,
-            startMinute: rule.startMinute,
-            endMinute: rule.endMinute,
-            bufferBeforeMinutes: rule.bufferBeforeMinutes,
-            bufferAfterMinutes: rule.bufferAfterMinutes,
-          })),
-        );
+        if (parsed.data.rules.length > 0) {
+          await transaction.insert(availabilityRules).values(
+            parsed.data.rules.map((rule) => ({
+              userId: authedUser.id,
+              dayOfWeek: rule.dayOfWeek,
+              startMinute: rule.startMinute,
+              endMinute: rule.endMinute,
+              bufferBeforeMinutes: rule.bufferBeforeMinutes,
+              bufferAfterMinutes: rule.bufferAfterMinutes,
+            })),
+          );
+        }
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'availability_save',
+          sourceKey: buildDemoFeatureSourceKey('availability_save', {
+            scope: 'rules',
+            rules: parsed.data.rules,
+          }),
+          metadata: {
+            scope: 'rules',
+            count: parsed.data.rules.length,
+          },
+          now,
+        });
+      });
+    } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
       }
-    });
+      throw error;
+    }
 
     return context.json({
       ok: true,
@@ -6643,23 +7087,44 @@ app.put('/v0/me/availability/overrides', async (context) => {
       return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
     }
 
-    await db.transaction(async (transaction) => {
-      await transaction
-        .delete(availabilityOverrides)
-        .where(eq(availabilityOverrides.userId, authedUser.id));
+    const now = new Date();
+    try {
+      await db.transaction(async (transaction) => {
+        await transaction
+          .delete(availabilityOverrides)
+          .where(eq(availabilityOverrides.userId, authedUser.id));
 
-      if (parsed.data.overrides.length > 0) {
-        await transaction.insert(availabilityOverrides).values(
-          parsed.data.overrides.map((override) => ({
-            userId: authedUser.id,
-            startAt: new Date(override.startAt),
-            endAt: new Date(override.endAt),
-            isAvailable: override.isAvailable,
-            reason: override.reason ?? null,
-          })),
-        );
+        if (parsed.data.overrides.length > 0) {
+          await transaction.insert(availabilityOverrides).values(
+            parsed.data.overrides.map((override) => ({
+              userId: authedUser.id,
+              startAt: new Date(override.startAt),
+              endAt: new Date(override.endAt),
+              isAvailable: override.isAvailable,
+              reason: override.reason ?? null,
+            })),
+          );
+        }
+
+        await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+          featureKey: 'availability_save',
+          sourceKey: buildDemoFeatureSourceKey('availability_save', {
+            scope: 'overrides',
+            overrides: parsed.data.overrides,
+          }),
+          metadata: {
+            scope: 'overrides',
+            count: parsed.data.overrides.length,
+          },
+          now,
+        });
+      });
+    } catch (error) {
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
       }
-    });
+      throw error;
+    }
 
     return context.json({
       ok: true,
@@ -6675,18 +7140,18 @@ app.post('/v0/analytics/funnel/events', async (context) => {
     return jsonError(context, 400, parsed.error.issues[0]?.message ?? 'Invalid request body.');
   }
 
-  const requestIp = resolveClientIp(context.req.raw);
-  if (
-    isPublicAnalyticsRateLimited({
-      ip: requestIp,
-      username: parsed.data.username,
-      eventSlug: parsed.data.eventSlug,
-    })
-  ) {
-    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
-  }
-
   return withDatabase(context, async (db) => {
+    const clientKey = resolveRateLimitClientKey(context.req.raw);
+    if (
+      await isPublicAnalyticsRateLimited(db, {
+        clientKey,
+        username: parsed.data.username,
+        eventSlug: parsed.data.eventSlug,
+      })
+    ) {
+      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+    }
+
     const eventType = await findPublicEventType(db, parsed.data.username, parsed.data.eventSlug);
     if (!eventType) {
       return jsonError(context, 404, 'Event type not found.');
@@ -6715,6 +7180,13 @@ app.get('/v0/users/:username/event-types/:slug', async (context) => {
   return withDatabase(context, async (db) => {
     const username = context.req.param('username');
     const slug = context.req.param('slug');
+    if (requiresLaunchDemoAuthForUserRoute(username)) {
+      const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+      if (!authedUser) {
+        return jsonError(context, 401, 'Sign in to access the launch demo.');
+      }
+    }
+
     const result = await findPublicEventView(db, username, slug);
 
     if (!result) {
@@ -6738,18 +7210,26 @@ app.get('/v0/users/:username/event-types/:slug', async (context) => {
 app.get('/v0/users/:username/event-types/:slug/availability', async (context) => {
   const username = context.req.param('username');
   const slug = context.req.param('slug');
-  const requestIp = resolveClientIp(context.req.raw);
-  if (
-    isPublicBookingRateLimited({
-      ip: requestIp,
-      scope: `availability|${username}|${slug}`,
-      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
-    })
-  ) {
-    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
-  }
 
   return withDatabase(context, async (db) => {
+    if (requiresLaunchDemoAuthForUserRoute(username)) {
+      const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+      if (!authedUser) {
+        return jsonError(context, 401, 'Sign in to access the launch demo.');
+      }
+    }
+
+    const clientKey = resolveRateLimitClientKey(context.req.raw);
+    if (
+      await isPublicBookingRateLimited(db, {
+        clientKey,
+        scope: `availability|${username}|${slug}`,
+        perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
+      })
+    ) {
+      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+    }
+
     const eventType = await findPublicEventType(db, username, slug);
 
     if (!eventType) {
@@ -6883,18 +7363,26 @@ app.get('/v0/users/:username/event-types/:slug/availability', async (context) =>
 app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (context) => {
   const teamSlug = context.req.param('teamSlug');
   const eventSlug = context.req.param('eventSlug');
-  const requestIp = resolveClientIp(context.req.raw);
-  if (
-    isPublicBookingRateLimited({
-      ip: requestIp,
-      scope: `team-availability|${teamSlug}|${eventSlug}`,
-      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
-    })
-  ) {
-    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
-  }
 
   return withDatabase(context, async (db) => {
+    if (requiresLaunchDemoAuthForTeamRoute(teamSlug)) {
+      const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+      if (!authedUser) {
+        return jsonError(context, 401, 'Sign in to access the launch demo.');
+      }
+    }
+
+    const clientKey = resolveRateLimitClientKey(context.req.raw);
+    if (
+      await isPublicBookingRateLimited(db, {
+        clientKey,
+        scope: `team-availability|${teamSlug}|${eventSlug}`,
+        perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
+      })
+    ) {
+      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+    }
+
     const teamEventContext = await findTeamEventTypeContext(db, teamSlug, eventSlug);
 
     if (!teamEventContext) {
@@ -6977,18 +7465,25 @@ app.get('/v0/teams/:teamSlug/event-types/:eventSlug/availability', async (contex
 app.get('/v0/teams/:teamSlug/event-types/:eventSlug', async (context) => {
   const teamSlug = context.req.param('teamSlug');
   const eventSlug = context.req.param('eventSlug');
-  const requestIp = resolveClientIp(context.req.raw);
-  if (
-    isPublicBookingRateLimited({
-      ip: requestIp,
-      scope: `team-event|${teamSlug}|${eventSlug}`,
-      perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
-    })
-  ) {
-    return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
-  }
-
   return withDatabase(context, async (db) => {
+    if (requiresLaunchDemoAuthForTeamRoute(teamSlug)) {
+      const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+      if (!authedUser) {
+        return jsonError(context, 401, 'Sign in to access the launch demo.');
+      }
+    }
+
+    const clientKey = resolveRateLimitClientKey(context.req.raw);
+    if (
+      await isPublicBookingRateLimited(db, {
+        clientKey,
+        scope: `team-event|${teamSlug}|${eventSlug}`,
+        perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
+      })
+    ) {
+      return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
+    }
+
     const teamEventContext = await findTeamEventTypeContext(db, teamSlug, eventSlug);
     if (!teamEventContext) {
       return jsonError(context, 404, 'Team event type not found.');
@@ -7062,7 +7557,7 @@ app.post('/v0/team-bookings', async (context) => {
   }
 
   const payload = parsed.data;
-  const requestIp = resolveClientIp(context.req.raw);
+  const clientKey = resolveRateLimitClientKey(context.req.raw);
 
   const timezone = normalizeTimezone(payload.timezone);
   const startsAt = DateTime.fromISO(payload.startsAt, { zone: 'utc' });
@@ -7097,6 +7592,13 @@ app.post('/v0/team-bookings', async (context) => {
   }
 
   return withDatabase(context, async (db) => {
+    const authedUser = requiresLaunchDemoAuthForTeamRoute(payload.teamSlug)
+      ? await resolveAuthenticatedUser(db, context.req.raw)
+      : null;
+    if (requiresLaunchDemoAuthForTeamRoute(payload.teamSlug) && !authedUser) {
+      return jsonError(context, 401, 'Sign in to access the launch demo.');
+    }
+
     const idempotencyState = await claimIdempotencyRequest(db, {
       scope: 'team_booking_create',
       rawKey: idempotencyKey.key,
@@ -7116,8 +7618,8 @@ app.post('/v0/team-bookings', async (context) => {
       return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
     }
     if (
-      isPublicBookingRateLimited({
-        ip: requestIp,
+      await isPublicBookingRateLimited(db, {
+        clientKey,
         scope: `team-booking|${payload.teamSlug}|${payload.eventSlug}`,
         perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
       })
@@ -7366,6 +7868,19 @@ app.post('/v0/team-bookings', async (context) => {
           endsAt: insertedBooking.endsAt,
         });
 
+        if (authedUser) {
+          await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+            featureKey: 'team_booking',
+            sourceKey: `team-booking:${insertedBooking.id}`,
+            metadata: {
+              teamSlug: payload.teamSlug,
+              eventSlug: payload.eventSlug,
+              bookingId: insertedBooking.id,
+            },
+            now: new Date(),
+          });
+        }
+
         return {
           booking: insertedBooking,
           eventType: {
@@ -7554,6 +8069,13 @@ app.post('/v0/team-bookings', async (context) => {
         });
         return context.json(responseBody, 409);
       }
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        await releaseIdempotencyRequest(db, {
+          scope: 'team_booking_create',
+          keyHash: idempotencyState.keyHash,
+        });
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       console.error('Unexpected error in team booking create:', error);
       const responseBody: Record<string, unknown> = {
         ok: false,
@@ -7584,7 +8106,7 @@ app.post('/v0/bookings', async (context) => {
   }
 
   const payload = parsed.data;
-  const requestIp = resolveClientIp(context.req.raw);
+  const clientKey = resolveRateLimitClientKey(context.req.raw);
 
   const timezone = normalizeTimezone(payload.timezone);
   const idempotencyRequestHash = hashIdempotencyRequestPayload({
@@ -7609,6 +8131,13 @@ app.post('/v0/bookings', async (context) => {
   }
 
   return withDatabase(context, async (db) => {
+    const authedUser = requiresLaunchDemoAuthForUserRoute(payload.username)
+      ? await resolveAuthenticatedUser(db, context.req.raw)
+      : null;
+    if (requiresLaunchDemoAuthForUserRoute(payload.username) && !authedUser) {
+      return jsonError(context, 401, 'Sign in to access the launch demo.');
+    }
+
     const idempotencyState = await claimIdempotencyRequest(db, {
       scope: 'booking_create',
       rawKey: idempotencyKey.key,
@@ -7628,8 +8157,8 @@ app.post('/v0/bookings', async (context) => {
       return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
     }
     if (
-      isPublicBookingRateLimited({
-        ip: requestIp,
+      await isPublicBookingRateLimited(db, {
+        clientKey,
         scope: `booking|${payload.username}|${payload.eventSlug}`,
         perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
       })
@@ -7757,6 +8286,19 @@ app.post('/v0/bookings', async (context) => {
                     startsAt: booking.startsAt,
                     endsAt: booking.endsAt,
                   });
+
+                  if (authedUser) {
+                    await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+                      featureKey: 'one_on_one_booking',
+                      sourceKey: `booking:${booking.id}`,
+                      metadata: {
+                        username: payload.username,
+                        eventSlug: payload.eventSlug,
+                        bookingId: booking.id,
+                      },
+                      now: new Date(),
+                    });
+                  }
                 },
                 insertBooking: async (input) => {
                   try {
@@ -7967,6 +8509,13 @@ app.post('/v0/bookings', async (context) => {
         });
         return context.json(responseBody, 409);
       }
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        await releaseIdempotencyRequest(db, {
+          scope: 'booking_create',
+          keyHash: idempotencyState.keyHash,
+        });
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       console.error('Unexpected error in booking create:', error);
       const responseBody: Record<string, unknown> = {
         ok: false,
@@ -8045,6 +8594,18 @@ app.get('/v0/bookings/actions/:token', async (context) => {
         }
       : null;
 
+    if (
+      isLaunchDemoBookingContext({
+        organizerUsername: row.organizerUsername,
+        teamSlug: teamMetadata?.teamSlug ?? null,
+      })
+    ) {
+      const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
+      if (!authedUser) {
+        return jsonError(context, 401, 'Sign in to access the launch demo.');
+      }
+    }
+
     let rescheduledTo: { id: string; startsAt: string; endsAt: string } | null = null;
     if (row.bookingStatus === 'rescheduled') {
       const [child] = row.consumedBookingId
@@ -8112,6 +8673,7 @@ app.get('/v0/bookings/actions/:token', async (context) => {
 
 app.post('/v0/bookings/actions/:token/cancel', async (context) => {
   return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
     const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
     if (!tokenParam.success) {
       return jsonError(context, 404, 'Action link is invalid or expired.');
@@ -8166,6 +8728,15 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
 
         if (!eventType || !organizer) {
           throw new BookingActionNotFoundError('Booking context not found.');
+        }
+
+        const bookingMetadata = parseBookingMetadata(booking.metadata, normalizeTimezone);
+        const launchDemoContext = isLaunchDemoBookingContext({
+          organizerUsername: organizer.username,
+          teamSlug: bookingMetadata.team?.teamSlug ?? null,
+        });
+        if (launchDemoContext && !authedUser) {
+          throw new LaunchDemoAuthError('Sign in to access the launch demo.');
         }
 
         const tokenState = evaluateBookingActionToken({
@@ -8251,6 +8822,17 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
         const canceledNotifications = await cancelPendingScheduledNotificationsForBooking(transaction, {
           bookingId: booking.id,
         });
+
+        if (launchDemoContext && authedUser) {
+          await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+            featureKey: 'booking_cancel',
+            sourceKey: `booking-cancel:${booking.id}`,
+            metadata: {
+              bookingId: booking.id,
+            },
+            now,
+          });
+        }
 
         return {
           booking: canceledBooking,
@@ -8389,11 +8971,17 @@ app.post('/v0/bookings/actions/:token/cancel', async (context) => {
         },
       });
     } catch (error) {
+      if (error instanceof LaunchDemoAuthError) {
+        return jsonError(context, 401, error.message);
+      }
       if (error instanceof BookingActionNotFoundError) {
         return jsonError(context, 404, 'Action link is invalid or expired.');
       }
       if (error instanceof BookingActionGoneError) {
         return jsonError(context, 410, 'Action link is invalid or expired.');
+      }
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
       }
       throw error;
     }
@@ -8423,7 +9011,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
     return jsonError(context, 400, 'Invalid startsAt value.');
   }
 
-  const requestIp = resolveClientIp(context.req.raw);
+  const clientKey = resolveRateLimitClientKey(context.req.raw);
 
   const requestedStartsAtIso = startsAt.toUTC().toISO();
   if (!requestedStartsAtIso) {
@@ -8448,6 +9036,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
   }
 
   return withDatabase(context, async (db) => {
+    const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
     const idempotencyState = await claimIdempotencyRequest(db, {
       scope: 'booking_reschedule',
       rawKey: idempotencyKey.key,
@@ -8467,8 +9056,8 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
       return jsonError(context, 409, 'A request with this idempotency key is already in progress.');
     }
     if (
-      isPublicBookingRateLimited({
-        ip: requestIp,
+      await isPublicBookingRateLimited(db, {
+        clientKey,
         scope: `reschedule|${hashToken(tokenParam.data)}`,
         perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE,
       })
@@ -8513,7 +9102,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           for update
         `);
 
-        const organizerResult = await transaction.execute<OrganizerProfile>(sql`
+        const bookingOrganizerResult = await transaction.execute<OrganizerProfile>(sql`
           select
             id,
             email,
@@ -8526,10 +9115,19 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
         `);
 
         const eventTypeRow = eventTypeResult.rows[0];
-        const organizerRow = organizerResult.rows[0];
+        const bookingOrganizerRow = bookingOrganizerResult.rows[0];
 
-        if (!eventTypeRow || !organizerRow || !eventTypeRow.isActive) {
+        if (!eventTypeRow || !bookingOrganizerRow || !eventTypeRow.isActive) {
           throw new BookingActionNotFoundError('Booking context not found.');
+        }
+
+        const existingMetadata = parseBookingMetadata(booking.metadata, normalizeTimezone);
+        const launchDemoContext = isLaunchDemoBookingContext({
+          organizerUsername: bookingOrganizerRow.username,
+          teamSlug: existingMetadata.team?.teamSlug ?? null,
+        });
+        if (launchDemoContext && !authedUser) {
+          throw new LaunchDemoAuthError('Sign in to access the launch demo.');
         }
 
         const findReplayBooking = async (): Promise<LockedBooking | null> => {
@@ -8587,7 +9185,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             oldBooking: booking,
             newBooking: replayBooking,
             eventType: eventTypeRow,
-            organizer: organizerRow,
+            organizer: bookingOrganizerRow,
             actionTokens: null,
             alreadyProcessed: true,
             canceledNotificationsForOldBooking: 0,
@@ -8612,7 +9210,6 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           throw new BookingValidationError('Unable to build slot validation range.');
         }
 
-        const existingMetadata = parseBookingMetadata(booking.metadata, normalizeTimezone);
         const existingTeamAssignments = await transaction
           .select({
             teamEventTypeId: teamBookingAssignments.teamEventTypeId,
@@ -8624,8 +9221,15 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
 
         let bufferBeforeMinutes = 0;
         let bufferAfterMinutes = 0;
-        let teamAssignmentWrite: { teamEventTypeId: string; userIds: string[]; mode: TeamSchedulingMode } | null =
-          null;
+        let teamAssignmentWrite:
+          | {
+              teamEventTypeId: string;
+              userIds: string[];
+              mode: TeamSchedulingMode;
+              nextRoundRobinCursor: number;
+              organizerId: string;
+            }
+          | null = null;
 
         if (existingTeamAssignments.length === 0) {
           const [rules, overrides, userTimeOffBlocks, externalBusyWindows, existingBookings] =
@@ -8639,7 +9243,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
                 bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
               })
               .from(availabilityRules)
-              .where(eq(availabilityRules.userId, organizerRow.id)),
+              .where(eq(availabilityRules.userId, bookingOrganizerRow.id)),
             transaction
               .select({
                 startAt: availabilityOverrides.startAt,
@@ -8649,20 +9253,20 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
               .from(availabilityOverrides)
               .where(
                 and(
-                  eq(availabilityOverrides.userId, organizerRow.id),
+                  eq(availabilityOverrides.userId, bookingOrganizerRow.id),
                   lt(availabilityOverrides.startAt, rangeEnd.toJSDate()),
                   gt(availabilityOverrides.endAt, rangeStart.toJSDate()),
                 ),
               ),
             listTimeOffBlocksForUser(
               transaction,
-              organizerRow.id,
+              bookingOrganizerRow.id,
               rangeStart.toJSDate(),
               rangeEnd.toJSDate(),
             ),
             listExternalBusyWindowsForUser(
               transaction,
-              organizerRow.id,
+              bookingOrganizerRow.id,
               rangeStart.toJSDate(),
               rangeEnd.toJSDate(),
             ),
@@ -8677,7 +9281,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
               .from(bookings)
               .where(
                 and(
-                  eq(bookings.organizerId, organizerRow.id),
+                  eq(bookings.organizerId, bookingOrganizerRow.id),
                   eq(bookings.status, 'confirmed'),
                   lt(bookings.startsAt, rangeEnd.toJSDate()),
                   gt(bookings.endsAt, rangeStart.toJSDate()),
@@ -8688,7 +9292,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           const slotResolution = resolveRequestedRescheduleSlot({
             requestedStartsAtIso,
             durationMinutes: eventTypeRow.durationMinutes,
-            organizerTimezone: normalizeTimezone(organizerRow.timezone),
+            organizerTimezone: normalizeTimezone(bookingOrganizerRow.timezone),
             rules,
             overrides: [
               ...overrides,
@@ -8723,6 +9327,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             .select({
               id: teamEventTypes.id,
               mode: teamEventTypes.mode,
+              roundRobinCursor: teamEventTypes.roundRobinCursor,
             })
             .from(teamEventTypes)
             .where(eq(teamEventTypes.id, teamEventTypeId))
@@ -8733,15 +9338,33 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             throw new BookingValidationError('Team scheduling mode is invalid.');
           }
 
-          const assignmentUserIds = Array.from(
-            new Set(existingTeamAssignments.map((assignment) => assignment.userId)),
-          );
+          const requiredMemberRows = await transaction
+            .select({
+              userId: teamEventTypeMembers.userId,
+            })
+            .from(teamEventTypeMembers)
+            .where(
+              and(
+                eq(teamEventTypeMembers.teamEventTypeId, teamEventTypeId),
+                eq(teamEventTypeMembers.isRequired, true),
+              ),
+            )
+            .orderBy(asc(teamEventTypeMembers.userId));
+
+          const requiredMemberUserIds = requiredMemberRows.map((member) => member.userId);
+          if (requiredMemberUserIds.length === 0) {
+            throw new BookingValidationError('Team event has no required members.');
+          }
+
           const memberSchedules = await listTeamMemberSchedules(
             transaction,
-            assignmentUserIds,
+            requiredMemberUserIds,
             rangeStart.toJSDate(),
             rangeEnd.toJSDate(),
           );
+          if (memberSchedules.length !== requiredMemberUserIds.length) {
+            throw new BookingValidationError('Some required team members no longer exist.');
+          }
 
           const filteredMemberSchedules = memberSchedules.map((schedule) => ({
             ...schedule,
@@ -8761,10 +9384,15 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             durationMinutes: eventTypeRow.durationMinutes,
             rangeStartIso,
             days: 2,
-            roundRobinCursor: 0,
+            roundRobinCursor: teamEventRow.roundRobinCursor,
           });
           if (!teamSlotResolution) {
             throw new BookingConflictError('Selected slot is no longer available.');
+          }
+
+          const nextOrganizerId = teamSlotResolution.assignmentUserIds[0];
+          if (!nextOrganizerId) {
+            throw new BookingValidationError('Unable to assign team booking.');
           }
 
           bufferBeforeMinutes = teamSlotResolution.bufferBeforeMinutes;
@@ -8773,12 +9401,14 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             teamEventTypeId,
             userIds: teamSlotResolution.assignmentUserIds,
             mode: teamMode,
+            nextRoundRobinCursor: teamSlotResolution.nextRoundRobinCursor,
+            organizerId: nextOrganizerId,
           };
         }
 
         const capWindows = buildBookingCapWindowsForSlot({
           startsAtIso: requestedStartsAtIso,
-          timezone: normalizeTimezone(eventTypeRow.organizerTimezone ?? organizerRow.timezone),
+          timezone: normalizeTimezone(eventTypeRow.organizerTimezone ?? bookingOrganizerRow.timezone),
           caps: toEventTypeBookingCaps(eventTypeRow),
         });
         for (const window of capWindows) {
@@ -8813,6 +9443,8 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             : {}),
         });
 
+        const nextOrganizerId = teamAssignmentWrite?.organizerId ?? booking.organizerId;
+
         let insertedBooking: {
           id: string;
           eventTypeId: string;
@@ -8828,7 +9460,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             .insert(bookings)
             .values({
               eventTypeId: booking.eventTypeId,
-              organizerId: booking.organizerId,
+              organizerId: nextOrganizerId,
               inviteeName: booking.inviteeName,
               inviteeEmail: booking.inviteeEmail,
               startsAt: startsAt.toJSDate(),
@@ -8886,6 +9518,15 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
             and(eq(bookingActionTokens.bookingId, booking.id), isNull(bookingActionTokens.consumedAt)),
           );
 
+        if (teamAssignmentWrite?.mode === 'round_robin') {
+          await transaction
+            .update(teamEventTypes)
+            .set({
+              roundRobinCursor: teamAssignmentWrite.nextRoundRobinCursor,
+            })
+            .where(eq(teamEventTypes.id, teamAssignmentWrite.teamEventTypeId));
+        }
+
         await transaction
           .delete(teamBookingAssignments)
           .where(eq(teamBookingAssignments.bookingId, booking.id));
@@ -8925,6 +9566,34 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           endsAt: insertedBooking.endsAt,
         });
 
+        const [effectiveOrganizer] = await transaction
+          .select({
+            id: users.id,
+            email: users.email,
+            username: users.username,
+            displayName: users.displayName,
+            timezone: users.timezone,
+          })
+          .from(users)
+          .where(eq(users.id, insertedBooking.organizerId))
+          .limit(1);
+
+        if (!effectiveOrganizer) {
+          throw new Error('Assigned organizer not found.');
+        }
+
+        if (launchDemoContext && authedUser) {
+          await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
+            featureKey: 'booking_reschedule',
+            sourceKey: `booking-reschedule:${booking.id}:${insertedBooking.id}`,
+            metadata: {
+              oldBookingId: booking.id,
+              newBookingId: insertedBooking.id,
+            },
+            now,
+          });
+        }
+
         return {
           oldBooking: {
             ...booking,
@@ -8932,7 +9601,7 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
           },
           newBooking: insertedBooking,
           eventType: eventTypeRow,
-          organizer: organizerRow,
+          organizer: effectiveOrganizer,
           actionTokens: tokenSet.publicTokens,
           alreadyProcessed: false,
           canceledNotificationsForOldBooking,
@@ -9116,6 +9785,20 @@ app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
 
       return context.json(responseBody);
     } catch (error) {
+      if (error instanceof LaunchDemoAuthError) {
+        await releaseIdempotencyRequest(db, {
+          scope: 'booking_reschedule',
+          keyHash: idempotencyState.keyHash,
+        });
+        return jsonError(context, 401, error.message);
+      }
+      if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+        await releaseIdempotencyRequest(db, {
+          scope: 'booking_reschedule',
+          keyHash: idempotencyState.keyHash,
+        });
+        return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+      }
       if (error instanceof BookingActionNotFoundError) {
         const responseBody: Record<string, unknown> = {
           ok: false,

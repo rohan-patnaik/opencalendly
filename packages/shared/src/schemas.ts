@@ -44,17 +44,6 @@ export const teamMemberRoleSchema = z.enum(['owner', 'member']);
 export const teamSchedulingModeSchema = z.enum(['round_robin', 'collective']);
 export const bookingLimitSchema = z.number().int().min(1).max(1000);
 
-export const magicLinkRequestSchema = z.object({
-  email: emailSchema,
-  username: usernameSchema.optional(),
-  displayName: z.string().min(1).max(120).optional(),
-  timezone: timezoneSchema.optional(),
-});
-
-export const verifyMagicLinkRequestSchema = z.object({
-  token: z.string().min(32).max(256),
-});
-
 export const clerkAuthExchangeRequestSchema = z.object({
   clerkToken: z.string().min(20).max(4096),
   username: usernameSchema.optional(),
@@ -222,10 +211,6 @@ export const notificationsRunSchema = z.object({
   limit: z.number().int().min(1).max(100).optional(),
 });
 
-export const demoCreditsConsumeSchema = z.object({
-  email: emailSchema,
-});
-
 export const waitlistJoinSchema = z.object({
   email: emailSchema,
   source: z.string().min(1).max(80).default('demo-credits-exhausted'),
@@ -334,8 +319,6 @@ export const webhookEventSchema = z.object({
 });
 
 export type HealthCheck = z.infer<typeof healthCheckSchema>;
-export type MagicLinkRequest = z.infer<typeof magicLinkRequestSchema>;
-export type VerifyMagicLinkRequest = z.infer<typeof verifyMagicLinkRequestSchema>;
 export type ClerkAuthExchangeRequest = z.infer<typeof clerkAuthExchangeRequestSchema>;
 export type BookingActionToken = z.infer<typeof bookingActionTokenSchema>;
 export type BookingActionType = z.infer<typeof bookingActionTypeSchema>;
@@ -360,7 +343,6 @@ export type NotificationRuleType = z.infer<typeof notificationRuleTypeSchema>;
 export type NotificationRuleInput = z.infer<typeof notificationRuleSchema>;
 export type SetNotificationRulesInput = z.infer<typeof setNotificationRulesSchema>;
 export type NotificationsRunInput = z.infer<typeof notificationsRunSchema>;
-export type DemoCreditsConsumeInput = z.infer<typeof demoCreditsConsumeSchema>;
 export type WaitlistJoinInput = z.infer<typeof waitlistJoinSchema>;
 export type WebhookEventType = z.infer<typeof webhookEventTypeSchema>;
 export type WebhookSubscriptionCreateInput = z.infer<typeof webhookSubscriptionCreateSchema>;

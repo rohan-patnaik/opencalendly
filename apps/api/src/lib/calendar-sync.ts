@@ -58,6 +58,26 @@ export const resolveGoogleSyncRange = (
   return { startIso, endIso };
 };
 
+export const resolveMicrosoftSyncRange = (
+  now: Date,
+  requestedStartIso?: string,
+  requestedEndIso?: string,
+): { startIso: string; endIso: string } => {
+  const range = resolveGoogleSyncRange(now, requestedStartIso, requestedEndIso);
+  const start = DateTime.fromISO(range.startIso, { zone: 'utc' });
+  const end = DateTime.fromISO(range.endIso, { zone: 'utc' });
+
+  if (!start.isValid || !end.isValid || end.toMillis() <= start.toMillis()) {
+    throw new Error('Sync range start/end is invalid.');
+  }
+
+  if (end.diff(start, 'days').days >= MICROSOFT_SYNC_MAX_RANGE_DAYS) {
+    throw new Error('Microsoft sync range must be less than 62 days.');
+  }
+
+  return range;
+};
+
 export const resolveGoogleAccessToken = async (
   input: {
     connection: CalendarConnectionSecretState;

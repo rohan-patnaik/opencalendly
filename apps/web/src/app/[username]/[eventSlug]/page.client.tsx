@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { DemoQuotaCard } from '../../../components/demo-quota-card';
+import { buildEmailDeliveryMessage } from '../../../lib/booking-outcome';
+import { getAuthHeader } from '../../../lib/auth-session';
+import { useDemoQuota } from '../../../lib/demo-quota';
 import {
   COMMON_TIMEZONES,
   createIdempotencyKey,
@@ -9,7 +13,7 @@ import {
   getBrowserTimezone,
   groupSlotsByDay,
 } from '../../../lib/public-booking';
-import { buildEmailDeliveryMessage } from '../../../lib/booking-outcome';
+import { useAuthSession } from '../../../lib/use-auth-session';
 import styles from './page.module.css';
 
 type PublicEventResponse = {
@@ -91,6 +95,8 @@ const readableLocation = (locationType: string, locationValue: string | null): s
 };
 
 export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: BookingPageClientProps) {
+  const { session, ready } = useAuthSession();
+  const isLaunchDemoPage = username.trim().toLowerCase() === 'demo';
   const [timezone, setTimezone] = useState('UTC');
   const [eventData, setEventData] = useState<PublicEventResponse | null>(null);
   const [slots, setSlots] = useState<Array<{ startsAt: string; endsAt: string }>>([]);
@@ -109,6 +115,22 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     cancelPageUrl?: string;
     reschedulePageUrl?: string;
   } | null>(null);
+  const {
+    status: demoQuotaStatus,
+    loading: demoQuotaLoading,
+    error: demoQuotaError,
+    refresh: refreshDemoQuota,
+  } = useDemoQuota({
+    apiBaseUrl,
+    session,
+    enabled: isLaunchDemoPage,
+  });
+
+  const signInHref = useMemo(() => {
+    return `/auth/sign-in?redirect_url=${encodeURIComponent(
+      `/${encodeURIComponent(username)}/${encodeURIComponent(eventSlug)}`,
+    )}`;
+  }, [eventSlug, username]);
 
   const timezoneOptions = useMemo(() => {
     return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
@@ -141,13 +163,24 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   );
 
   const loadEvent = useCallback(async () => {
+    if (isLaunchDemoPage && !session) {
+      setEventData(null);
+      setLoadingEvent(false);
+      return;
+    }
+
     setLoadingEvent(true);
     setPageError(null);
 
     try {
       const response = await fetch(
         `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}`,
-        { cache: 'no-store' },
+        {
+          cache: 'no-store',
+          headers: {
+            ...getAuthHeader(session),
+          },
+        },
       );
       const payload = (await response.json()) as PublicEventResponse;
       if (!response.ok || !payload.ok) {
@@ -165,9 +198,15 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     } finally {
       setLoadingEvent(false);
     }
-  }, [apiBaseUrl, eventSlug, trackFunnelEvent, username]);
+  }, [apiBaseUrl, eventSlug, isLaunchDemoPage, session, trackFunnelEvent, username]);
 
   const loadAvailability = useCallback(async () => {
+    if (isLaunchDemoPage && !session) {
+      setSlots([]);
+      setLoadingSlots(false);
+      return;
+    }
+
     setLoadingSlots(true);
     setPageError(null);
 
@@ -180,7 +219,12 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
 
       const response = await fetch(
         `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
-        { cache: 'no-store' },
+        {
+          cache: 'no-store',
+          headers: {
+            ...getAuthHeader(session),
+          },
+        },
       );
       const payload = (await response.json()) as AvailabilityResponse;
       if (!response.ok || !payload.ok) {
@@ -199,22 +243,28 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     } finally {
       setLoadingSlots(false);
     }
-  }, [apiBaseUrl, eventSlug, timezone, username]);
+  }, [apiBaseUrl, eventSlug, isLaunchDemoPage, session, timezone, username]);
 
   useEffect(() => {
     setTimezone(getBrowserTimezone());
   }, []);
 
   useEffect(() => {
+    if (isLaunchDemoPage && !ready) {
+      return;
+    }
     void loadEvent();
-  }, [loadEvent]);
+  }, [isLaunchDemoPage, loadEvent, ready]);
 
   useEffect(() => {
     if (!eventData) {
       return;
     }
+    if (isLaunchDemoPage && !session) {
+      return;
+    }
     void loadAvailability();
-  }, [eventData, loadAvailability]);
+  }, [eventData, isLaunchDemoPage, loadAvailability, session]);
 
   useEffect(() => {
     if (!selectedSlot) {
@@ -253,6 +303,7 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       const response = await fetch(`${apiBaseUrl}/v0/bookings`, {
         method: 'POST',
         headers: {
+          ...getAuthHeader(session),
           'Content-Type': 'application/json',
           'Idempotency-Key': requestIdempotencyKey,
         },
@@ -273,6 +324,9 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
         setPageError(payload.error || 'Booking failed. Please choose another slot.');
         if (response.status === 409) {
           void loadAvailability();
+        }
+        if (response.status === 429 && isLaunchDemoPage) {
+          void refreshDemoQuota();
         }
         return;
       }
@@ -301,6 +355,9 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       setBookingRequestKey('');
       setAnswers(buildInitialAnswers(eventData?.eventType.questions ?? []));
       void loadAvailability();
+      if (isLaunchDemoPage) {
+        void refreshDemoQuota();
+      }
     } catch {
       setPageError('Booking failed. Please try again.');
     } finally {
@@ -308,12 +365,38 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     }
   };
 
-  if (loadingEvent) {
+  if (loadingEvent || (isLaunchDemoPage && !ready)) {
     return (
       <main className={styles.page}>
         <section className={styles.heroCard}>
           <p className={styles.kicker}>Public booking</p>
           <h1>Loading event...</h1>
+        </section>
+      </main>
+    );
+  }
+
+  if (isLaunchDemoPage && !session) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.heroCard}>
+          <p className={styles.kicker}>Launch demo</p>
+          <h1>Sign in to book the demo</h1>
+          <p>The launch demo requires authentication so anonymous traffic cannot consume today’s pool.</p>
+        </section>
+
+        <section className={styles.layout}>
+          <DemoQuotaCard
+            apiBaseUrl={apiBaseUrl}
+            session={session}
+            status={demoQuotaStatus}
+            loading={demoQuotaLoading}
+            error={demoQuotaError}
+            signInHref={signInHref}
+            waitlistSource="demo-booking"
+            featureKeys={['one_on_one_booking']}
+            onStatusChange={refreshDemoQuota}
+          />
         </section>
       </main>
     );
@@ -418,6 +501,19 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
           ) : (
             <p className={styles.selection}>Select a slot to continue.</p>
           )}
+
+          {isLaunchDemoPage ? (
+            <DemoQuotaCard
+              apiBaseUrl={apiBaseUrl}
+              session={session}
+              status={demoQuotaStatus}
+              loading={demoQuotaLoading}
+              error={demoQuotaError}
+              waitlistSource="demo-booking"
+              featureKeys={['one_on_one_booking']}
+              onStatusChange={refreshDemoQuota}
+            />
+          ) : null}
 
           <form className={styles.form} onSubmit={submitBooking}>
             <label className={styles.label} htmlFor="invitee-name">

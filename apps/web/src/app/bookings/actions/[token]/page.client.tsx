@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
+import { DemoQuotaCard } from '../../../../components/demo-quota-card';
+import { getAuthHeader } from '../../../../lib/auth-session';
+import { type DemoFeatureCostKey, useDemoQuota } from '../../../../lib/demo-quota';
 import {
   COMMON_TIMEZONES,
   createIdempotencyKey,
@@ -10,6 +13,7 @@ import {
   getBrowserTimezone,
   groupSlotsByDay,
 } from '../../../../lib/public-booking';
+import { useAuthSession } from '../../../../lib/use-auth-session';
 import styles from './page.module.css';
 
 type BookingActionLookupResponse = {
@@ -121,6 +125,7 @@ const statusLabel = (status: BookingActionLookupResponse['booking']['status']): 
 };
 
 export default function BookingActionPageClient({ token, apiBaseUrl }: BookingActionPageClientProps) {
+  const { session, ready } = useAuthSession();
   const [actionStatus, setActionStatus] = useState<ActionStatus>('active');
   const [actionData, setActionData] = useState<BookingActionLookupResponse | null>(null);
   const [timezone, setTimezone] = useState('UTC');
@@ -134,6 +139,34 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
   const [submittingReschedule, setSubmittingReschedule] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [requiresDemoAuth, setRequiresDemoAuth] = useState(false);
+  const [isLaunchDemoAction, setIsLaunchDemoAction] = useState(false);
+  const {
+    status: demoQuotaStatus,
+    loading: demoQuotaLoading,
+    error: demoQuotaError,
+    refresh: refreshDemoQuota,
+  } = useDemoQuota({
+    apiBaseUrl,
+    session,
+    enabled: requiresDemoAuth || isLaunchDemoAction,
+  });
+
+  const signInHref = useMemo(() => {
+    return `/auth/sign-in?redirect_url=${encodeURIComponent(
+      `/bookings/actions/${encodeURIComponent(token)}`,
+    )}`;
+  }, [token]);
+
+  const quotaFeatureKeys = useMemo<DemoFeatureCostKey[]>(() => {
+    if (actionData?.actions.canReschedule) {
+      return ['booking_reschedule', 'booking_cancel'];
+    }
+    if (actionData?.actions.canCancel) {
+      return ['booking_cancel'];
+    }
+    return ['booking_cancel', 'booking_reschedule'];
+  }, [actionData]);
 
   const timezoneOptions = useMemo(() => {
     return Array.from(new Set([timezone, getBrowserTimezone(), ...COMMON_TIMEZONES]));
@@ -171,6 +204,11 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
   }, [actionStatus]);
 
   const loadAction = useCallback(async () => {
+    if (requiresDemoAuth && !session) {
+      setLoadingAction(false);
+      return;
+    }
+
     setLoadingAction(true);
     setError(null);
     setSuccess(null);
@@ -178,6 +216,9 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     try {
       const response = await fetch(`${apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(token)}`, {
         cache: 'no-store',
+        headers: {
+          ...getAuthHeader(session),
+        },
       });
       const payload = (await response.json().catch(() => null)) as
         | BookingActionLookupResponse
@@ -193,11 +234,20 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
         } else {
           setActionStatus('active');
         }
+        if (response.status === 401) {
+          setRequiresDemoAuth(true);
+        }
         setActionData(null);
         setError(errorMessage);
         return;
       }
 
+      const launchDemoAction =
+        payload.organizer.username.trim().toLowerCase() === 'demo' ||
+        payload.booking.team?.teamSlug?.trim().toLowerCase() === 'demo-team';
+
+      setRequiresDemoAuth(false);
+      setIsLaunchDemoAction(launchDemoAction);
       setActionStatus('active');
       setActionData(payload);
       setTimezone(payload.booking.timezone || getBrowserTimezone());
@@ -208,7 +258,7 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     } finally {
       setLoadingAction(false);
     }
-  }, [apiBaseUrl, token]);
+  }, [apiBaseUrl, requiresDemoAuth, session, token]);
 
   const loadAvailability = useCallback(async () => {
     if (!actionData || !actionData.actions.canReschedule) {
@@ -231,9 +281,15 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     try {
       const response = await fetch(`${apiBaseUrl}${path}`, {
         cache: 'no-store',
+        headers: {
+          ...getAuthHeader(session),
+        },
       });
       const payload = (await response.json().catch(() => null)) as AvailabilityResponse | BookingActionApiError | null;
       if (!response.ok || !payload || !('ok' in payload) || payload.ok !== true) {
+        if (response.status === 401) {
+          setRequiresDemoAuth(true);
+        }
         setSlots([]);
         setError(getErrorMessage(payload, 'Unable to load availability.'));
         return;
@@ -249,11 +305,14 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     } finally {
       setLoadingAvailability(false);
     }
-  }, [actionData, apiBaseUrl, timezone]);
+  }, [actionData, apiBaseUrl, session, timezone]);
 
   useEffect(() => {
+    if (!ready) {
+      return;
+    }
     void loadAction();
-  }, [loadAction]);
+  }, [loadAction, ready, session]);
 
   useEffect(() => {
     if (!actionData?.actions.canReschedule) {
@@ -284,6 +343,7 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
       const response = await fetch(`${apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(token)}/cancel`, {
         method: 'POST',
         headers: {
+          ...getAuthHeader(session),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -300,6 +360,10 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
         } else if (response.status === 404) {
           setActionStatus('invalid');
           setActionData(null);
+        } else if (response.status === 401) {
+          setRequiresDemoAuth(true);
+        } else if (response.status === 429) {
+          void refreshDemoQuota();
         }
         setError(message);
         return;
@@ -308,6 +372,7 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
       setSuccess('Booking canceled successfully.');
       setSlots([]);
       setSelectedSlot('');
+      setCancelReason('');
       setActionData((current) => {
         if (!current) {
           return current;
@@ -324,6 +389,9 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
           },
         };
       });
+      if (requiresDemoAuth || isLaunchDemoAction) {
+        void refreshDemoQuota();
+      }
     } catch {
       setError('Unable to cancel booking.');
     } finally {
@@ -353,6 +421,7 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
       const response = await fetch(`${apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(token)}/reschedule`, {
         method: 'POST',
         headers: {
+          ...getAuthHeader(session),
           'Content-Type': 'application/json',
           'Idempotency-Key': requestIdempotencyKey,
         },
@@ -386,6 +455,10 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
           setActionStatus('invalid');
           setActionData(null);
           setRescheduleRequestKey('');
+        } else if (response.status === 401) {
+          setRequiresDemoAuth(true);
+        } else if (response.status === 429) {
+          void refreshDemoQuota();
         }
         setError(message);
         return;
@@ -422,6 +495,9 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
           },
         };
       });
+      if (requiresDemoAuth || isLaunchDemoAction) {
+        void refreshDemoQuota();
+      }
     } catch {
       setError('Unable to reschedule booking.');
     } finally {
@@ -429,12 +505,39 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
     }
   };
 
-  if (loadingAction) {
+  if (!ready || loadingAction) {
     return (
       <main className={styles.page}>
         <section className={styles.heroCard}>
           <p className={styles.kicker}>Booking actions</p>
           <h1>Loading action link...</h1>
+        </section>
+      </main>
+    );
+  }
+
+  if (requiresDemoAuth && !session) {
+    return (
+      <main className={styles.page}>
+        <section className={styles.heroCard}>
+          <p className={styles.kicker}>Launch demo action</p>
+          <p className={styles.statusPill}>Link status: {actionStatusLabel}</p>
+          <h1>Sign in to continue</h1>
+          <p className={styles.error}>{error || 'This launch demo action requires authentication.'}</p>
+        </section>
+
+        <section className={styles.layout}>
+          <DemoQuotaCard
+            apiBaseUrl={apiBaseUrl}
+            session={session}
+            status={demoQuotaStatus}
+            loading={demoQuotaLoading}
+            error={demoQuotaError}
+            signInHref={signInHref}
+            waitlistSource="demo-booking-action"
+            featureKeys={quotaFeatureKeys}
+            onStatusChange={refreshDemoQuota}
+          />
         </section>
       </main>
     );
@@ -481,6 +584,21 @@ export default function BookingActionPageClient({ token, apiBaseUrl }: BookingAc
           </p>
         )}
       </section>
+
+      {isLaunchDemoAction ? (
+        <section className={styles.card}>
+          <DemoQuotaCard
+            apiBaseUrl={apiBaseUrl}
+            session={session}
+            status={demoQuotaStatus}
+            loading={demoQuotaLoading}
+            error={demoQuotaError}
+            waitlistSource="demo-booking-action"
+            featureKeys={quotaFeatureKeys}
+            onStatusChange={refreshDemoQuota}
+          />
+        </section>
+      ) : null}
 
       {actionData.actions.canReschedule ? (
         <section className={styles.layout}>

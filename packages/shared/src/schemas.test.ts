@@ -15,10 +15,8 @@ import {
   bookingRescheduleSchema,
   setNotificationRulesSchema,
   notificationsRunSchema,
-  demoCreditsConsumeSchema,
   eventTypeCreateSchema,
   healthCheckSchema,
-  magicLinkRequestSchema,
   timeOffCreateSchema,
   timeOffHolidayImportSchema,
   teamAddMemberSchema,
@@ -221,14 +219,6 @@ describe('shared schemas', () => {
     expect(payload.limit).toBe(25);
   });
 
-  it('accepts demo credits consume payloads', () => {
-    const payload = demoCreditsConsumeSchema.parse({
-      email: 'demo@opencalendly.dev',
-    });
-
-    expect(payload.email).toBe('demo@opencalendly.dev');
-  });
-
   it('accepts waitlist join payloads', () => {
     const payload = waitlistJoinSchema.parse({
       email: 'demo@opencalendly.dev',
@@ -280,14 +270,6 @@ describe('shared schemas', () => {
     });
 
     expect(payload.teamSlug).toBe('customer-success');
-  });
-
-  it('rejects malformed auth payload', () => {
-    const result = magicLinkRequestSchema.safeParse({
-      email: 'not-an-email',
-    });
-
-    expect(result.success).toBe(false);
   });
 
   it('accepts calendar OAuth start payload', () => {

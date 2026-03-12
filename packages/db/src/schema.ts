@@ -112,6 +112,28 @@ export const sessions = pgTable('sessions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const requestRateLimits = pgTable(
+  'request_rate_limits',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    scope: varchar('scope', { length: 64 }).notNull(),
+    keyHash: varchar('key_hash', { length: 64 }).notNull(),
+    windowStartsAt: timestamp('window_starts_at', { withTimezone: true }).notNull(),
+    count: integer('count').notNull().default(1),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    scopeKeyWindowUnique: unique('request_rate_limits_scope_key_hash_window_unique').on(
+      table.scope,
+      table.keyHash,
+      table.windowStartsAt,
+    ),
+    countRange: check('request_rate_limits_count_range', sql`${table.count} > 0 and ${table.count} <= 1000000`),
+    scopeWindowIndex: index('request_rate_limits_scope_window_idx').on(table.scope, table.windowStartsAt),
+    updatedAtIndex: index('request_rate_limits_updated_at_idx').on(table.updatedAt),
+  }),
+);
+
 export const eventTypes = pgTable(
   'event_types',
   {
@@ -613,13 +635,81 @@ export const teamBookingAssignments = pgTable(
   }),
 );
 
-export const demoCreditsDaily = pgTable('demo_credits_daily', {
-  dateKey: varchar('date_key', { length: 10 }).primaryKey(),
-  used: integer('used').notNull().default(0),
-  dailyLimit: integer('daily_limit').notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const demoAdmissionsDaily = pgTable(
+  'demo_admissions_daily',
+  {
+    dateKey: varchar('date_key', { length: 10 }).primaryKey(),
+    admittedCount: integer('admitted_count').notNull().default(0),
+    dailyLimit: integer('daily_limit').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    admittedCountRange: check(
+      'demo_admissions_daily_count_range',
+      sql`${table.admittedCount} >= 0 and ${table.admittedCount} <= 1000000`,
+    ),
+    dailyLimitRange: check(
+      'demo_admissions_daily_limit_range',
+      sql`${table.dailyLimit} > 0 and ${table.dailyLimit} <= 1000000`,
+    ),
+  }),
+);
+
+export const demoAccountDailyUsage = pgTable(
+  'demo_account_daily_usage',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    dateKey: varchar('date_key', { length: 10 }).notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    creditsLimit: integer('credits_limit').notNull(),
+    creditsUsed: integer('credits_used').notNull().default(0),
+    isBypass: boolean('is_bypass').notNull().default(false),
+    admittedAt: timestamp('admitted_at', { withTimezone: true }).notNull().defaultNow(),
+    lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueDateUser: unique('demo_account_daily_usage_date_user_unique').on(table.dateKey, table.userId),
+    dateUserIndex: index('demo_account_daily_usage_date_user_idx').on(table.dateKey, table.userId),
+    creditsLimitRange: check(
+      'demo_account_daily_usage_limit_range',
+      sql`${table.creditsLimit} > 0 and ${table.creditsLimit} <= 1000000`,
+    ),
+    creditsUsedRange: check(
+      'demo_account_daily_usage_used_range',
+      sql`${table.creditsUsed} >= 0 and ${table.creditsUsed} <= 1000000`,
+    ),
+  }),
+);
+
+export const demoCreditEvents = pgTable(
+  'demo_credit_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    dateKey: varchar('date_key', { length: 10 }).notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    featureKey: varchar('feature_key', { length: 64 }).notNull(),
+    cost: integer('cost').notNull(),
+    sourceKey: varchar('source_key', { length: 200 }).notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueDateUserSource: unique('demo_credit_events_date_user_source_unique').on(
+      table.dateKey,
+      table.userId,
+      table.sourceKey,
+    ),
+    dateUserIndex: index('demo_credit_events_date_user_idx').on(table.dateKey, table.userId),
+    costRange: check('demo_credit_events_cost_range', sql`${table.cost} > 0 and ${table.cost} <= 1000`),
+  }),
+);
 
 export const waitlistEntries = pgTable(
   'waitlist_entries',
