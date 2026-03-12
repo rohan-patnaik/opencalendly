@@ -823,7 +823,8 @@ Acceptance criteria:
   - `npm run lint`
   - `npm run test`
   - `npm run typecheck`
-  - local browser smoke for demo booking page no longer surfaces the SQL syntax error
+  - local browser smoke confirms `/demo/intro-call` no longer surfaces the SQL syntax error
+  - local browser smoke confirms `/team/demo-team/team-intro-call` no longer surfaces the SQL syntax error
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
