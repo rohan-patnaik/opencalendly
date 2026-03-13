@@ -29,11 +29,16 @@ export const useDashboardSession = ({
 
   const handleSignOut = useCallback(async () => {
     setSignOutError(null);
+    let apiSessionRevoked = false;
     try {
       await revokeApiSession(apiBaseUrl);
-      await signOut({ redirectUrl: '/auth/sign-in' });
+      apiSessionRevoked = true;
       clear();
+      await signOut({ redirectUrl: '/auth/sign-in' });
     } catch (error) {
+      if (apiSessionRevoked) {
+        clear();
+      }
       console.error('Clerk sign-out failed:', error);
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;

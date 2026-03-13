@@ -41,11 +41,16 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const handleSignOut = useCallback(async () => {
     setSignOutError(null);
+    let apiSessionRevoked = false;
     try {
       await revokeApiSession(apiBaseUrl);
-      await signOut({ redirectUrl: '/auth/sign-in' });
+      apiSessionRevoked = true;
       clear();
+      await signOut({ redirectUrl: '/auth/sign-in' });
     } catch (error) {
+      if (apiSessionRevoked) {
+        clear();
+      }
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
         console.error('Clerk sign-out failed:', detail ?? 'unknown clerk error');

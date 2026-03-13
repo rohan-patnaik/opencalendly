@@ -1468,7 +1468,7 @@ Public endpoint returning team event metadata for the booking page.
 
 Note:
 
-- The seeded launch demo team (`teamSlug = demo-team`) requires bearer auth.
+- The seeded launch demo team (`teamSlug = demo-team`) requires authenticated access.
 
 Success response:
 

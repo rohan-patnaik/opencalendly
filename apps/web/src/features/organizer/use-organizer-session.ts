@@ -30,11 +30,16 @@ export const useOrganizerSession = ({
 
   const handleSignOut = useCallback(async () => {
     setPanelError(null);
+    let apiSessionRevoked = false;
     try {
       await revokeApiSession(apiBaseUrl);
-      await signOut({ redirectUrl: '/auth/sign-in' });
+      apiSessionRevoked = true;
       clear();
+      await signOut({ redirectUrl: '/auth/sign-in' });
     } catch (error) {
+      if (apiSessionRevoked) {
+        clear();
+      }
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
         setPanelError(detail ?? 'Unable to sign out right now. Please try again.');

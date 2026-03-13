@@ -103,6 +103,7 @@ describe('demo quota client helpers', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('https://api.example.com/v0/waitlist');
       expect(init?.method).toBe('POST');
+      expect(init?.credentials).toBe('include');
       expect(init?.headers).toMatchObject({
         'Content-Type': 'application/json',
       });
