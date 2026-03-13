@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
 import { resolveAllowedCorsOrigins } from './lib/cors';
-import { jsonError } from './server/core';
+import { jsonError, logInternalError } from './server/core';
 import type { Bindings } from './server/types';
 import { registerAnalyticsFunnelRoutes } from './routes/analytics-funnel';
 import { registerAnalyticsOperatorRoutes } from './routes/analytics-operator';
@@ -90,8 +90,8 @@ registerBookingActionCancelRoutes(app);
 registerBookingActionRescheduleRoutes(app);
 
 app.onError((error, context) => {
-  const message = error instanceof Error ? error.message : 'Unexpected server error.';
-  return jsonError(context, 500, message);
+  logInternalError('api_unhandled_error', error);
+  return jsonError(context, 500, 'Unexpected server error.');
 });
 
 export default app;

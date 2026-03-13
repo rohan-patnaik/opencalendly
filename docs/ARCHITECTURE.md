@@ -40,6 +40,26 @@ flowchart LR
 
 ## Frontend architecture (post-v1 parity track)
 
+## Current module boundaries
+
+- `apps/api/src/app.ts` is the API composition root only:
+  - shared middleware
+  - route registration
+  - global error boundary
+- API HTTP handlers are split by domain under `apps/api/src/routes`:
+  - auth/session
+  - analytics
+  - public booking and availability
+  - booking actions
+  - organizer operations
+  - calendar connect/sync/writeback
+  - webhooks, demo, and embed
+- Shared server-side workflow helpers live under `apps/api/src/server` and keep booking, rate-limit, auth-session, demo-quota, and writeback logic out of route registration files.
+- Web route shells are intentionally thin:
+  - route-level `page.client.tsx` files delegate feature logic into adjacent `page.client.impl.tsx` or `apps/web/src/features/*`
+  - organizer, dashboard, and booking flows keep state and UI split into feature-local hooks, panels, and API clients
+- Cross-app request and response contracts that are stable across API and web live in `packages/shared/src/contracts.ts` and existing schema modules.
+
 - Global app chrome wraps all routes and provides:
   - primary navigation
   - session state affordances (signed-in identity + sign-out)

@@ -8,6 +8,10 @@ export const jsonError = (context: ContextLike, status: number, error: string): 
   return context.json({ ok: false, error }, status);
 };
 
+export const logInternalError = (scope: string, error: unknown): void => {
+  console.error(scope, error);
+};
+
 export const isUuid = (value: string): boolean => {
   return UUID_PATTERN.test(value);
 };

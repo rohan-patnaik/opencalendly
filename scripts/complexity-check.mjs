@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
+import { normalizeRepoPath } from './complexity-check-lib.mjs';
+
 const rootDir = process.cwd();
 const authoredExtensions = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const ignoredDirs = new Set([
@@ -69,7 +71,7 @@ const walk = (directory) => {
       continue;
     }
 
-    const path = relative(rootDir, fullPath);
+    const path = normalizeRepoPath(relative(rootDir, fullPath));
     const lineCount = readFileSync(fullPath, 'utf8').split('\n').length;
     files.push({ path, lineCount });
   }

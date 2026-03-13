@@ -14,7 +14,7 @@ import {
   fetchMicrosoftUserProfile,
 } from '../lib/microsoft-calendar';
 import { resolveAuthenticatedUser } from '../server/auth-session';
-import { jsonError } from '../server/core';
+import { jsonError, logInternalError } from '../server/core';
 import { withDatabase } from '../server/database';
 import { assertDemoFeatureAvailable, consumeDemoFeatureCredits, jsonDemoQuotaError } from '../server/demo-quota';
 import {
@@ -232,8 +232,8 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
           return jsonDemoQuotaError(context, db, context.env, authedUser, error);
         }
-        const message = error instanceof Error ? error.message : 'Microsoft OAuth exchange failed.';
-        return jsonError(context, 502, message);
+        logInternalError('microsoft_calendar_connect_failed', error);
+        return jsonError(context, 502, 'Microsoft OAuth exchange failed.');
       }
     });
   });

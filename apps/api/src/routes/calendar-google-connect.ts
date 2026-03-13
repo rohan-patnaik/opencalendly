@@ -14,7 +14,7 @@ import {
   fetchGoogleUserProfile,
 } from '../lib/google-calendar';
 import { resolveAuthenticatedUser } from '../server/auth-session';
-import { jsonError } from '../server/core';
+import { jsonError, logInternalError } from '../server/core';
 import { withDatabase } from '../server/database';
 import { assertDemoFeatureAvailable, jsonDemoQuotaError, consumeDemoFeatureCredits } from '../server/demo-quota';
 import {
@@ -232,8 +232,8 @@ export const registerGoogleCalendarConnectRoutes = (app: ApiApp): void => {
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
           return jsonDemoQuotaError(context, db, context.env, authedUser, error);
         }
-        const message = error instanceof Error ? error.message : 'Google OAuth exchange failed.';
-        return jsonError(context, 502, message);
+        logInternalError('google_calendar_connect_failed', error);
+        return jsonError(context, 502, 'Google OAuth exchange failed.');
       }
     });
   });

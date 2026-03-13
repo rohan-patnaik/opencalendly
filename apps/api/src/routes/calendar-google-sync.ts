@@ -14,7 +14,7 @@ import {
   syncGoogleBusyWindows,
 } from '../lib/calendar-sync';
 import { resolveAuthenticatedUser } from '../server/auth-session';
-import { jsonError } from '../server/core';
+import { jsonError, logInternalError } from '../server/core';
 import { withDatabase } from '../server/database';
 import { assertDemoFeatureAvailable, consumeDemoFeatureCredits, jsonDemoQuotaError } from '../server/demo-quota';
 import {
@@ -215,7 +215,8 @@ export const registerGoogleCalendarSyncRoutes = (app: ApiApp): void => {
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
           return jsonDemoQuotaError(context, db, context.env, authedUser, error);
         }
-        const message = (error instanceof Error ? error.message : 'Calendar sync failed.').slice(0, 1000);
+        logInternalError('google_calendar_sync_failed', error);
+        const message = 'Google calendar sync failed.';
         const nextSyncAt = new Date(now.getTime() + CALENDAR_SYNC_NEXT_MINUTES * 60_000);
         await db
           .update(calendarConnections)

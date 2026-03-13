@@ -15,6 +15,8 @@ import type { Database } from './types';
 
 export { resolveRateLimitClientKey };
 
+const IDEMPOTENCY_KEY_ALIASES = [IDEMPOTENCY_KEY_HEADER, 'X-Idempotency-Key'] as const;
+
 export const isPublicAnalyticsRateLimited = async (
   db: Pick<Database, 'delete' | 'insert'>,
   input: { clientKey: string; username: string; eventSlug: string },
@@ -75,9 +77,11 @@ export const isClerkExchangeRateLimited = async (
 };
 
 export const parseIdempotencyKey = (request: Request): { key: string } | { error: string } => {
-  const rawKey = request.headers.get(IDEMPOTENCY_KEY_HEADER)?.trim();
+  const rawKey = IDEMPOTENCY_KEY_ALIASES.map((header) => request.headers.get(header)?.trim()).find(
+    (value) => value && value.length > 0,
+  );
   if (!rawKey) {
-    return { error: `${IDEMPOTENCY_KEY_HEADER} header is required.` };
+    return { error: `${IDEMPOTENCY_KEY_HEADER} or X-Idempotency-Key header is required.` };
   }
   if (rawKey.length < IDEMPOTENCY_KEY_MIN_LENGTH || rawKey.length > IDEMPOTENCY_KEY_MAX_LENGTH) {
     return {
