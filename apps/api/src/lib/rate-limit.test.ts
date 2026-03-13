@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { resolveRateLimitClientKey } from './rate-limit';
+import { parseIdempotencyKey } from '../server/rate-limit';
 
 describe('resolveRateLimitClientKey', () => {
   it('prefers the Cloudflare client IP header', () => {
@@ -32,5 +33,35 @@ describe('resolveRateLimitClientKey', () => {
     });
 
     expect(resolveRateLimitClientKey(request)).toMatch(/^ua:/);
+  });
+});
+
+describe('parseIdempotencyKey', () => {
+  it('accepts the standard Idempotency-Key header', () => {
+    const request = new Request('https://api.opencalendly.test/v0/bookings', {
+      headers: {
+        'Idempotency-Key': 'booking-key-1234',
+      },
+    });
+
+    expect(parseIdempotencyKey(request)).toEqual({ key: 'booking-key-1234' });
+  });
+
+  it('accepts the X-Idempotency-Key compatibility header', () => {
+    const request = new Request('https://api.opencalendly.test/v0/bookings', {
+      headers: {
+        'X-Idempotency-Key': 'booking-key-compat-1234',
+      },
+    });
+
+    expect(parseIdempotencyKey(request)).toEqual({ key: 'booking-key-compat-1234' });
+  });
+
+  it('rejects requests without any supported idempotency header', () => {
+    const request = new Request('https://api.opencalendly.test/v0/bookings');
+
+    expect(parseIdempotencyKey(request)).toEqual({
+      error: 'Idempotency-Key or X-Idempotency-Key header is required.',
+    });
   });
 });

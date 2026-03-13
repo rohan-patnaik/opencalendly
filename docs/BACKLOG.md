@@ -1,5 +1,96 @@
 # Ordered Backlog (One Feature per PR)
 
+## Maintainability Program (PR#56-PR#61)
+
+Goal:
+
+- Reduce structural complexity while preserving the current feature surface.
+- Move the codebase from complexity `4/5` and maintainability `2.5/5` toward complexity `2/5` and maintainability `4.5/5`.
+- Keep solutions production-friendly, explicit, and easy to debug.
+
+Working rules:
+
+- No user-facing feature removals in this program.
+- No new heavy abstractions or major libraries for refactor-only work.
+- Public API contracts stay stable unless a separate feature PR explicitly changes them.
+- Every PR in this program must pass:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+- Required review gate for each PR:
+  - Qodo review runs and actionable comments are resolved.
+  - CodeRabbit review runs and actionable comments are resolved.
+  - CI is green before merge.
+
+Guardrails:
+
+- `apps/api/src/index.ts`: `<300` LOC, composition only.
+- `page.client.tsx` route shells: `<300` LOC.
+- General authored modules: `<400` LOC unless schema or test file.
+- `npm run complexity:check:enforce` is enabled in CI and must stay green.
+
+### PR 1: Baseline health + review tooling + guardrails
+
+Acceptance criteria:
+
+- Local baseline is deterministic and green from a clean install.
+- `docs/BACKLOG.md` documents this cleanup program and acceptance criteria.
+- Complexity guardrails are documented for future contributors.
+- Repo-local Qodo configuration exists for `describe` and `review` commands with summary-first feedback.
+- `npm run complexity:check` exists for local visibility, and CI enforcement is enabled once the refactor program is complete.
+
+### PR 2: API route decomposition
+
+Acceptance criteria:
+
+- `apps/api/src/index.ts` is reduced to composition and route registration only.
+- Route groups are split by domain: auth, organizer, bookings, booking actions, teams, calendar, analytics, webhooks, demo, and embed.
+- Shared route concerns are extracted into focused helpers instead of being duplicated across modules.
+- Public API behavior remains contract-compatible.
+
+### PR 3: Booking workflow normalization
+
+Acceptance criteria:
+
+- One-on-one booking, team booking, cancel, and reschedule follow the same internal sequence:
+  - parse and normalize request
+  - load context
+  - compute and validate slot
+  - run transaction
+  - enqueue side effects
+  - map response
+- Booking routes become thin orchestration only.
+- Booking correctness logic is not duplicated across route handlers.
+- Existing booking tests remain green.
+
+### PR 4: Organizer console decomposition
+
+Acceptance criteria:
+
+- `apps/web/src/app/organizer/page.client.tsx` becomes a thin page shell.
+- Organizer feature areas are split into focused panels and hooks for bootstrap, busy actions, team detail loading, and notification rule loading.
+- The organizer API client is split into domain-specific modules or namespaces.
+- Page-level state is reduced to wiring concerns rather than owning every form and panel lifecycle.
+
+### PR 5: Public booking UI consolidation
+
+Acceptance criteria:
+
+- One-on-one and team booking pages reuse a shared booking feature layer for timezone, slot grouping, submission lifecycle, and confirmation handling.
+- Team-specific and one-on-one-specific behavior stays explicit through small adapters.
+- Each booking page shell is reduced below the guardrail threshold.
+- Existing booking UI tests remain green.
+
+### PR 6: Shared contracts + cleanup + CI enforcement
+
+Acceptance criteria:
+
+- Stable web-facing request and response shapes are moved into narrow shared contracts.
+- Dead helpers and accidental duplication introduced by earlier growth are removed.
+- `npm run complexity:check:enforce` is turned on in CI because the repo is below the agreed thresholds.
+- Docs capture the structural conventions for future work.
+
 ## Feature 0 (PR#2): Bootstrap + docs + infra + Greptile config
 
 Acceptance criteria:

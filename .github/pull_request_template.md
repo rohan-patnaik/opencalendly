@@ -14,12 +14,16 @@
 ## Validation
 
 ```bash
+npm run env:check
 npm run lint
+npm run complexity:check:enforce
 npm run typecheck
 npm run test
 ```
 
+- [ ] `npm run env:check`
 - [ ] `npm run lint`
+- [ ] `npm run complexity:check:enforce`
 - [ ] `npm run typecheck`
 - [ ] `npm run test`
 
@@ -32,11 +36,13 @@ npm run test
 
 ## Review Notes
 
+- Qodo summary (trigger + comments if any):
+  -
 - Greptile summary (if active):
-  - 
+  -
 - CodeRabbit summary (trigger + comments if any):
-  - 
+  -
 
 ## IST Timestamp
 
-- Prepared at: 
+- Prepared at:

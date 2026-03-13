@@ -21,8 +21,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Create CI .env
+        run: |
+          cat > .env <<'EOF'
+          DATABASE_URL=ci.neon.tech
+          SESSION_SECRET=ci-validation-session-secret-abcdefghijklmnopqrstuvwxyz-123456
+          APP_BASE_URL=http://localhost:3000
+          API_BASE_URL=http://127.0.0.1:8787
+          NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8787
+          CLOUDFLARE_ACCOUNT_ID=ci-validation-cloudflare-account
+          CLOUDFLARE_API_TOKEN=ci-validation-cloudflare-token
+          HYPERDRIVE_ID=ci-hyperdrive-id
+          RESEND_API_KEY=ci-validation-resend-key
+          RESEND_FROM_EMAIL=ci-bot@opencalendly.dev
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=ci-validation-clerk-publishable-key
+          CLERK_SECRET_KEY=ci-validation-clerk-secret-key-abcdefghijklmnopqrstuvwxyz
+          GOOGLE_CLIENT_ID=ci-validation-google-client-id
+          GOOGLE_CLIENT_SECRET=ci-validation-google-client-secret
+          EOF
+
+      - name: Environment check
+        run: npm run env:check
+
       - name: Lint
         run: npm run lint
+
+      - name: Complexity guardrails
+        run: npm run complexity:check:enforce
 
       - name: Unit tests
         run: npm run test
