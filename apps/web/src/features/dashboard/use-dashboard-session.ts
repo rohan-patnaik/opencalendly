@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 
-import { authedGetJson } from '../../lib/api-client';
+import { authedGetJson, revokeApiSession } from '../../lib/api-client';
 import type { AuthSession } from '../../lib/auth-session';
 import type { AuthMeResponse, DashboardUser } from './types';
 
@@ -29,11 +29,19 @@ export const useDashboardSession = ({
 
   const handleSignOut = useCallback(async () => {
     setSignOutError(null);
-    clear();
+    let apiSessionRevoked = false;
     try {
+      await revokeApiSession(apiBaseUrl);
+      apiSessionRevoked = true;
+      clear();
       await signOut({ redirectUrl: '/auth/sign-in' });
     } catch (error) {
-      console.error('Clerk sign-out failed:', error);
+      if (apiSessionRevoked) {
+        clear();
+        console.error('Clerk sign-out failed after API session revocation:', error);
+      } else {
+        console.error('API session revocation failed:', error);
+      }
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
         setSignOutError(detail ?? 'Unable to sign out right now. Please try again.');
@@ -41,7 +49,7 @@ export const useDashboardSession = ({
       }
       setSignOutError('Unable to sign out right now. Please try again.');
     }
-  }, [clear, signOut]);
+  }, [apiBaseUrl, clear, signOut]);
 
   useEffect(() => {
     if (!ready) {

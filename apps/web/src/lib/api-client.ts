@@ -1,4 +1,4 @@
-import { getAuthHeader, type AuthSession } from './auth-session';
+import { API_REQUEST_CREDENTIALS, type AuthSession } from './auth-session';
 
 type ApiErrorPayload = {
   ok?: boolean;
@@ -28,9 +28,7 @@ const authedJson = async <T>(input: {
   fallbackError: string;
 }): Promise<T> => {
   const hasBody = input.method !== 'GET';
-  const headers: Record<string, string> = {
-    ...getAuthHeader(input.session),
-  };
+  const headers: Record<string, string> = {};
   if (hasBody) {
     headers['Content-Type'] = 'application/json';
   }
@@ -38,6 +36,7 @@ const authedJson = async <T>(input: {
   const response = await fetch(input.url, {
     method: input.method,
     cache: 'no-store',
+    credentials: API_REQUEST_CREDENTIALS,
     headers,
     ...(hasBody ? { body: JSON.stringify(input.body ?? {}) } : {}),
   });
@@ -106,4 +105,17 @@ export const authedDeleteJson = async <T>(input: {
     ...input,
     method: 'DELETE',
   });
+};
+
+export const revokeApiSession = async (apiBaseUrl: string): Promise<void> => {
+  const response = await fetch(`${apiBaseUrl}/v0/auth/logout`, {
+    method: 'POST',
+    cache: 'no-store',
+    credentials: API_REQUEST_CREDENTIALS,
+  });
+
+  const payload = await readJsonSafely<ApiErrorPayload>(response);
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(toErrorMessage(payload, 'Unable to sign out right now. Please retry.'));
+  }
 };

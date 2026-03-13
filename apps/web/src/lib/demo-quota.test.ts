@@ -6,7 +6,6 @@ import { fetchDemoQuotaStatus, joinDemoWaitlist } from './demo-quota';
 const originalFetch = globalThis.fetch;
 
 const buildSession = (): AuthSession => ({
-  sessionToken: 'session-token',
   expiresAt: new Date(Date.now() + 60_000).toISOString(),
   user: {
     id: 'user-id',
@@ -53,12 +52,10 @@ afterEach(() => {
 });
 
 describe('demo quota client helpers', () => {
-  it('loads quota status with bearer auth when a session exists', async () => {
+  it('loads quota status with cookie credentials when a session exists', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('https://api.example.com/v0/demo-credits/status');
-      expect(init?.headers).toMatchObject({
-        Authorization: 'Bearer session-token',
-      });
+      expect(init?.credentials).toBe('include');
 
       return new Response(JSON.stringify(buildQuotaPayload()), {
         status: 200,
@@ -106,6 +103,7 @@ describe('demo quota client helpers', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(String(input)).toBe('https://api.example.com/v0/waitlist');
       expect(init?.method).toBe('POST');
+      expect(init?.credentials).toBe('include');
       expect(init?.headers).toMatchObject({
         'Content-Type': 'application/json',
       });

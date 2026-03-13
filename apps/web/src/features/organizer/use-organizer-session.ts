@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 
-import { authedGetJson } from '../../lib/api-client';
+import { authedGetJson, revokeApiSession } from '../../lib/api-client';
 import type { AuthSession } from '../../lib/auth-session';
 import type { AuthMeResponse, OrganizerConsoleUser } from './types';
 
@@ -30,19 +30,27 @@ export const useOrganizerSession = ({
 
   const handleSignOut = useCallback(async () => {
     setPanelError(null);
-    clear();
+    let apiSessionRevoked = false;
     try {
+      await revokeApiSession(apiBaseUrl);
+      apiSessionRevoked = true;
+      clear();
       await signOut({ redirectUrl: '/auth/sign-in' });
     } catch (error) {
+      if (apiSessionRevoked) {
+        clear();
+        console.error('Clerk sign-out failed after API session revocation:', error);
+      } else {
+        console.error('API session revocation failed:', error);
+      }
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
         setPanelError(detail ?? 'Unable to sign out right now. Please try again.');
         return;
       }
-      console.error('Clerk sign-out failed:', error);
       setPanelError('Unable to sign out right now. Please try again.');
     }
-  }, [clear, setPanelError, signOut]);
+  }, [apiBaseUrl, clear, setPanelError, signOut]);
 
   useEffect(() => {
     if (!ready) {

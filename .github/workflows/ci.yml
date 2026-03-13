@@ -27,8 +27,8 @@ jobs:
           DATABASE_URL=ci.neon.tech
           SESSION_SECRET=ci-validation-session-secret-abcdefghijklmnopqrstuvwxyz-123456
           APP_BASE_URL=http://localhost:3000
-          API_BASE_URL=http://127.0.0.1:8787
-          NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8787
+          API_BASE_URL=http://localhost:8787
+          NEXT_PUBLIC_API_BASE_URL=http://localhost:8787
           CLOUDFLARE_ACCOUNT_ID=ci-validation-cloudflare-account
           CLOUDFLARE_API_TOKEN=ci-validation-cloudflare-token
           HYPERDRIVE_ID=ci-hyperdrive-id

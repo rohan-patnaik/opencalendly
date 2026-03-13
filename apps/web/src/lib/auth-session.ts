@@ -7,7 +7,6 @@ export type AuthUser = {
 };
 
 export type AuthSession = {
-  sessionToken: string;
   expiresAt: string;
   issuer?: 'legacy' | 'clerk' | 'dev';
   user: AuthUser;
@@ -15,6 +14,7 @@ export type AuthSession = {
 
 export const AUTH_SESSION_STORAGE_KEY = 'opencalendly.auth.session';
 export const AUTH_SESSION_EVENT = 'opencalendly:auth-session-changed';
+export const API_REQUEST_CREDENTIALS: RequestCredentials = 'include';
 
 const isBrowser = (): boolean => typeof window !== 'undefined';
 const removeSessionFromStorage = (): void => {
@@ -55,7 +55,6 @@ export const readAuthSession = (): AuthSession | null => {
     const parsed = JSON.parse(raw) as Partial<AuthSession>;
     if (
       !parsed ||
-      typeof parsed.sessionToken !== 'string' ||
       typeof parsed.expiresAt !== 'string' ||
       (parsed.issuer !== undefined &&
         parsed.issuer !== 'legacy' &&
@@ -110,13 +109,4 @@ export const clearAuthSession = (): void => {
   }
   removeSessionFromStorage();
   emitSessionChange();
-};
-
-export const getAuthHeader = (session: AuthSession | null): Record<string, string> => {
-  if (!session) {
-    return {};
-  }
-  return {
-    Authorization: `Bearer ${session.sessionToken}`,
-  };
 };

@@ -4,7 +4,12 @@ import { useAuth, useUser } from '@clerk/nextjs';
 import { useEffect, useRef, useState } from 'react';
 
 import { resolveApiBaseUrl } from '../lib/api-base-url';
-import { clearAuthSession, readAuthSession, writeAuthSession } from '../lib/auth-session';
+import {
+  API_REQUEST_CREDENTIALS,
+  clearAuthSession,
+  readAuthSession,
+  writeAuthSession,
+} from '../lib/auth-session';
 import {
   resolveBrowserTimezone,
   shouldExchangeClerkSession,
@@ -13,7 +18,6 @@ import {
 
 type ClerkExchangeResponse = {
   ok: boolean;
-  sessionToken: string;
   expiresAt: string;
   user: {
     id: string;
@@ -100,6 +104,7 @@ export default function AuthSessionBridge() {
         }, EXCHANGE_REQUEST_TIMEOUT_MS);
         response = await fetch(`${apiBaseUrl}/v0/auth/clerk/exchange`, {
           method: 'POST',
+          credentials: API_REQUEST_CREDENTIALS,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -135,8 +140,6 @@ export default function AuthSessionBridge() {
       const hasValidPayload =
         Boolean(payload) &&
         payload?.ok === true &&
-        typeof payload.sessionToken === 'string' &&
-        payload.sessionToken.length > 0 &&
         typeof payload.expiresAt === 'string' &&
         !Number.isNaN(new Date(payload.expiresAt).getTime()) &&
         maybeUser !== null &&
@@ -172,7 +175,6 @@ export default function AuthSessionBridge() {
       }
 
       writeAuthSession({
-        sessionToken: payload.sessionToken,
         expiresAt: payload.expiresAt,
         issuer: 'clerk',
         user: payload.user,

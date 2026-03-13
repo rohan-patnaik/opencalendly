@@ -71,9 +71,11 @@ flowchart LR
   - CSS variable tokens in global stylesheet for a single dark palette
   - no runtime theme switching (`light`/`system` removed to reduce UX clutter)
 - Auth session model:
-  - client-side `AuthSession` store in localStorage
-  - shared hook to observe/update session across tabs via storage + custom events
+  - API issues a DB-backed `HttpOnly` session cookie after Clerk exchange or local dev bootstrap
+  - client-side `AuthSession` store in localStorage keeps non-secret metadata only (`user`, `issuer`, `expiresAt`)
+  - shared hook observes session metadata across tabs via storage + custom events
   - bootstrap validation through `GET /v0/auth/me` before loading authenticated dashboard data
+  - authenticated browser mutations send `credentials: 'include'`, and the API enforces same-origin checks for cookie-backed non-GET requests
 - Auth route shells:
   - `/auth/sign-in` completes Clerk sign-in, then exchanges the Clerk session via `POST /v0/auth/clerk/exchange`
   - `/auth/verify` is a legacy route that redirects back to Clerk sign-in

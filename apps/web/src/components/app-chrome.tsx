@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 
+import { resolveApiBaseUrl } from '../lib/api-base-url';
+import { revokeApiSession } from '../lib/api-client';
 import { useAuthSession } from '../lib/use-auth-session';
 import styles from './app-chrome.module.css';
 
@@ -30,6 +32,7 @@ const isActive = (pathname: string, href: string): boolean => {
 };
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
+  const apiBaseUrl = resolveApiBaseUrl('app chrome sign-out');
   const pathname = usePathname();
   const { session, ready, clear } = useAuthSession();
   const { signOut } = useClerk();
@@ -38,20 +41,28 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const handleSignOut = useCallback(async () => {
     setSignOutError(null);
-    clear();
+    let apiSessionRevoked = false;
     try {
+      await revokeApiSession(apiBaseUrl);
+      apiSessionRevoked = true;
+      clear();
       await signOut({ redirectUrl: '/auth/sign-in' });
     } catch (error) {
+      if (apiSessionRevoked) {
+        clear();
+        console.error('Clerk sign-out failed after API session revocation:', error);
+      } else {
+        console.error('API session revocation failed:', error);
+      }
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
         console.error('Clerk sign-out failed:', detail ?? 'unknown clerk error');
         setSignOutError(detail ?? 'Unable to sign out right now. Please retry.');
         return;
       }
-      console.error('Clerk sign-out failed:', error);
       setSignOutError('Unable to sign out right now. Please retry.');
     }
-  }, [clear, signOut]);
+  }, [apiBaseUrl, clear, signOut]);
 
   useEffect(() => {
     closeMobileNav();

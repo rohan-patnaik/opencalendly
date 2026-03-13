@@ -5,7 +5,7 @@ const REQUIRED = {
   DATABASE_URL: 'Neon dashboard -> Project -> Connection details (direct Postgres URL).',
   SESSION_SECRET: 'Generate with: openssl rand -hex 32',
   APP_BASE_URL: 'Local web URL, usually http://localhost:3000',
-  API_BASE_URL: 'Local API URL, usually http://127.0.0.1:8787',
+  API_BASE_URL: 'Local API URL, usually http://localhost:8787',
   NEXT_PUBLIC_API_BASE_URL: 'Should match API_BASE_URL for local web->API calls.',
   CLOUDFLARE_ACCOUNT_ID: 'Cloudflare dashboard -> Account ID.',
   CLOUDFLARE_API_TOKEN: 'Cloudflare dashboard -> API Tokens.',
@@ -39,6 +39,19 @@ const OPTIONAL = {
 
 const PLACEHOLDER_PATTERN = /(replace-with|your[_-]|changeme|todo|example\.com|YOUR_|dummy|sample)/i;
 const NEON_HOST_PATTERN = /\.neon\.tech(?::\d+)?(?:\/|$)/i;
+const LOCAL_HOSTNAME_SET = new Set(['localhost', '127.0.0.1']);
+
+const resolveHostname = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+};
 
 const envPath = resolve(process.cwd(), '.env');
 let envContents = '';
@@ -112,6 +125,34 @@ if (apiBaseUrl && !/^https?:\/\/.+/i.test(apiBaseUrl)) {
 const publicApiBaseUrl = parsed.NEXT_PUBLIC_API_BASE_URL;
 if (publicApiBaseUrl && !/^https?:\/\/.+/i.test(publicApiBaseUrl)) {
   errors.push('NEXT_PUBLIC_API_BASE_URL must be an absolute http(s) URL.');
+}
+
+const appBaseHostname = resolveHostname(appBaseUrl);
+const apiBaseHostname = resolveHostname(apiBaseUrl);
+const publicApiBaseHostname = resolveHostname(publicApiBaseUrl);
+
+if (
+  appBaseHostname &&
+  apiBaseHostname &&
+  LOCAL_HOSTNAME_SET.has(appBaseHostname) &&
+  LOCAL_HOSTNAME_SET.has(apiBaseHostname) &&
+  appBaseHostname !== apiBaseHostname
+) {
+  errors.push(
+    `APP_BASE_URL and API_BASE_URL must use the same local hostname for cookie auth (found ${appBaseHostname} vs ${apiBaseHostname}).`,
+  );
+}
+
+if (
+  apiBaseHostname &&
+  publicApiBaseHostname &&
+  LOCAL_HOSTNAME_SET.has(apiBaseHostname) &&
+  LOCAL_HOSTNAME_SET.has(publicApiBaseHostname) &&
+  apiBaseHostname !== publicApiBaseHostname
+) {
+  errors.push(
+    `API_BASE_URL and NEXT_PUBLIC_API_BASE_URL must use the same local hostname for cookie auth (found ${apiBaseHostname} vs ${publicApiBaseHostname}).`,
+  );
 }
 
 const demoDailyAccountLimit = parsed.DEMO_DAILY_ACCOUNT_LIMIT;

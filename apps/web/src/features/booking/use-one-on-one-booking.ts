@@ -8,7 +8,7 @@ import type {
 } from '@opencalendly/shared';
 
 import { buildEmailDeliveryMessage } from '../../lib/booking-outcome';
-import { getAuthHeader } from '../../lib/auth-session';
+import { API_REQUEST_CREDENTIALS } from '../../lib/auth-session';
 import { useDemoQuota } from '../../lib/demo-quota';
 import {
   COMMON_TIMEZONES,
@@ -90,6 +90,7 @@ export function useOneOnOneBooking(input: OneOnOneBookingArgs) {
     (stage: 'page_view' | 'slot_selection') => {
       void fetch(`${apiBaseUrl}/v0/analytics/funnel/events`, {
         method: 'POST',
+        credentials: API_REQUEST_CREDENTIALS,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username,
@@ -116,9 +117,7 @@ export function useOneOnOneBooking(input: OneOnOneBookingArgs) {
         `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}`,
         {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeader(session),
-          },
+          credentials: API_REQUEST_CREDENTIALS,
         },
       );
       const payload = (await response.json()) as PublicEventResponse;
@@ -160,9 +159,7 @@ export function useOneOnOneBooking(input: OneOnOneBookingArgs) {
         `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
         {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeader(session),
-          },
+          credentials: API_REQUEST_CREDENTIALS,
         },
       );
       const payload = (await response.json()) as PublicAvailabilityResponse;
@@ -240,8 +237,8 @@ export function useOneOnOneBooking(input: OneOnOneBookingArgs) {
       }
       const response = await fetch(`${apiBaseUrl}/v0/bookings`, {
         method: 'POST',
+        credentials: API_REQUEST_CREDENTIALS,
         headers: {
-          ...getAuthHeader(session),
           'Content-Type': 'application/json',
           'Idempotency-Key': requestIdempotencyKey,
         },
