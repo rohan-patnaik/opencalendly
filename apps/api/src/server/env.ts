@@ -169,7 +169,7 @@ export const resolveAppBaseUrl = (env: Bindings, request: Request): string => {
   const configured = env.APP_BASE_URL?.trim();
   if (configured) {
     try {
-      return stripTrailingSlash(new URL(configured).toString());
+      return stripTrailingSlash(new URL(configured).origin);
     } catch {
       throw new Error('APP_BASE_URL must be a valid absolute URL.');
     }
