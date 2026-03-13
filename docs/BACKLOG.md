@@ -880,6 +880,21 @@ Acceptance criteria:
   - `npm run typecheck`
   - `npm run build -w apps/web`
   - local browser smoke confirms the homepage hero renders both art states without layout breakage
+### Feature 47: Concise repository README refresh
+
+Scope:
+- Rewrite the repository README for first-time visitors who need a fast understanding of what OpenCalendly is and how to run it.
+- Add a lightweight homepage visual asset so the repo page shows the product immediately without requiring readers to click away.
+
+Acceptance criteria:
+
+- `README.md` explains what the app does in concise visitor-facing language.
+- `README.md` includes minimal local setup instructions that remain accurate for the current stack.
+- `README.md` includes a homepage visual asset committed in-repo and rendered from the README.
+- `README.md` links to the key deeper docs for API, architecture, stack, and deploy details instead of duplicating them inline.
+- Validation passes:
+  - `npm run env:check`
+  - `git diff --check`
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
