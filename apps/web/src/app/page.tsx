@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { useId } from 'react';
+import { GlobeCanvas } from '../components/globe-canvas';
 import { LinkButton } from '../components/ui/button';
+import { HeroArtCarousel } from './hero-art-carousel';
 import { HomepageTimezoneBadge } from './homepage-timezone-badge';
 import styles from './page.module.css';
 
@@ -199,7 +201,10 @@ export default function HomePage() {
           <div className={styles.heroArtPanel} aria-hidden="true">
             <div className={styles.artFrame}>
               <HomepageTimezoneBadge />
-              <CalendarDotArt />
+              <HeroArtCarousel>
+                <CalendarDotArt />
+                <GlobeCanvas />
+              </HeroArtCarousel>
               <div className={styles.artLegend}>
                 <div>
                   <span className={styles.legendDot} />

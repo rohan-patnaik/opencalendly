@@ -1,0 +1,25 @@
+.carousel {
+  width: 100%;
+  display: grid;
+}
+
+.slide {
+  grid-area: 1 / 1;
+  animation: hero-art-fade-in 0.8s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide {
+    animation: none;
+  }
+}
+
+@keyframes hero-art-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
