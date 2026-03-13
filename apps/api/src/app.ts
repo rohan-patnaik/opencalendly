@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
-import { resolveAllowedCorsOrigins } from './lib/cors';
+import { resolveAllowedCorsOrigins, toCorsOrigin } from './lib/cors';
+import { hasSessionCookie } from './server/auth-session';
 import { jsonError, logInternalError } from './server/core';
 import type { Bindings } from './server/types';
 import { registerAnalyticsFunnelRoutes } from './routes/analytics-funnel';
@@ -49,8 +50,28 @@ app.use('*', async (context, next) => {
     },
     allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Idempotency-Key'],
+    credentials: true,
     maxAge: 86_400,
   })(context, next);
+});
+
+app.use('*', async (context, next) => {
+  const method = context.req.method.toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+    return next();
+  }
+  if (!hasSessionCookie(context.req.raw)) {
+    return next();
+  }
+
+  const allowedOrigins = resolveAllowedCorsOrigins(context.env.APP_BASE_URL);
+  const originCandidate = context.req.header('origin') ?? context.req.header('referer') ?? undefined;
+  const requestOrigin = toCorsOrigin(originCandidate);
+  if (!requestOrigin || !allowedOrigins.has(requestOrigin)) {
+    return jsonError(context, 403, 'Cross-site authenticated requests are not allowed.');
+  }
+
+  return next();
 });
 
 registerHealthRoutes(app);

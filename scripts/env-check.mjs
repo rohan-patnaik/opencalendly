@@ -5,7 +5,7 @@ const REQUIRED = {
   DATABASE_URL: 'Neon dashboard -> Project -> Connection details (direct Postgres URL).',
   SESSION_SECRET: 'Generate with: openssl rand -hex 32',
   APP_BASE_URL: 'Local web URL, usually http://localhost:3000',
-  API_BASE_URL: 'Local API URL, usually http://127.0.0.1:8787',
+  API_BASE_URL: 'Local API URL, usually http://localhost:8787',
   NEXT_PUBLIC_API_BASE_URL: 'Should match API_BASE_URL for local web->API calls.',
   CLOUDFLARE_ACCOUNT_ID: 'Cloudflare dashboard -> Account ID.',
   CLOUDFLARE_API_TOKEN: 'Cloudflare dashboard -> API Tokens.',

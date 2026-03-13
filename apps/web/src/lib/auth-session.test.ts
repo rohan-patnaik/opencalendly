@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { isSessionExpired, type AuthSession } from './auth-session';
 
 const buildSession = (expiresAt: string): AuthSession => ({
-  sessionToken: 'session-token',
   expiresAt,
   user: {
     id: 'user-id',

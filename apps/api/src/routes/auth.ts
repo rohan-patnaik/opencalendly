@@ -6,7 +6,13 @@ import {
 } from '@opencalendly/shared';
 
 import { isDevAuthBootstrapEnabled, isLocalBootstrapRequest } from '../lib/dev-auth';
-import { issueSessionForUser, resolveAuthenticatedUser } from '../server/auth-session';
+import {
+  clearIssuedSessionCookie,
+  issueSessionForUser,
+  resolveAuthenticatedUser,
+  revokeSession,
+  withIssuedSessionCookie,
+} from '../server/auth-session';
 import { jsonError } from '../server/core';
 import { withDatabase } from '../server/database';
 import type { ApiApp } from '../server/types';
@@ -57,13 +63,20 @@ export const registerAuthRoutes = (app: ApiApp): void => {
         return jsonError(context, 500, 'Unable to create session.');
       }
 
-      return context.json({
-        ok: true,
-        issuer: 'dev' as const,
-        sessionToken: issuedSession.sessionToken,
-        expiresAt: issuedSession.expiresAt.toISOString(),
-        user: issuedSession.user,
-      });
+      return withIssuedSessionCookie(
+        context.json({
+          ok: true,
+          issuer: 'dev' as const,
+          expiresAt: issuedSession.expiresAt.toISOString(),
+          user: issuedSession.user,
+        }),
+        {
+          request: context.req.raw,
+          env: context.env,
+          sessionToken: issuedSession.sessionToken,
+          expiresAt: issuedSession.expiresAt,
+        },
+      );
     });
   });
 
@@ -75,6 +88,16 @@ export const registerAuthRoutes = (app: ApiApp): void => {
       }
 
       return context.json({ ok: true, user: authedUser });
+    });
+  });
+
+  app.post('/v0/auth/logout', async (context) => {
+    return withDatabase(context, async (db) => {
+      await revokeSession(db, context.req.raw);
+      return clearIssuedSessionCookie(context.json({ ok: true }), {
+        request: context.req.raw,
+        env: context.env,
+      });
     });
   });
 };

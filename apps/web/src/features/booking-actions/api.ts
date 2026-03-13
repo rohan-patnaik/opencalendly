@@ -1,4 +1,4 @@
-import { getAuthHeader, type AuthSession } from '../../lib/auth-session';
+import { API_REQUEST_CREDENTIALS, type AuthSession } from '../../lib/auth-session';
 import type {
   AvailabilityResponse,
   BookingActionApiError,
@@ -30,9 +30,7 @@ export const fetchBookingAction = async (input: {
     `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}`,
     {
       cache: 'no-store',
-      headers: {
-        ...getAuthHeader(input.session),
-      },
+      credentials: API_REQUEST_CREDENTIALS,
     },
   );
   const payload = await parseJson<BookingActionLookupResponse | BookingActionApiError>(response);
@@ -57,9 +55,7 @@ export const fetchBookingActionAvailability = async (input: {
 
   const response = await fetch(`${input.apiBaseUrl}${path}`, {
     cache: 'no-store',
-    headers: {
-      ...getAuthHeader(input.session),
-    },
+    credentials: API_REQUEST_CREDENTIALS,
   });
   const payload = await parseJson<AvailabilityResponse | BookingActionApiError>(response);
   return { response, payload };
@@ -75,8 +71,8 @@ export const postBookingCancel = async (input: {
     `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}/cancel`,
     {
       method: 'POST',
+      credentials: API_REQUEST_CREDENTIALS,
       headers: {
-        ...getAuthHeader(input.session),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -100,8 +96,8 @@ export const postBookingReschedule = async (input: {
     `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}/reschedule`,
     {
       method: 'POST',
+      credentials: API_REQUEST_CREDENTIALS,
       headers: {
-        ...getAuthHeader(input.session),
         'Content-Type': 'application/json',
         'Idempotency-Key': input.idempotencyKey,
       },

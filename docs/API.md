@@ -8,9 +8,10 @@
 
 ## Auth model
 
-- Auth uses bearer sessions: `Authorization: Bearer <sessionToken>`.
-- Primary session tokens are issued via Clerk exchange flow.
-- Protected routes return `401` on missing/invalid/expired token.
+- Browser auth uses DB-backed API sessions stored in an `HttpOnly` cookie issued by the API.
+- Primary sessions are issued via Clerk exchange flow or the local dev bootstrap flow.
+- Protected routes return `401` on missing/invalid/expired session.
+- Existing bearer session tokens are still accepted on protected routes for compatibility, but browser clients should use cookie auth.
 
 ## Endpoints
 
@@ -52,7 +53,6 @@ Success response:
 ```json
 {
   "ok": true,
-  "sessionToken": "session-token",
   "expiresAt": "2026-03-28T15:04:05.000Z",
   "user": {
     "id": "d8bdbf6d-aed7-4c84-a67f-a2c54f7c4f4a",
@@ -63,6 +63,11 @@ Success response:
   }
 }
 ```
+
+Behavior:
+
+- Success sets the `opencalendly_session` `HttpOnly` cookie.
+- Browser clients should not persist raw API session tokens in `localStorage`.
 
 ### `GET /v0/auth/me`
 
@@ -80,6 +85,23 @@ Success response:
     "displayName": "Demo Organizer",
     "timezone": "America/New_York"
   }
+}
+```
+
+### `POST /v0/auth/logout`
+
+Auth required.
+
+Behavior:
+
+- Revokes the current API session when present.
+- Clears the API session cookie.
+
+Success response:
+
+```json
+{
+  "ok": true
 }
 ```
 
@@ -453,7 +475,7 @@ Public endpoint for booking page details.
 
 Note:
 
-- The seeded launch demo organizer (`username = demo`) requires bearer auth.
+- The seeded launch demo organizer (`username = demo`) requires authenticated access.
 
 Success response:
 
@@ -485,7 +507,7 @@ Public endpoint for slot picker.
 
 Note:
 
-- The seeded launch demo organizer (`username = demo`) requires bearer auth.
+- The seeded launch demo organizer (`username = demo`) requires authenticated access.
 
 Query params:
 
@@ -668,7 +690,7 @@ Public endpoint used by cancel/reschedule action pages to resolve a token into b
 
 Note:
 
-- Demo booking action tokens require bearer auth when the booking belongs to the seeded launch demo surfaces.
+- Demo booking action tokens require authenticated access when the booking belongs to the seeded launch demo surfaces.
 
 Success response:
 
@@ -927,7 +949,7 @@ Behavior:
 
 ### `GET /v0/demo-credits/status`
 
-Returns launch-demo admission state plus the authenticated account’s daily credit state when a bearer session is present.
+Returns launch-demo admission state plus the authenticated account’s daily credit state when an authenticated session is present.
 
 Success response:
 
@@ -1008,7 +1030,7 @@ Protected dev/admin endpoint to reset today’s admission + credit counters.
 
 Auth:
 
-- bearer session required
+- authenticated session required
 - can be restricted further in implementation to dev/admin users or environments
 
 Success response:
@@ -1054,8 +1076,8 @@ Behavior:
 
 - rejects non-local hosts and non-local `Origin`/`Referer` headers
 - defaults to seeded `demo@opencalendly.dev` when `email` is omitted
-- reuses the normal bearer session issuance path
-- returns `issuer: "dev"` so the payload can be written directly to `localStorage["opencalendly.auth.session"]` for local browser automation
+- reuses the normal API session issuance path
+- returns `issuer: "dev"` and sets the `HttpOnly` session cookie for local browser automation
 
 Request:
 
@@ -1071,7 +1093,6 @@ Success response:
 {
   "ok": true,
   "issuer": "dev",
-  "sessionToken": "session-token",
   "expiresAt": "2026-04-11T14:00:00.000Z",
   "user": {
     "id": "d8bdbf6d-aed7-4c84-a67f-a2c54f7c4f4a",

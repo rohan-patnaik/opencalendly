@@ -8,7 +8,6 @@ import {
 } from './clerk-session-bridge';
 
 const buildSession = (email: string): AuthSession => ({
-  sessionToken: 'session-token',
   expiresAt: new Date(Date.now() + 60_000).toISOString(),
   user: {
     id: 'user-id',

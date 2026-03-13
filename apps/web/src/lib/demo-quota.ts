@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { getAuthHeader, type AuthSession } from './auth-session';
+import { API_REQUEST_CREDENTIALS, type AuthSession } from './auth-session';
 
 export type DemoFeatureCostKey =
   | 'event_type_create'
@@ -73,9 +73,7 @@ export const fetchDemoQuotaStatus = async (input: {
 }): Promise<DemoQuotaStatusResponse> => {
   const response = await fetch(`${input.apiBaseUrl}/v0/demo-credits/status`, {
     cache: 'no-store',
-    headers: {
-      ...getAuthHeader(input.session),
-    },
+    credentials: API_REQUEST_CREDENTIALS,
     ...(input.signal ? { signal: input.signal } : {}),
   });
   const payload = await readJsonSafely<DemoQuotaStatusResponse & DemoQuotaApiError>(response);
@@ -94,6 +92,7 @@ export const joinDemoWaitlist = async (input: {
   const response = await fetch(`${input.apiBaseUrl}/v0/waitlist`, {
     method: 'POST',
     cache: 'no-store',
+    credentials: API_REQUEST_CREDENTIALS,
     headers: {
       'Content-Type': 'application/json',
     },

@@ -5,9 +5,93 @@ import { sessions, users } from '@opencalendly/db';
 import { SESSION_TTL_DAYS, createRawToken, getBearerToken, hashToken } from '../lib/auth';
 import { normalizeTimezone } from './core';
 import { SESSION_EXPIRED_CLEANUP_INTERVAL } from './env';
-import type { AuthenticatedUser, Database, SessionUserRecord } from './types';
+import type { AuthenticatedUser, Bindings, Database, SessionUserRecord } from './types';
 
 let sessionCleanupRequestCounter = 0;
+export const API_SESSION_COOKIE_NAME = 'opencalendly_session';
+const SESSION_COOKIE_PATH = '/';
+
+const parseCookieHeader = (request: Request): Map<string, string> => {
+  const cookies = new Map<string, string>();
+  const rawCookieHeader = request.headers.get('cookie');
+  if (!rawCookieHeader) {
+    return cookies;
+  }
+
+  for (const part of rawCookieHeader.split(';')) {
+    const separatorIndex = part.indexOf('=');
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const name = part.slice(0, separatorIndex).trim();
+    const value = part.slice(separatorIndex + 1).trim();
+    if (!name || !value) {
+      continue;
+    }
+
+    try {
+      cookies.set(name, decodeURIComponent(value));
+    } catch {
+      cookies.set(name, value);
+    }
+  }
+
+  return cookies;
+};
+
+const isLocalHostname = (hostname: string): boolean => {
+  const normalized = hostname.trim().toLowerCase().replace(/^\[(.*)\]$/, '$1');
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+};
+
+const shouldUseSecureSessionCookie = (request: Request, env: Bindings): boolean => {
+  const configuredAppUrl = env.APP_BASE_URL?.trim();
+  if (configuredAppUrl) {
+    try {
+      const appUrl = new URL(configuredAppUrl);
+      if (isLocalHostname(appUrl.hostname)) {
+        return false;
+      }
+      return appUrl.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  const requestUrl = new URL(request.url);
+  if (isLocalHostname(requestUrl.hostname)) {
+    return false;
+  }
+  return requestUrl.protocol === 'https:';
+};
+
+const buildSessionCookieHeader = (input: {
+  request: Request;
+  env: Bindings;
+  value: string;
+  expiresAt: Date;
+}): string => {
+  const segments = [
+    `${API_SESSION_COOKIE_NAME}=${encodeURIComponent(input.value)}`,
+    `Path=${SESSION_COOKIE_PATH}`,
+    'HttpOnly',
+    'SameSite=Lax',
+    `Expires=${input.expiresAt.toUTCString()}`,
+    `Max-Age=${Math.max(0, Math.floor((input.expiresAt.getTime() - Date.now()) / 1000))}`,
+  ];
+
+  if (shouldUseSecureSessionCookie(input.request, input.env)) {
+    segments.push('Secure');
+  }
+
+  return segments.join('; ');
+};
+
+const appendSetCookieHeader = (response: Response, cookieValue: string): Response => {
+  response.headers.append('Set-Cookie', cookieValue);
+  return response;
+};
 
 const maybeCleanupExpiredSessions = async (db: Database, now: Date): Promise<void> => {
   sessionCleanupRequestCounter += 1;
@@ -18,11 +102,24 @@ const maybeCleanupExpiredSessions = async (db: Database, now: Date): Promise<voi
   await db.delete(sessions).where(lte(sessions.expiresAt, now));
 };
 
+export const resolveSessionToken = (request: Request): string | null => {
+  const bearerToken = getBearerToken(request);
+  if (bearerToken) {
+    return bearerToken;
+  }
+
+  return parseCookieHeader(request).get(API_SESSION_COOKIE_NAME) ?? null;
+};
+
+export const hasSessionCookie = (request: Request): boolean => {
+  return parseCookieHeader(request).has(API_SESSION_COOKIE_NAME);
+};
+
 export const resolveAuthenticatedUser = async (
   db: Database,
   request: Request,
 ): Promise<AuthenticatedUser | null> => {
-  const token = getBearerToken(request);
+  const token = resolveSessionToken(request);
   if (!token) {
     return null;
   }
@@ -94,4 +191,43 @@ export const issueSessionForUser = async (
         user: { ...userRecord, timezone: normalizeTimezone(userRecord.timezone) },
       }
     : null;
+};
+
+export const withIssuedSessionCookie = (
+  response: Response,
+  input: { request: Request; env: Bindings; sessionToken: string; expiresAt: Date },
+): Response => {
+  return appendSetCookieHeader(
+    response,
+    buildSessionCookieHeader({
+      request: input.request,
+      env: input.env,
+      value: input.sessionToken,
+      expiresAt: input.expiresAt,
+    }),
+  );
+};
+
+export const clearIssuedSessionCookie = (
+  response: Response,
+  input: { request: Request; env: Bindings },
+): Response => {
+  return appendSetCookieHeader(
+    response,
+    buildSessionCookieHeader({
+      request: input.request,
+      env: input.env,
+      value: '',
+      expiresAt: new Date(0),
+    }),
+  );
+};
+
+export const revokeSession = async (db: Database, request: Request): Promise<void> => {
+  const token = resolveSessionToken(request);
+  if (!token) {
+    return;
+  }
+
+  await db.delete(sessions).where(eq(sessions.tokenHash, hashToken(token)));
 };

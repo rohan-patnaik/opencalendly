@@ -8,7 +8,7 @@ import type {
 } from '@opencalendly/shared';
 
 import { buildEmailDeliveryMessage } from '../../lib/booking-outcome';
-import { getAuthHeader } from '../../lib/auth-session';
+import { API_REQUEST_CREDENTIALS } from '../../lib/auth-session';
 import { useDemoQuota } from '../../lib/demo-quota';
 import {
   COMMON_TIMEZONES,
@@ -103,9 +103,7 @@ export function useTeamBooking(input: TeamBookingArgs) {
         `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}`,
         {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeader(session),
-          },
+          credentials: API_REQUEST_CREDENTIALS,
         },
       );
       const payload = (await response.json()) as TeamEventResponse;
@@ -145,9 +143,7 @@ export function useTeamBooking(input: TeamBookingArgs) {
         `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
         {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeader(session),
-          },
+          credentials: API_REQUEST_CREDENTIALS,
         },
       );
       const payload = (await response.json()) as TeamAvailabilityResponse;
@@ -225,8 +221,8 @@ export function useTeamBooking(input: TeamBookingArgs) {
       }
       const response = await fetch(`${apiBaseUrl}/v0/team-bookings`, {
         method: 'POST',
+        credentials: API_REQUEST_CREDENTIALS,
         headers: {
-          ...getAuthHeader(session),
           'Content-Type': 'application/json',
           'Idempotency-Key': requestIdempotencyKey,
         },

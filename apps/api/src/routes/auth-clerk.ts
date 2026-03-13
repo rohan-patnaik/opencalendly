@@ -10,7 +10,7 @@ import {
   resolveDisplayName,
   resolveUniqueUsername,
 } from '../lib/clerk-auth';
-import { issueSessionForUser } from '../server/auth-session';
+import { issueSessionForUser, withIssuedSessionCookie } from '../server/auth-session';
 import { normalizeTimezone, jsonError } from '../server/core';
 import { withDatabase, isUniqueViolation } from '../server/database';
 import {
@@ -302,12 +302,19 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
         return jsonError(context, 500, 'Unable to create session.');
       }
 
-      return context.json({
-        ok: true,
-        sessionToken: issuedSession.sessionToken,
-        expiresAt: issuedSession.expiresAt.toISOString(),
-        user: issuedSession.user,
-      });
+      return withIssuedSessionCookie(
+        context.json({
+          ok: true,
+          expiresAt: issuedSession.expiresAt.toISOString(),
+          user: issuedSession.user,
+        }),
+        {
+          request: context.req.raw,
+          env: context.env,
+          sessionToken: issuedSession.sessionToken,
+          expiresAt: issuedSession.expiresAt,
+        },
+      );
     });
   });
 };

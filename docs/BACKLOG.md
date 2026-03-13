@@ -1024,3 +1024,23 @@ Acceptance criteria:
   - `npm run typecheck`
   - `npm run test`
   - `npm run build -w apps/web`
+
+### Feature 50: Security hardening for API sessions and Next.js patch level
+
+Scope:
+- Remove browser-side storage of raw API bearer tokens and move web auth to secure cookie-backed API sessions.
+- Patch the vulnerable web runtime dependency line for Next.js.
+- Keep organizer, dashboard, booking, and booking-action behavior unchanged from the user point of view.
+
+Acceptance criteria:
+
+- Web auth exchange and local dev bootstrap issue `HttpOnly` API session cookies instead of returning raw session tokens to browser callers.
+- Web app `localStorage` stores only non-secret auth metadata and no bearer token.
+- Authenticated browser API requests use `credentials: 'include'`.
+- API exposes a logout endpoint that revokes the active session and clears the session cookie.
+- Cookie-backed non-GET browser requests are rejected when `Origin`/`Referer` is cross-site.
+- Web dependency manifest and lockfile move Next.js to a patched release line.
+- Validation passes:
+  - `npm run typecheck`
+  - `npm run lint`
+  - focused auth/session Vitest coverage stays green
