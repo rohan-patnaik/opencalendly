@@ -1044,3 +1044,21 @@ Acceptance criteria:
   - `npm run typecheck`
   - `npm run lint`
   - focused auth/session Vitest coverage stays green
+
+### Feature 51: Webhook destination SSRF hardening
+
+Scope:
+- Restrict organizer-managed webhook destinations to public HTTPS hostnames.
+- Prevent the delivery runner from calling legacy webhook targets that no longer meet the destination policy.
+- Keep webhook payload shape, signing, and retry behavior unchanged for valid destinations.
+
+Acceptance criteria:
+
+- Webhook create/update validation rejects non-HTTPS targets, localhost/private-network hostnames, direct IP literals, and URLs with embedded credentials.
+- Existing invalid webhook rows are not delivered to; due deliveries fail immediately with a configuration error instead of making a network request.
+- Webhook helper/schema coverage includes safe and unsafe destination examples.
+- `docs/API.md` documents the webhook destination restrictions.
+- Validation passes:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`

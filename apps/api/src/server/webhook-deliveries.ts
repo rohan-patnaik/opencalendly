@@ -9,6 +9,7 @@ import {
   buildWebhookSignatureHeader,
   computeNextWebhookAttemptAt,
   isWebhookDeliveryExhausted,
+  isAllowedWebhookTargetUrl,
   parseWebhookEventTypes,
 } from '../lib/webhooks';
 import type {
@@ -121,6 +122,22 @@ export const executeWebhookDelivery = async (
   delivery: PendingWebhookDelivery,
 ): Promise<'succeeded' | 'retried' | 'failed'> => {
   const now = new Date();
+  if (!isAllowedWebhookTargetUrl(delivery.url)) {
+    await db
+      .update(webhookDeliveries)
+      .set({
+        status: 'failed',
+        attemptCount: delivery.maxAttempts,
+        lastAttemptAt: now,
+        lastError: 'Webhook target URL is not allowed. Use an HTTPS URL with a public hostname.',
+        nextAttemptAt: now,
+        updatedAt: now,
+      })
+      .where(eq(webhookDeliveries.id, delivery.id));
+
+    return 'failed';
+  }
+
   const serializedPayload = JSON.stringify(delivery.payload);
   const timestampSeconds = Math.floor(now.getTime() / 1000);
   const signature = buildWebhookSignatureHeader(delivery.secret, serializedPayload, timestampSeconds);

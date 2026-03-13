@@ -8,6 +8,8 @@ const usernamePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const questionIdPattern = /^[a-zA-Z0-9_-]+$/;
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+const ipv4SegmentPattern = /^(25[0-5]|2[0-4]\d|1?\d?\d)$/;
+const ipv6HostnamePattern = /^[0-9a-f:.]+$/i;
 
 const isValidIsoDate = (value: string): boolean => {
   if (!isoDatePattern.test(value)) {
@@ -20,6 +22,59 @@ const isValidIsoDate = (value: string): boolean => {
   }
 
   return parsed.toISOString().slice(0, 10) === value;
+};
+
+const stripIpv6Brackets = (value: string): string => value.replace(/^\[(.*)\]$/, '$1');
+
+const isIpv4Literal = (value: string): boolean => {
+  const parts = value.split('.');
+  return parts.length === 4 && parts.every((part) => ipv4SegmentPattern.test(part));
+};
+
+const isIpv6Literal = (value: string): boolean => {
+  const normalized = stripIpv6Brackets(value);
+  return normalized.includes(':') && ipv6HostnamePattern.test(normalized);
+};
+
+export const isSafeWebhookTargetUrl = (value: string): boolean => {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    return false;
+  }
+
+  const hostname = stripIpv6Brackets(parsed.hostname.trim().toLowerCase());
+  if (!hostname) {
+    return false;
+  }
+
+  if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+    return false;
+  }
+
+  if (
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.home') ||
+    hostname.endsWith('.lan')
+  ) {
+    return false;
+  }
+
+  if (isIpv4Literal(hostname) || isIpv6Literal(hostname)) {
+    return false;
+  }
+
+  if (!hostname.includes('.')) {
+    return false;
+  }
+
+  return true;
 };
 
 const isoDateSchema = z.string().refine(isValidIsoDate, {
@@ -289,14 +344,23 @@ export const analyticsRangeQuerySchema = z
   );
 
 export const webhookSubscriptionCreateSchema = z.object({
-  url: z.string().url().max(2000),
+  url: z.string().url().max(2000).refine(isSafeWebhookTargetUrl, {
+    message: 'Use an HTTPS webhook URL with a public hostname.',
+  }),
   events: z.array(webhookEventTypeSchema).min(1).max(3),
   secret: z.string().min(8).max(200),
 });
 
 export const webhookSubscriptionUpdateSchema = z
   .object({
-    url: z.string().url().max(2000).optional(),
+    url: z
+      .string()
+      .url()
+      .max(2000)
+      .refine(isSafeWebhookTargetUrl, {
+        message: 'Use an HTTPS webhook URL with a public hostname.',
+      })
+      .optional(),
     events: z.array(webhookEventTypeSchema).min(1).max(3).optional(),
     secret: z.string().min(8).max(200).optional(),
     isActive: z.boolean().optional(),

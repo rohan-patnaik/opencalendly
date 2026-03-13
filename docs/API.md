@@ -1159,6 +1159,11 @@ Success response:
 
 Auth required. Creates webhook subscription.
 
+Notes:
+
+- `url` must be an `https://` endpoint with a public hostname.
+- Localhost, private-network targets, direct IP literals, and embedded basic-auth credentials are rejected.
+
 Request:
 
 ```json
@@ -1194,6 +1199,10 @@ Auth required. Supports partial updates for:
 - `secret`
 - `isActive`
 
+Notes:
+
+- When updating `url`, the same public-HTTPS restriction as `POST /v0/webhooks` applies.
+
 Success response shape matches `POST /v0/webhooks`.
 
 ### `POST /v0/webhooks/deliveries/run`
@@ -1208,6 +1217,7 @@ Behavior:
 
 - Picks eligible due deliveries.
 - Sends signed payloads with retry backoff.
+- Fails deliveries immediately when the stored target URL is no longer allowed by the webhook URL policy.
 - Updates attempt count + next attempt timestamp.
 
 Success response:
