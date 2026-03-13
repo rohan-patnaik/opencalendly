@@ -1,6 +1,7 @@
 'use client';
 
-import { Children, useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { Children, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { usePrefersReducedMotion } from '../lib/use-prefers-reduced-motion';
 import styles from './hero-art-carousel.module.css';
 
 interface HeroArtCarouselProps {
@@ -11,29 +12,19 @@ const INTERVAL_MS = 5000;
 
 export function HeroArtCarousel({ children }: HeroArtCarouselProps) {
   const slides = useMemo(() => Children.toArray(children), [children]);
+  const reducedMotion = usePrefersReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
-  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined;
+    if (slides.length === 0 || activeIndex < slides.length) {
+      return;
     }
 
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const syncReducedMotion = () => {
-      setReducedMotion(mediaQuery.matches);
-    };
-
-    syncReducedMotion();
-    mediaQuery.addEventListener('change', syncReducedMotion);
-
-    return () => {
-      mediaQuery.removeEventListener('change', syncReducedMotion);
-    };
-  }, []);
+    setActiveIndex(0);
+  }, [activeIndex, slides.length]);
 
   useEffect(() => {
-    if (reducedMotion) {
+    if (reducedMotion || slides.length < 2) {
       setActiveIndex(0);
       return undefined;
     }
@@ -45,21 +36,15 @@ export function HeroArtCarousel({ children }: HeroArtCarouselProps) {
     return () => window.clearInterval(id);
   }, [reducedMotion, slides.length]);
 
+  if (slides.length === 0) {
+    return null;
+  }
+
   return (
     <div className={styles.carousel}>
-      {slides.map((slide, index) => {
-        const isActive = activeIndex === index;
-
-        return (
-          <div
-            key={index}
-            className={`${styles.slide} ${isActive ? styles.slideActive : styles.slideHidden}`}
-            aria-hidden={!isActive}
-          >
-            {slide}
-          </div>
-        );
-      })}
+      <div key={activeIndex} className={styles.slide} data-slide-index={activeIndex}>
+        {slides[activeIndex]}
+      </div>
     </div>
   );
 }

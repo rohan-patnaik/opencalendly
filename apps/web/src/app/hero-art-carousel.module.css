@@ -1,29 +1,25 @@
 .carousel {
-  position: relative;
   width: 100%;
+  display: grid;
 }
 
 .slide {
-  transition: opacity 0.8s ease;
-  will-change: opacity;
-}
-
-.slide:not(:first-child) {
-  position: absolute;
-  inset: 0;
-}
-
-.slideActive {
-  opacity: 1;
-}
-
-.slideHidden {
-  opacity: 0;
-  pointer-events: none;
+  grid-area: 1 / 1;
+  animation: hero-art-fade-in 0.8s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .slide {
-    transition: none;
+    animation: none;
+  }
+}
+
+@keyframes hero-art-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
   }
 }

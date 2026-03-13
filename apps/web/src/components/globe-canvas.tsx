@@ -2,18 +2,20 @@
 
 import { useEffect, useRef } from 'react';
 import createGlobe from 'cobe';
+import { usePrefersReducedMotion } from '../lib/use-prefers-reduced-motion';
 import styles from './globe-canvas.module.css';
 
 /** Small orbiting dots rendered as absolutely-positioned elements around the canvas. */
 const SATELLITES = [
-    { radius: 54, speed: 0.012, size: 5, delay: 0 },
-    { radius: 48, speed: -0.009, size: 4, delay: Math.PI * 0.7 },
-    { radius: 51, speed: 0.007, size: 3, delay: Math.PI * 1.4 },
+  { radius: 54, speed: 0.012, size: 5, delay: 0 },
+  { radius: 48, speed: -0.009, size: 4, delay: Math.PI * 0.7 },
+  { radius: 51, speed: 0.007, size: 3, delay: Math.PI * 1.4 },
 ];
 
 export function GlobeCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const reducedMotion = usePrefersReducedMotion();
 
   /* ---- cobe globe ---- */
   useEffect(() => {
@@ -22,7 +24,14 @@ export function GlobeCanvas() {
       return undefined;
     }
 
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const webGlContext =
+      canvas.getContext('webgl2') ||
+      canvas.getContext('webgl') ||
+      canvas.getContext('experimental-webgl');
+    if (!webGlContext) {
+      return undefined;
+    }
+
     let phi = 0;
     let width = 0;
 
@@ -33,34 +42,41 @@ export function GlobeCanvas() {
     window.addEventListener('resize', onResize);
     onResize();
 
-    const globe = createGlobe(canvas, {
-      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-      width: width * 2,
-      height: width * 2,
-      phi: 0,
-      theta: 0.25,
-      dark: 1,
-      diffuse: 2.4,
-      mapSamples: 20000,
-      mapBrightness: 10,
-      mapBaseBrightness: 0.05,
-      baseColor: [0.18, 0.15, 0.12],
-      markerColor: [0.85, 0.63, 0.4],
-      glowColor: [0.22, 0.16, 0.1],
-      markers: [],
-      onRender: (state) => {
-        state.phi = phi;
-        phi += reducedMotion ? 0 : 0.005;
-        state.width = width * 2;
-        state.height = width * 2;
-      },
-    });
+    let globe: ReturnType<typeof createGlobe> | null = null;
+
+    try {
+      globe = createGlobe(canvas, {
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        width: width * 2,
+        height: width * 2,
+        phi: 0,
+        theta: 0.25,
+        dark: 1,
+        diffuse: 2.4,
+        mapSamples: 20000,
+        mapBrightness: 10,
+        mapBaseBrightness: 0.05,
+        baseColor: [0.18, 0.15, 0.12],
+        markerColor: [0.85, 0.63, 0.4],
+        glowColor: [0.22, 0.16, 0.1],
+        markers: [],
+        onRender: (state) => {
+          state.phi = phi;
+          phi += reducedMotion ? 0 : 0.005;
+          state.width = width * 2;
+          state.height = width * 2;
+        },
+      });
+    } catch {
+      window.removeEventListener('resize', onResize);
+      return undefined;
+    }
 
     return () => {
-      globe.destroy();
+      globe?.destroy();
       window.removeEventListener('resize', onResize);
     };
-  }, []);
+  }, [reducedMotion]);
 
   /* ---- orbiting satellites ---- */
   useEffect(() => {
@@ -70,7 +86,6 @@ export function GlobeCanvas() {
     }
 
     const dots = wrapper.querySelectorAll<HTMLSpanElement>(`.${styles.satellite}`);
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     dots.forEach((dot, index) => {
       const { radius, delay } = SATELLITES[index]!;
@@ -102,7 +117,7 @@ export function GlobeCanvas() {
 
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <div ref={wrapperRef} className={styles.wrapper}>
