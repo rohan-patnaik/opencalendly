@@ -49,10 +49,17 @@ npm run db:migrate
 npm run db:seed
 ```
 
-5. Start the API and web app:
+5. Start the API and web app in separate terminals:
+
+Terminal 1:
 
 ```bash
 npm run dev:api
+```
+
+Terminal 2:
+
+```bash
 npm run dev:web
 ```
 
