@@ -20,7 +20,7 @@ OpenCalendly is an open-source scheduling app for teams that want Calendly-class
 - `packages/shared`: shared Zod schemas and TypeScript types
 - Auth and email: Clerk + Resend
 
-Neon is the only supported database provider for this repository.
+Neon is the only supported database provider for this repository because the local and production setup is built around the current Hyperdrive integration path.
 
 ## Run It Locally
 
@@ -59,8 +59,6 @@ npm run dev:web
 ## Try The Main Surfaces
 
 - `/`
-- `/demo/intro-call`
-- `/team/demo-team/team-intro-call`
 - `/embed/playground`
 - `/organizer`
 - `/dashboard`
