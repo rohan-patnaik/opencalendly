@@ -1,0 +1,29 @@
+.carousel {
+  position: relative;
+  width: 100%;
+}
+
+.slide {
+  transition: opacity 0.8s ease;
+  will-change: opacity;
+}
+
+.slide:not(:first-child) {
+  position: absolute;
+  inset: 0;
+}
+
+.slideActive {
+  opacity: 1;
+}
+
+.slideHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide {
+    transition: none;
+  }
+}

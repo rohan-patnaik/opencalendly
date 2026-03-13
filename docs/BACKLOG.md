@@ -862,6 +862,24 @@ Acceptance criteria:
   - `npm run lint`
   - `npm run typecheck`
   - local browser smoke confirms the homepage hero renders the centered badge and centered legend with browser timezone text
+### Feature 46: Homepage hero ambient art rotation
+
+Scope:
+- Add a second homepage hero art state that rotates between the existing calendar motif and a globe treatment.
+- Keep the hero copy and timezone-aware badge behavior from Feature 45 intact while making the right-side panel feel more alive.
+- Respect reduced-motion preferences so the art panel does not auto-rotate for motion-sensitive visitors.
+
+Acceptance criteria:
+
+- The homepage hero alternates between the calendar art and a globe art treatment on motion-allowed browsers.
+- The Feature 45 timezone-aware badge remains visible and accurate above the rotating hero art.
+- Visitors with `prefers-reduced-motion: reduce` do not get an automatic art swap.
+- Validation passes:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run build -w apps/web`
+  - local browser smoke confirms the homepage hero renders both art states without layout breakage
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
