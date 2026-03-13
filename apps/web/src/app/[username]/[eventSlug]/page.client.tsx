@@ -1,76 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-
-import { DemoQuotaCard } from '../../../components/demo-quota-card';
-import { buildEmailDeliveryMessage } from '../../../lib/booking-outcome';
-import { getAuthHeader } from '../../../lib/auth-session';
-import { useDemoQuota } from '../../../lib/demo-quota';
 import {
-  COMMON_TIMEZONES,
-  createIdempotencyKey,
-  formatSlot,
-  getBrowserTimezone,
-  groupSlotsByDay,
-} from '../../../lib/public-booking';
-import { useAuthSession } from '../../../lib/use-auth-session';
+  BookingActionLinks,
+  BookingDemoGate,
+  BookingInlineQuotaCard,
+  BookingLoadingState,
+  BookingQuestionFields,
+  BookingSlotPicker,
+  BookingUnavailableState,
+} from '../../../features/booking/components';
+import { readableLocation } from '../../../features/booking/common';
+import { useOneOnOneBooking } from '../../../features/booking/use-one-on-one-booking';
 import styles from './page.module.css';
-
-type PublicEventResponse = {
-  ok: boolean;
-  eventType: {
-    name: string;
-    slug: string;
-    durationMinutes: number;
-    locationType: string;
-    locationValue: string | null;
-    questions: Array<{
-      id: string;
-      label: string;
-      required: boolean;
-      placeholder?: string;
-    }>;
-  };
-  organizer: {
-    username: string;
-    displayName: string;
-    timezone: string;
-  };
-  error?: string;
-};
-
-type AvailabilityResponse = {
-  ok: boolean;
-  timezone: string;
-  slots: Array<{
-    startsAt: string;
-    endsAt: string;
-  }>;
-  error?: string;
-};
-
-type BookingResponse = {
-  ok: boolean;
-  booking?: {
-    id: string;
-    startsAt: string;
-    endsAt: string;
-  };
-  actions?: {
-    cancel: {
-      pageUrl: string;
-    };
-    reschedule: {
-      pageUrl: string;
-    };
-  };
-  email?: {
-    sent: boolean;
-    provider: string;
-    error?: string;
-  };
-  error?: string;
-};
 
 type BookingPageClientProps = {
   username: string;
@@ -78,339 +19,41 @@ type BookingPageClientProps = {
   apiBaseUrl: string;
 };
 
-const buildInitialAnswers = (
-  questions: PublicEventResponse['eventType']['questions'],
-): Record<string, string> => {
-  return questions.reduce<Record<string, string>>((accumulator, question) => {
-    accumulator[question.id] = '';
-    return accumulator;
-  }, {});
-};
-
-const readableLocation = (locationType: string, locationValue: string | null): string => {
-  if (locationValue && locationValue.trim().length > 0) {
-    return locationValue;
-  }
-  return locationType.replaceAll('_', ' ');
-};
-
 export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: BookingPageClientProps) {
-  const { session, ready } = useAuthSession();
-  const isLaunchDemoPage = username.trim().toLowerCase() === 'demo';
-  const [timezone, setTimezone] = useState('UTC');
-  const [eventData, setEventData] = useState<PublicEventResponse | null>(null);
-  const [slots, setSlots] = useState<Array<{ startsAt: string; endsAt: string }>>([]);
-  const [selectedSlot, setSelectedSlot] = useState('');
-  const [inviteeName, setInviteeName] = useState('');
-  const [inviteeEmail, setInviteeEmail] = useState('');
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [bookingRequestKey, setBookingRequestKey] = useState('');
-  const [pageError, setPageError] = useState<string | null>(null);
-  const [loadingEvent, setLoadingEvent] = useState(true);
-  const [loadingSlots, setLoadingSlots] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmation, setConfirmation] = useState<string | null>(null);
-  const [deliveryStatus, setDeliveryStatus] = useState<string | null>(null);
-  const [actionLinks, setActionLinks] = useState<{
-    cancelPageUrl?: string;
-    reschedulePageUrl?: string;
-  } | null>(null);
-  const {
-    status: demoQuotaStatus,
-    loading: demoQuotaLoading,
-    error: demoQuotaError,
-    refresh: refreshDemoQuota,
-  } = useDemoQuota({
-    apiBaseUrl,
-    session,
-    enabled: isLaunchDemoPage,
-  });
+  const booking = useOneOnOneBooking({ username, eventSlug, apiBaseUrl });
 
-  const signInHref = useMemo(() => {
-    return `/auth/sign-in?redirect_url=${encodeURIComponent(
-      `/${encodeURIComponent(username)}/${encodeURIComponent(eventSlug)}`,
-    )}`;
-  }, [eventSlug, username]);
+  if (booking.loadingEvent || (booking.isLaunchDemoPage && !booking.ready)) {
+    return <BookingLoadingState styles={styles} kicker="Public booking" title="Loading event..." />;
+  }
 
-  const timezoneOptions = useMemo(() => {
-    return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
-  }, [timezone]);
-
-  const slotGroups = useMemo(() => {
-    return groupSlotsByDay(slots, timezone);
-  }, [slots, timezone]);
-
-  const selectedSlotLabel = useMemo(() => {
-    if (!selectedSlot) {
-      return null;
-    }
-    return formatSlot(selectedSlot, timezone);
-  }, [selectedSlot, timezone]);
-
-  const trackFunnelEvent = useCallback(
-    (stage: 'page_view' | 'slot_selection') => {
-      void fetch(`${apiBaseUrl}/v0/analytics/funnel/events`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          eventSlug,
-          stage,
-        }),
-      }).catch(() => undefined);
-    },
-    [apiBaseUrl, eventSlug, username],
-  );
-
-  const loadEvent = useCallback(async () => {
-    if (isLaunchDemoPage && !session) {
-      setEventData(null);
-      setLoadingEvent(false);
-      return;
-    }
-
-    setLoadingEvent(true);
-    setPageError(null);
-
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}`,
-        {
-          cache: 'no-store',
-          headers: {
-            ...getAuthHeader(session),
-          },
-        },
-      );
-      const payload = (await response.json()) as PublicEventResponse;
-      if (!response.ok || !payload.ok) {
-        setPageError(payload.error || 'Unable to load event details.');
-        setEventData(null);
-        return;
-      }
-
-      setEventData(payload);
-      setAnswers(buildInitialAnswers(payload.eventType.questions));
-      trackFunnelEvent('page_view');
-    } catch {
-      setPageError('Unable to load event details.');
-      setEventData(null);
-    } finally {
-      setLoadingEvent(false);
-    }
-  }, [apiBaseUrl, eventSlug, isLaunchDemoPage, session, trackFunnelEvent, username]);
-
-  const loadAvailability = useCallback(async () => {
-    if (isLaunchDemoPage && !session) {
-      setSlots([]);
-      setLoadingSlots(false);
-      return;
-    }
-
-    setLoadingSlots(true);
-    setPageError(null);
-
-    try {
-      const params = new URLSearchParams({
-        timezone,
-        start: new Date().toISOString(),
-        days: '7',
-      });
-
-      const response = await fetch(
-        `${apiBaseUrl}/v0/users/${encodeURIComponent(username)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
-        {
-          cache: 'no-store',
-          headers: {
-            ...getAuthHeader(session),
-          },
-        },
-      );
-      const payload = (await response.json()) as AvailabilityResponse;
-      if (!response.ok || !payload.ok) {
-        setSlots([]);
-        setPageError(payload.error || 'Unable to load availability.');
-        return;
-      }
-
-      setSlots(payload.slots);
-      setSelectedSlot((current) => {
-        return payload.slots.some((slot) => slot.startsAt === current) ? current : '';
-      });
-    } catch {
-      setSlots([]);
-      setPageError('Unable to load availability.');
-    } finally {
-      setLoadingSlots(false);
-    }
-  }, [apiBaseUrl, eventSlug, isLaunchDemoPage, session, timezone, username]);
-
-  useEffect(() => {
-    setTimezone(getBrowserTimezone());
-  }, []);
-
-  useEffect(() => {
-    if (isLaunchDemoPage && !ready) {
-      return;
-    }
-    void loadEvent();
-  }, [isLaunchDemoPage, loadEvent, ready]);
-
-  useEffect(() => {
-    if (!eventData) {
-      return;
-    }
-    if (isLaunchDemoPage && !session) {
-      return;
-    }
-    void loadAvailability();
-  }, [eventData, isLaunchDemoPage, loadAvailability, session]);
-
-  useEffect(() => {
-    if (!selectedSlot) {
-      setBookingRequestKey('');
-      return;
-    }
-    setBookingRequestKey(createIdempotencyKey());
-  }, [selectedSlot]);
-
-  const submitBooking = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setConfirmation(null);
-    setDeliveryStatus(null);
-    setActionLinks(null);
-    setPageError(null);
-
-    if (!selectedSlot) {
-      setPageError('Select a timeslot before booking.');
-      return;
-    }
-
-    const missingRequiredQuestion = eventData?.eventType.questions.find(
-      (question) => question.required && !(answers[question.id] ?? '').trim(),
-    );
-    if (missingRequiredQuestion) {
-      setPageError(`Answer required question: "${missingRequiredQuestion.label}".`);
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const requestIdempotencyKey = bookingRequestKey || createIdempotencyKey();
-      if (!bookingRequestKey) {
-        setBookingRequestKey(requestIdempotencyKey);
-      }
-      const response = await fetch(`${apiBaseUrl}/v0/bookings`, {
-        method: 'POST',
-        headers: {
-          ...getAuthHeader(session),
-          'Content-Type': 'application/json',
-          'Idempotency-Key': requestIdempotencyKey,
-        },
-        body: JSON.stringify({
-          username,
-          eventSlug,
-          startsAt: selectedSlot,
-          timezone,
-          inviteeName,
-          inviteeEmail,
-          answers: Object.fromEntries(
-            Object.entries(answers).filter((entry) => entry[1].trim().length > 0),
-          ),
-        }),
-      });
-      const payload = (await response.json()) as BookingResponse;
-      if (!response.ok || !payload.ok || !payload.booking) {
-        setPageError(payload.error || 'Booking failed. Please choose another slot.');
-        if (response.status === 409) {
-          void loadAvailability();
-        }
-        if (response.status === 429 && isLaunchDemoPage) {
-          void refreshDemoQuota();
-        }
-        return;
-      }
-
-      const inviteeEmailForNotice = inviteeEmail;
-      setConfirmation(`Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} (${timezone}).`);
-      setDeliveryStatus(buildEmailDeliveryMessage(payload.email, inviteeEmailForNotice));
-      const cancelPageUrl = payload.actions?.cancel?.pageUrl;
-      const reschedulePageUrl = payload.actions?.reschedule?.pageUrl;
-      if (cancelPageUrl || reschedulePageUrl) {
-        const nextActionLinks: {
-          cancelPageUrl?: string;
-          reschedulePageUrl?: string;
-        } = {};
-        if (cancelPageUrl) {
-          nextActionLinks.cancelPageUrl = cancelPageUrl;
-        }
-        if (reschedulePageUrl) {
-          nextActionLinks.reschedulePageUrl = reschedulePageUrl;
-        }
-        setActionLinks(nextActionLinks);
-      }
-      setInviteeName('');
-      setInviteeEmail('');
-      setSelectedSlot('');
-      setBookingRequestKey('');
-      setAnswers(buildInitialAnswers(eventData?.eventType.questions ?? []));
-      void loadAvailability();
-      if (isLaunchDemoPage) {
-        void refreshDemoQuota();
-      }
-    } catch {
-      setPageError('Booking failed. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (loadingEvent || (isLaunchDemoPage && !ready)) {
+  if (booking.isLaunchDemoPage && !booking.session) {
     return (
-      <main className={styles.page}>
-        <section className={styles.heroCard}>
-          <p className={styles.kicker}>Public booking</p>
-          <h1>Loading event...</h1>
-        </section>
-      </main>
+      <BookingDemoGate
+        styles={styles}
+        kicker="Launch demo"
+        title="Sign in to book the demo"
+        body="The launch demo requires authentication so anonymous traffic cannot consume today’s pool."
+        apiBaseUrl={apiBaseUrl}
+        session={booking.session}
+        status={booking.demoQuotaStatus}
+        loading={booking.demoQuotaLoading}
+        error={booking.demoQuotaError}
+        signInHref={booking.signInHref}
+        waitlistSource="demo-booking"
+        featureKeys={['one_on_one_booking']}
+        onStatusChange={booking.refreshDemoQuota}
+      />
     );
   }
 
-  if (isLaunchDemoPage && !session) {
+  if (!booking.eventData) {
     return (
-      <main className={styles.page}>
-        <section className={styles.heroCard}>
-          <p className={styles.kicker}>Launch demo</p>
-          <h1>Sign in to book the demo</h1>
-          <p>The launch demo requires authentication so anonymous traffic cannot consume today’s pool.</p>
-        </section>
-
-        <section className={styles.layout}>
-          <DemoQuotaCard
-            apiBaseUrl={apiBaseUrl}
-            session={session}
-            status={demoQuotaStatus}
-            loading={demoQuotaLoading}
-            error={demoQuotaError}
-            signInHref={signInHref}
-            waitlistSource="demo-booking"
-            featureKeys={['one_on_one_booking']}
-            onStatusChange={refreshDemoQuota}
-          />
-        </section>
-      </main>
-    );
-  }
-
-  if (!eventData) {
-    return (
-      <main className={styles.page}>
-        <section className={styles.heroCard}>
-          <p className={styles.kicker}>Public booking</p>
-          <h1>Event unavailable</h1>
-          <p className={styles.error}>{pageError || 'Event not found.'}</p>
-        </section>
-      </main>
+      <BookingUnavailableState
+        styles={styles}
+        kicker="Public booking"
+        title="Event unavailable"
+        error={booking.pageError || 'Event not found.'}
+      />
     );
   }
 
@@ -418,75 +61,48 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
     <main className={styles.page}>
       <section className={styles.heroCard}>
         <p className={styles.kicker}>Open booking link</p>
-        <h1>{eventData.eventType.name}</h1>
+        <h1>{booking.eventData.eventType.name}</h1>
         <p>
-          Hosted by <strong>{eventData.organizer.displayName}</strong> ·{' '}
-          {eventData.eventType.durationMinutes} minutes
+          Hosted by <strong>{booking.eventData.organizer.displayName}</strong> ·{' '}
+          {booking.eventData.eventType.durationMinutes} minutes
         </p>
-        <p>Location: {readableLocation(eventData.eventType.locationType, eventData.eventType.locationValue)}</p>
+        <p>
+          Location:{' '}
+          {readableLocation(
+            booking.eventData.eventType.locationType,
+            booking.eventData.eventType.locationValue,
+          )}
+        </p>
       </section>
 
       <section className={styles.layout}>
-        <div className={styles.card}>
-          <div className={styles.sectionHead}>
-            <h2>Pick your time</h2>
-            <p>Slots are shown in your selected timezone.</p>
-          </div>
-
-          <label className={styles.label} htmlFor="timezone">
-            Timezone
-          </label>
-          <select
-            id="timezone"
-            className={styles.select}
-            value={timezone}
-            onChange={(event) => setTimezone(event.target.value)}
-          >
-            {timezoneOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-
-          <p className={styles.muted}>
-            Organizer timezone: <strong>{eventData.organizer.timezone}</strong>
-          </p>
-
-          {loadingSlots ? <p className={styles.muted}>Loading slots...</p> : null}
-          {!loadingSlots && slots.length === 0 ? (
-            <p className={styles.muted}>No slots available in the next 7 days.</p>
-          ) : null}
-
-          <div className={styles.slotDayStack}>
-            {slotGroups.map((group) => (
-              <section key={group.dateKey} className={styles.slotDay}>
-                <h3>{group.label}</h3>
-                <div className={styles.slotGrid}>
-                  {group.slots.map((slot) => (
-                    <button
-                      key={slot.startsAt}
-                      type="button"
-                      className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
-                      onClick={() => {
-                        if (selectedSlot === slot.startsAt) {
-                          return;
-                        }
-                        setSelectedSlot(slot.startsAt);
-                        trackFunnelEvent('slot_selection');
-                      }}
-                    >
-                      {new Intl.DateTimeFormat(undefined, {
-                        timeStyle: 'short',
-                        timeZone: timezone,
-                      }).format(new Date(slot.startsAt))}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </div>
+        <BookingSlotPicker
+          styles={styles}
+          title="Pick your time"
+          description="Slots are shown in your selected timezone."
+          timezoneId="timezone"
+          timezone={booking.timezone}
+          timezoneOptions={booking.timezoneOptions}
+          onTimezoneChange={booking.setTimezone}
+          organizerTimezoneText={
+            <>
+              Organizer timezone: <strong>{booking.eventData.organizer.timezone}</strong>
+            </>
+          }
+          loadingText="Loading slots..."
+          emptyText="No slots available in the next 7 days."
+          loading={booking.loadingSlots}
+          slotsCount={booking.slots.length}
+          slotGroups={booking.slotGroups}
+          selectedSlot={booking.selectedSlot}
+          onSelectSlot={booking.setSelectedSlot}
+          renderSlotLabel={(slotStartsAt) =>
+            new Intl.DateTimeFormat(undefined, {
+              timeStyle: 'short',
+              timeZone: booking.timezone,
+            }).format(new Date(slotStartsAt))
+          }
+        />
 
         <div className={styles.card}>
           <div className={styles.sectionHead}>
@@ -494,36 +110,42 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
             <p>We will email your booking confirmation and action links.</p>
           </div>
 
-          {selectedSlotLabel ? (
+          {booking.selectedSlotLabel ? (
             <p className={styles.selection}>
-              Selected slot: <strong>{selectedSlotLabel}</strong>
+              Selected slot: <strong>{booking.selectedSlotLabel}</strong>
             </p>
           ) : (
             <p className={styles.selection}>Select a slot to continue.</p>
           )}
 
-          {isLaunchDemoPage ? (
-            <DemoQuotaCard
+          {booking.isLaunchDemoPage ? (
+            <BookingInlineQuotaCard
               apiBaseUrl={apiBaseUrl}
-              session={session}
-              status={demoQuotaStatus}
-              loading={demoQuotaLoading}
-              error={demoQuotaError}
+              session={booking.session}
+              status={booking.demoQuotaStatus}
+              loading={booking.demoQuotaLoading}
+              error={booking.demoQuotaError}
               waitlistSource="demo-booking"
               featureKeys={['one_on_one_booking']}
-              onStatusChange={refreshDemoQuota}
+              onStatusChange={booking.refreshDemoQuota}
             />
           ) : null}
 
-          <form className={styles.form} onSubmit={submitBooking}>
+          <form
+            className={styles.form}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void booking.submitBooking();
+            }}
+          >
             <label className={styles.label} htmlFor="invitee-name">
               Your name
             </label>
             <input
               id="invitee-name"
               className={styles.input}
-              value={inviteeName}
-              onChange={(event) => setInviteeName(event.target.value)}
+              value={booking.inviteeName}
+              onChange={(event) => booking.setInviteeName(event.target.value)}
               required
             />
 
@@ -534,51 +156,30 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
               id="invitee-email"
               type="email"
               className={styles.input}
-              value={inviteeEmail}
-              onChange={(event) => setInviteeEmail(event.target.value)}
+              value={booking.inviteeEmail}
+              onChange={(event) => booking.setInviteeEmail(event.target.value)}
               required
             />
 
-            {eventData.eventType.questions.map((question) => (
-              <label key={question.id} className={styles.label}>
-                {question.label}
-                <input
-                  className={styles.input}
-                  value={answers[question.id] ?? ''}
-                  onChange={(event) =>
-                    setAnswers((previous) => ({
-                      ...previous,
-                      [question.id]: event.target.value,
-                    }))
-                  }
-                  placeholder={question.placeholder ?? ''}
-                  required={question.required}
-                />
-              </label>
-            ))}
+            <BookingQuestionFields
+              styles={styles}
+              prefix="booking-question"
+              questions={booking.eventData.eventType.questions}
+              answers={booking.answers}
+              onAnswerChange={booking.setAnswer}
+            />
 
-            <button className={styles.primaryButton} type="submit" disabled={submitting}>
-              {submitting ? 'Booking...' : 'Confirm booking'}
+            <button className={styles.primaryButton} type="submit" disabled={booking.submitting}>
+              {booking.submitting ? 'Booking...' : 'Confirm booking'}
             </button>
           </form>
 
-          {pageError ? <p className={styles.error}>{pageError}</p> : null}
-          {confirmation ? <p className={styles.confirmation}>{confirmation}</p> : null}
-          {deliveryStatus ? <p className={styles.notice}>{deliveryStatus}</p> : null}
-          {actionLinks ? (
-            <div className={styles.actionLinks}>
-              {actionLinks.cancelPageUrl ? (
-                <a className={styles.secondaryButton} href={actionLinks.cancelPageUrl}>
-                  Open cancel link
-                </a>
-              ) : null}
-              {actionLinks.reschedulePageUrl ? (
-                <a className={styles.secondaryButton} href={actionLinks.reschedulePageUrl}>
-                  Open reschedule link
-                </a>
-              ) : null}
-            </div>
+          {booking.pageError ? <p className={styles.error}>{booking.pageError}</p> : null}
+          {booking.confirmation ? (
+            <p className={styles.confirmation}>{booking.confirmation}</p>
           ) : null}
+          {booking.deliveryStatus ? <p className={styles.notice}>{booking.deliveryStatus}</p> : null}
+          <BookingActionLinks styles={styles} actionLinks={booking.actionLinks} />
         </div>
       </section>
     </main>

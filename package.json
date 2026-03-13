@@ -17,6 +17,8 @@
     "dev:api": "npm run dev -w apps/api",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "complexity:check": "node scripts/complexity-check.mjs",
+    "complexity:check:enforce": "node scripts/complexity-check.mjs --enforce",
     "lint": "eslint . --ext .ts,.tsx,.js,.mjs",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
@@ -31,7 +33,7 @@
     "deploy:api:production": "npm run deploy:production -w apps/api",
     "deploy:web:production": "node ./scripts/deploy-pages.mjs --production",
     "domain:check:production": "node ./scripts/domain-check.mjs --app-domain opencalendly.com --api-domain api.opencalendly.com",
-    "ci": "npm run lint && npm run test && npm run typecheck"
+    "ci": "npm run env:check && npm run lint && npm run complexity:check:enforce && npm run test && npm run typecheck"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

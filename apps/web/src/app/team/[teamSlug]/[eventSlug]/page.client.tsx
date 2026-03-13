@@ -1,92 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-
-import { DemoQuotaCard } from '../../../../components/demo-quota-card';
-import { buildEmailDeliveryMessage } from '../../../../lib/booking-outcome';
-import { getAuthHeader } from '../../../../lib/auth-session';
-import { useDemoQuota } from '../../../../lib/demo-quota';
 import {
-  COMMON_TIMEZONES,
-  createIdempotencyKey,
-  formatSlot,
-  getBrowserTimezone,
-  groupSlotsByDay,
-} from '../../../../lib/public-booking';
-import { useAuthSession } from '../../../../lib/use-auth-session';
+  BookingActionLinks,
+  BookingDemoGate,
+  BookingInlineQuotaCard,
+  BookingLoadingState,
+  BookingQuestionFields,
+  BookingSlotPicker,
+  BookingUnavailableState,
+} from '../../../../features/booking/components';
+import { readableLocation } from '../../../../features/booking/common';
+import { useTeamBooking } from '../../../../features/booking/use-team-booking';
+import { formatSlot } from '../../../../lib/public-booking';
 import styles from './page.module.css';
-
-type TeamEventResponse = {
-  ok: boolean;
-  team: {
-    id: string;
-    slug: string;
-    name: string;
-  };
-  eventType: {
-    id: string;
-    slug: string;
-    name: string;
-    durationMinutes: number;
-    locationType: string;
-    locationValue: string | null;
-    questions: Array<{
-      id: string;
-      label: string;
-      required: boolean;
-      placeholder?: string;
-    }>;
-  };
-  mode: 'round_robin' | 'collective';
-  members: Array<{
-    userId: string;
-    role: 'owner' | 'member';
-    user: {
-      id: string;
-      username: string;
-      displayName: string;
-      timezone: string;
-    } | null;
-  }>;
-  error?: string;
-};
-
-type TeamAvailabilityResponse = {
-  ok: boolean;
-  mode: 'round_robin' | 'collective';
-  timezone: string;
-  slots: Array<{
-    startsAt: string;
-    endsAt: string;
-    assignmentUserIds: string[];
-  }>;
-  error?: string;
-};
-
-type TeamBookingResponse = {
-  ok: boolean;
-  booking?: {
-    id: string;
-    startsAt: string;
-    endsAt: string;
-    assignmentUserIds: string[];
-    teamMode: 'round_robin' | 'collective';
-  };
-  actions?: {
-    cancel: {
-      pageUrl: string;
-    };
-    reschedule: {
-      pageUrl: string;
-    };
-  };
-  email?: {
-    sent: boolean;
-    provider: string;
-    error?: string;
-  };
-  error?: string;
-};
 
 type TeamBookingPageClientProps = {
   teamSlug: string;
@@ -94,331 +20,45 @@ type TeamBookingPageClientProps = {
   apiBaseUrl: string;
 };
 
-const buildInitialAnswers = (
-  questions: TeamEventResponse['eventType']['questions'],
-): Record<string, string> => {
-  return questions.reduce<Record<string, string>>((accumulator, question) => {
-    accumulator[question.id] = '';
-    return accumulator;
-  }, {});
-};
-
-const readableLocation = (locationType: string, locationValue: string | null): string => {
-  if (locationValue && locationValue.trim().length > 0) {
-    return locationValue;
-  }
-  return locationType.replaceAll('_', ' ');
-};
-
 export default function TeamBookingPageClient({
   teamSlug,
   eventSlug,
   apiBaseUrl,
 }: TeamBookingPageClientProps) {
-  const { session, ready } = useAuthSession();
-  const isLaunchDemoPage = teamSlug.trim().toLowerCase() === 'demo-team';
-  const [timezone, setTimezone] = useState('UTC');
-  const [teamEvent, setTeamEvent] = useState<TeamEventResponse | null>(null);
-  const [slots, setSlots] = useState<
-    Array<{ startsAt: string; endsAt: string; assignmentUserIds: string[] }>
-  >([]);
-  const [selectedSlot, setSelectedSlot] = useState('');
-  const [inviteeName, setInviteeName] = useState('');
-  const [inviteeEmail, setInviteeEmail] = useState('');
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [bookingRequestKey, setBookingRequestKey] = useState('');
-  const [loadingEvent, setLoadingEvent] = useState(true);
-  const [loadingSlots, setLoadingSlots] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<string | null>(null);
-  const [deliveryStatus, setDeliveryStatus] = useState<string | null>(null);
-  const [actionLinks, setActionLinks] = useState<{
-    cancelPageUrl?: string;
-    reschedulePageUrl?: string;
-  } | null>(null);
-  const {
-    status: demoQuotaStatus,
-    loading: demoQuotaLoading,
-    error: demoQuotaError,
-    refresh: refreshDemoQuota,
-  } = useDemoQuota({
-    apiBaseUrl,
-    session,
-    enabled: isLaunchDemoPage,
-  });
+  const booking = useTeamBooking({ teamSlug, eventSlug, apiBaseUrl });
 
-  const signInHref = useMemo(() => {
-    return `/auth/sign-in?redirect_url=${encodeURIComponent(
-      `/team/${encodeURIComponent(teamSlug)}/${encodeURIComponent(eventSlug)}`,
-    )}`;
-  }, [eventSlug, teamSlug]);
+  if (booking.loadingEvent || (booking.isLaunchDemoPage && !booking.ready)) {
+    return <BookingLoadingState styles={styles} kicker="Team booking" title="Loading team event..." />;
+  }
 
-  const timezoneOptions = useMemo(() => {
-    return Array.from(new Set([timezone, ...COMMON_TIMEZONES]));
-  }, [timezone]);
-
-  const slotGroups = useMemo(() => {
-    return groupSlotsByDay(slots, timezone);
-  }, [slots, timezone]);
-
-  const selectedSlotDetails = useMemo(() => {
-    if (!selectedSlot) {
-      return null;
-    }
-    return slots.find((slot) => slot.startsAt === selectedSlot) ?? null;
-  }, [selectedSlot, slots]);
-
-  const loadTeamEvent = useCallback(async () => {
-    if (isLaunchDemoPage && !session) {
-      setTeamEvent(null);
-      setLoadingEvent(false);
-      return;
-    }
-
-    setLoadingEvent(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}`,
-        {
-          cache: 'no-store',
-          headers: {
-            ...getAuthHeader(session),
-          },
-        },
-      );
-      const payload = (await response.json()) as TeamEventResponse;
-      if (!response.ok || !payload.ok) {
-        setError(payload.error || 'Unable to load team event details.');
-        setTeamEvent(null);
-        return;
-      }
-
-      setTeamEvent(payload);
-      setAnswers(buildInitialAnswers(payload.eventType.questions));
-    } catch {
-      setError('Unable to load team event details.');
-      setTeamEvent(null);
-    } finally {
-      setLoadingEvent(false);
-    }
-  }, [apiBaseUrl, eventSlug, isLaunchDemoPage, session, teamSlug]);
-
-  const loadAvailability = useCallback(async () => {
-    if (isLaunchDemoPage && !session) {
-      setSlots([]);
-      setLoadingSlots(false);
-      return;
-    }
-
-    setLoadingSlots(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams({
-        timezone,
-        start: new Date().toISOString(),
-        days: '7',
-      });
-      const response = await fetch(
-        `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
-        {
-          cache: 'no-store',
-          headers: {
-            ...getAuthHeader(session),
-          },
-        },
-      );
-      const payload = (await response.json()) as TeamAvailabilityResponse;
-      if (!response.ok || !payload.ok) {
-        setSlots([]);
-        setError(payload.error || 'Unable to load team availability.');
-        return;
-      }
-
-      setSlots(payload.slots);
-      setSelectedSlot((current) => {
-        return payload.slots.some((slot) => slot.startsAt === current) ? current : '';
-      });
-    } catch {
-      setSlots([]);
-      setError('Unable to load team availability.');
-    } finally {
-      setLoadingSlots(false);
-    }
-  }, [apiBaseUrl, eventSlug, isLaunchDemoPage, session, teamSlug, timezone]);
-
-  useEffect(() => {
-    setTimezone(getBrowserTimezone());
-  }, []);
-
-  useEffect(() => {
-    if (isLaunchDemoPage && !ready) {
-      return;
-    }
-    void loadTeamEvent();
-  }, [isLaunchDemoPage, loadTeamEvent, ready]);
-
-  useEffect(() => {
-    if (!teamEvent) {
-      return;
-    }
-    if (isLaunchDemoPage && !session) {
-      return;
-    }
-    void loadAvailability();
-  }, [isLaunchDemoPage, loadAvailability, session, teamEvent]);
-
-  useEffect(() => {
-    if (!selectedSlot) {
-      setBookingRequestKey('');
-      return;
-    }
-    setBookingRequestKey(createIdempotencyKey());
-  }, [selectedSlot]);
-
-  const submitTeamBooking = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-    setConfirmation(null);
-    setDeliveryStatus(null);
-    setActionLinks(null);
-
-    if (!selectedSlot) {
-      setError('Select a timeslot before booking.');
-      return;
-    }
-
-    const missingRequiredQuestion = teamEvent?.eventType.questions.find(
-      (question) => question.required && !(answers[question.id] ?? '').trim(),
-    );
-    if (missingRequiredQuestion) {
-      setError(`Answer required question: "${missingRequiredQuestion.label}".`);
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const requestIdempotencyKey = bookingRequestKey || createIdempotencyKey();
-      if (!bookingRequestKey) {
-        setBookingRequestKey(requestIdempotencyKey);
-      }
-      const response = await fetch(`${apiBaseUrl}/v0/team-bookings`, {
-        method: 'POST',
-        headers: {
-          ...getAuthHeader(session),
-          'Content-Type': 'application/json',
-          'Idempotency-Key': requestIdempotencyKey,
-        },
-        body: JSON.stringify({
-          teamSlug,
-          eventSlug,
-          startsAt: selectedSlot,
-          timezone,
-          inviteeName,
-          inviteeEmail,
-          answers: Object.fromEntries(
-            Object.entries(answers).filter((entry) => entry[1].trim().length > 0),
-          ),
-        }),
-      });
-
-      const payload = (await response.json()) as TeamBookingResponse;
-      if (!response.ok || !payload.ok || !payload.booking) {
-        setError(payload.error || 'Team booking failed. Please pick another slot.');
-        if (response.status === 409) {
-          void loadAvailability();
-        }
-        if (response.status === 429 && isLaunchDemoPage) {
-          void refreshDemoQuota();
-        }
-        return;
-      }
-
-      const inviteeEmailForNotice = inviteeEmail;
-      setConfirmation(
-        `Confirmed for ${formatSlot(payload.booking.startsAt, timezone)} with ${payload.booking.assignmentUserIds.length} assigned team member(s).`,
-      );
-      setDeliveryStatus(buildEmailDeliveryMessage(payload.email, inviteeEmailForNotice));
-      const cancelPageUrl = payload.actions?.cancel?.pageUrl;
-      const reschedulePageUrl = payload.actions?.reschedule?.pageUrl;
-      if (cancelPageUrl || reschedulePageUrl) {
-        const nextActionLinks: {
-          cancelPageUrl?: string;
-          reschedulePageUrl?: string;
-        } = {};
-        if (cancelPageUrl) {
-          nextActionLinks.cancelPageUrl = cancelPageUrl;
-        }
-        if (reschedulePageUrl) {
-          nextActionLinks.reschedulePageUrl = reschedulePageUrl;
-        }
-        setActionLinks(nextActionLinks);
-      }
-      setInviteeName('');
-      setInviteeEmail('');
-      setSelectedSlot('');
-      setBookingRequestKey('');
-      setAnswers(buildInitialAnswers(teamEvent?.eventType.questions ?? []));
-      void loadAvailability();
-      if (isLaunchDemoPage) {
-        void refreshDemoQuota();
-      }
-    } catch {
-      setError('Team booking failed. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (loadingEvent || (isLaunchDemoPage && !ready)) {
+  if (booking.isLaunchDemoPage && !booking.session) {
     return (
-      <main className={styles.page}>
-        <section className={styles.heroCard}>
-          <p className={styles.kicker}>Team booking</p>
-          <h1>Loading team event...</h1>
-        </section>
-      </main>
+      <BookingDemoGate
+        styles={styles}
+        kicker="Launch demo"
+        title="Sign in to book the team demo"
+        body="Team demo traffic is gated during launch so anonymous users cannot burn the shared pool."
+        apiBaseUrl={apiBaseUrl}
+        session={booking.session}
+        status={booking.demoQuotaStatus}
+        loading={booking.demoQuotaLoading}
+        error={booking.demoQuotaError}
+        signInHref={booking.signInHref}
+        waitlistSource="demo-team-booking"
+        featureKeys={['team_booking']}
+        onStatusChange={booking.refreshDemoQuota}
+      />
     );
   }
 
-  if (isLaunchDemoPage && !session) {
+  if (!booking.teamEvent) {
     return (
-      <main className={styles.page}>
-        <section className={styles.heroCard}>
-          <p className={styles.kicker}>Launch demo</p>
-          <h1>Sign in to book the team demo</h1>
-          <p>Team demo traffic is gated during launch so anonymous users cannot burn the shared pool.</p>
-        </section>
-
-        <section className={styles.layout}>
-          <DemoQuotaCard
-            apiBaseUrl={apiBaseUrl}
-            session={session}
-            status={demoQuotaStatus}
-            loading={demoQuotaLoading}
-            error={demoQuotaError}
-            signInHref={signInHref}
-            waitlistSource="demo-team-booking"
-            featureKeys={['team_booking']}
-            onStatusChange={refreshDemoQuota}
-          />
-        </section>
-      </main>
-    );
-  }
-
-  if (!teamEvent) {
-    return (
-      <main className={styles.page}>
-        <section className={styles.heroCard}>
-          <p className={styles.kicker}>Team booking</p>
-          <h1>Team event unavailable</h1>
-          <p className={styles.error}>{error || 'Team event type not found.'}</p>
-        </section>
-      </main>
+      <BookingUnavailableState
+        styles={styles}
+        kicker="Team booking"
+        title="Team event unavailable"
+        error={booking.error || 'Team event type not found.'}
+      />
     );
   }
 
@@ -426,98 +66,82 @@ export default function TeamBookingPageClient({
     <main className={styles.page}>
       <section className={styles.heroCard}>
         <p className={styles.kicker}>Team booking link</p>
-        <h1>{teamEvent.eventType.name}</h1>
+        <h1>{booking.teamEvent.eventType.name}</h1>
         <p>
-          Team: <strong>{teamEvent.team.name}</strong> · Mode:{' '}
-          <strong>{teamEvent.mode.replaceAll('_', ' ')}</strong>
+          Team: <strong>{booking.teamEvent.team.name}</strong> · Mode:{' '}
+          <strong>{booking.teamEvent.mode.replaceAll('_', ' ')}</strong>
         </p>
         <p>
-          Duration: {teamEvent.eventType.durationMinutes} min · Location:{' '}
-          {readableLocation(teamEvent.eventType.locationType, teamEvent.eventType.locationValue)}
+          Duration: {booking.teamEvent.eventType.durationMinutes} min · Location:{' '}
+          {readableLocation(
+            booking.teamEvent.eventType.locationType,
+            booking.teamEvent.eventType.locationValue,
+          )}
         </p>
       </section>
 
       <section className={styles.layout}>
-        <div className={styles.card}>
-          <h2>Choose a slot</h2>
-          <label className={styles.label} htmlFor="team-timezone">
-            Timezone
-          </label>
-          <select
-            id="team-timezone"
-            className={styles.select}
-            value={timezone}
-            onChange={(entry) => setTimezone(entry.target.value)}
-          >
-            {timezoneOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-
-          {loadingSlots ? <p className={styles.muted}>Loading slots...</p> : null}
-          {!loadingSlots && slots.length === 0 ? (
-            <p className={styles.muted}>No team slots available in the next 7 days.</p>
-          ) : null}
-
-          <div className={styles.slotDayStack}>
-            {slotGroups.map((group) => (
-              <section key={group.dateKey} className={styles.slotDay}>
-                <h3>{group.label}</h3>
-                <div className={styles.slotGrid}>
-                  {group.slots.map((slot) => (
-                    <button
-                      key={slot.startsAt}
-                      type="button"
-                      className={slot.startsAt === selectedSlot ? styles.slotActive : styles.slot}
-                      onClick={() => setSelectedSlot(slot.startsAt)}
-                    >
-                      {new Intl.DateTimeFormat(undefined, {
-                        timeStyle: 'short',
-                        timeZone: timezone,
-                      }).format(new Date(slot.startsAt))}
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </div>
+        <BookingSlotPicker
+          styles={styles}
+          title="Choose a slot"
+          timezoneId="team-timezone"
+          timezone={booking.timezone}
+          timezoneOptions={booking.timezoneOptions}
+          onTimezoneChange={booking.setTimezone}
+          loadingText="Loading slots..."
+          emptyText="No team slots available in the next 7 days."
+          loading={booking.loadingSlots}
+          slotsCount={booking.slots.length}
+          slotGroups={booking.slotGroups}
+          selectedSlot={booking.selectedSlot}
+          onSelectSlot={booking.setSelectedSlot}
+          renderSlotLabel={(slotStartsAt) =>
+            new Intl.DateTimeFormat(undefined, {
+              timeStyle: 'short',
+              timeZone: booking.timezone,
+            }).format(new Date(slotStartsAt))
+          }
+        />
 
         <div className={styles.card}>
           <h2>Confirm team booking</h2>
-          {selectedSlotDetails ? (
+          {booking.selectedSlotDetails ? (
             <p className={styles.selection}>
-              {formatSlot(selectedSlotDetails.startsAt, timezone)} ·{' '}
-              {selectedSlotDetails.assignmentUserIds.length} assigned member(s)
+              {formatSlot(booking.selectedSlotDetails.startsAt, booking.timezone)} ·{' '}
+              {booking.selectedSlotDetails.assignmentUserIds.length} assigned member(s)
             </p>
           ) : (
             <p className={styles.selection}>Select a slot to continue.</p>
           )}
 
-          {isLaunchDemoPage ? (
-            <DemoQuotaCard
+          {booking.isLaunchDemoPage ? (
+            <BookingInlineQuotaCard
               apiBaseUrl={apiBaseUrl}
-              session={session}
-              status={demoQuotaStatus}
-              loading={demoQuotaLoading}
-              error={demoQuotaError}
+              session={booking.session}
+              status={booking.demoQuotaStatus}
+              loading={booking.demoQuotaLoading}
+              error={booking.demoQuotaError}
               waitlistSource="demo-team-booking"
               featureKeys={['team_booking']}
-              onStatusChange={refreshDemoQuota}
+              onStatusChange={booking.refreshDemoQuota}
             />
           ) : null}
 
-          <form className={styles.form} onSubmit={submitTeamBooking}>
+          <form
+            className={styles.form}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void booking.submitTeamBooking();
+            }}
+          >
             <label className={styles.label} htmlFor="team-invitee-name">
               Your name
             </label>
             <input
               id="team-invitee-name"
               className={styles.input}
-              value={inviteeName}
-              onChange={(entry) => setInviteeName(entry.target.value)}
+              value={booking.inviteeName}
+              onChange={(event) => booking.setInviteeName(event.target.value)}
               required
             />
 
@@ -528,39 +152,28 @@ export default function TeamBookingPageClient({
               id="team-invitee-email"
               type="email"
               className={styles.input}
-              value={inviteeEmail}
-              onChange={(entry) => setInviteeEmail(entry.target.value)}
+              value={booking.inviteeEmail}
+              onChange={(event) => booking.setInviteeEmail(event.target.value)}
               required
             />
 
-            {teamEvent.eventType.questions.map((question) => (
-              <label key={question.id} className={styles.label} htmlFor={`team-question-${question.id}`}>
-                {question.label}
-                <input
-                  id={`team-question-${question.id}`}
-                  className={styles.input}
-                  value={answers[question.id] ?? ''}
-                  onChange={(entry) =>
-                    setAnswers((previous) => ({
-                      ...previous,
-                      [question.id]: entry.target.value,
-                    }))
-                  }
-                  placeholder={question.placeholder ?? ''}
-                  required={question.required}
-                />
-              </label>
-            ))}
+            <BookingQuestionFields
+              styles={styles}
+              prefix="team-question"
+              questions={booking.teamEvent.eventType.questions}
+              answers={booking.answers}
+              onAnswerChange={booking.setAnswer}
+            />
 
-            <button className={styles.primaryButton} type="submit" disabled={submitting}>
-              {submitting ? 'Booking...' : 'Confirm team booking'}
+            <button className={styles.primaryButton} type="submit" disabled={booking.submitting}>
+              {booking.submitting ? 'Booking...' : 'Confirm team booking'}
             </button>
           </form>
 
           <div className={styles.memberPanel}>
             <h3>Required members</h3>
             <ul>
-              {teamEvent.members.map((member) => (
+              {booking.teamEvent.members.map((member) => (
                 <li key={member.userId}>
                   {member.user?.displayName ?? member.userId} · {member.role}
                 </li>
@@ -568,23 +181,12 @@ export default function TeamBookingPageClient({
             </ul>
           </div>
 
-          {error ? <p className={styles.error}>{error}</p> : null}
-          {confirmation ? <p className={styles.confirmation}>{confirmation}</p> : null}
-          {deliveryStatus ? <p className={styles.notice}>{deliveryStatus}</p> : null}
-          {actionLinks ? (
-            <div className={styles.actionLinks}>
-              {actionLinks.cancelPageUrl ? (
-                <a className={styles.secondaryButton} href={actionLinks.cancelPageUrl}>
-                  Open cancel link
-                </a>
-              ) : null}
-              {actionLinks.reschedulePageUrl ? (
-                <a className={styles.secondaryButton} href={actionLinks.reschedulePageUrl}>
-                  Open reschedule link
-                </a>
-              ) : null}
-            </div>
+          {booking.error ? <p className={styles.error}>{booking.error}</p> : null}
+          {booking.confirmation ? (
+            <p className={styles.confirmation}>{booking.confirmation}</p>
           ) : null}
+          {booking.deliveryStatus ? <p className={styles.notice}>{booking.deliveryStatus}</p> : null}
+          <BookingActionLinks styles={styles} actionLinks={booking.actionLinks} />
         </div>
       </section>
     </main>

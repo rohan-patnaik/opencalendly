@@ -21,8 +21,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Environment check
+        run: npm run env:check
+
       - name: Lint
         run: npm run lint
+
+      - name: Complexity guardrails
+        run: npm run complexity:check:enforce
 
       - name: Unit tests
         run: npm run test

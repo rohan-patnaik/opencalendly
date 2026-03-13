@@ -24,10 +24,21 @@ npm run dev:web
 - Run before opening PR:
 
 ```bash
+npm run env:check
 npm run lint
+npm run complexity:check:enforce
 npm run test
 npm run typecheck
 ```
+
+## Maintainability guardrails
+
+- Keep `apps/api/src/index.ts` as composition only. Target `<300` LOC.
+- Keep `page.client.tsx` route shells focused on composition and page wiring. Target `<300` LOC.
+- Keep general authored modules under `<400` LOC unless they are schema or test files.
+- Prefer small route/domain modules over adding new architectural layers.
+- Do not add major dependencies for refactor-only work.
+- `npm run complexity:check:enforce` is part of CI and should stay green on every PR.
 
 ## Code style
 
