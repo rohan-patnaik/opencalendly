@@ -38,8 +38,10 @@ export const useDashboardSession = ({
     } catch (error) {
       if (apiSessionRevoked) {
         clear();
+        console.error('Clerk sign-out failed after API session revocation:', error);
+      } else {
+        console.error('API session revocation failed:', error);
       }
-      console.error('Clerk sign-out failed:', error);
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
         setSignOutError(detail ?? 'Unable to sign out right now. Please try again.');

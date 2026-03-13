@@ -50,6 +50,9 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     } catch (error) {
       if (apiSessionRevoked) {
         clear();
+        console.error('Clerk sign-out failed after API session revocation:', error);
+      } else {
+        console.error('API session revocation failed:', error);
       }
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
@@ -57,7 +60,6 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         setSignOutError(detail ?? 'Unable to sign out right now. Please retry.');
         return;
       }
-      console.error('Clerk sign-out failed:', error);
       setSignOutError('Unable to sign out right now. Please retry.');
     }
   }, [apiBaseUrl, clear, signOut]);
