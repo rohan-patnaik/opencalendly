@@ -24,7 +24,8 @@ Authentication requirements for webhook operations:
 
 - Use an authenticated organizer session in the target environment.
 - Browser-driven operator flows use the cookie-backed API session established by the normal login flow.
-- Scripted/API-client flows must present the same authenticated organizer context used by `/v0/auth/me`.
+- Scripted/API-client flows may reuse the same organizer session with `Authorization: Bearer <session-token>` when cookie auth is not available.
+- Scripted/API-client flows must still present the same authenticated organizer context used by `/v0/auth/me`.
 - `GET /v0/webhooks` and `POST /v0/webhooks/deliveries/run` require that authenticated organizer context.
 
 1. Inspect current delivery status (authenticated):
@@ -53,7 +54,7 @@ Authentication requirements for webhook operations:
    - `POST /v0/calendar/writeback/run`
 5. Verify conflict enforcement is restored by checking availability against known busy windows.
 6. If sync or writeback still fails:
-   - confirm runtime egress still permits `accounts.google.com`, `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, and `graph.microsoft.com`
+   - confirm runtime egress still permits `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, and `graph.microsoft.com`
    - treat provider DNS/firewall failures as operational incidents before debugging booking logic
 
 ## 4) Database restore drill (Neon)

@@ -14,7 +14,7 @@ Last updated: 28 Feb 2026 (IST)
 - [ ] Neon `DATABASE_URL` points to production branch/database.
 - [ ] Required OAuth and email provider env vars are present.
 - [ ] Outbound egress assumptions are reviewed for production:
-  - provider/auth APIs: Clerk, `accounts.google.com`, `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, `graph.microsoft.com`, `api.resend.com`
+  - provider/auth APIs: Clerk, `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, `graph.microsoft.com`, `api.resend.com`
   - webhook safety checks can reach `cloudflare-dns.com`
   - organizer-managed webhooks are limited to validated public HTTPS destinations and the runtime can reach the HTTPS port encoded in those URLs
   - private-network and metadata-service egress remains blocked
