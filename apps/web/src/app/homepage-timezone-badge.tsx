@@ -18,8 +18,7 @@ export function HomepageTimezoneBadge() {
 
   return (
     <div className={styles.artHeader}>
-      <span className={styles.artBadge}>Personal timezone aware</span>
-      <span className={styles.artTimezoneText}>Following {timezoneLabel}</span>
+      <span className={styles.artTimezoneText}>Your timezone: {timezoneLabel}</span>
     </div>
   );
 }

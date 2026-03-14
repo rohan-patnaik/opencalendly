@@ -1,38 +1,29 @@
+/* ===== OpenNote-inspired homepage — generous negative space, borderless ===== */
+
 .page {
-  width: min(1680px, calc(100% - 3rem));
+  width: min(1100px, calc(100% - 3rem));
   margin: 0 auto;
-  padding: 1.75rem 0 3.5rem;
+  padding: 2rem 0 10rem;
   display: grid;
-  gap: 0.85rem;
+  gap: 12rem;
 }
 
-.hero,
-.workflowPanel,
-.routePanel,
-.integrationPanel,
-.pricingPanel,
-.ctaBand,
-.footer {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-soft);
-}
+/* ---------- Hero — centered, single-column ---------- */
 
 .hero {
-  padding: 1.35rem;
-}
-
-.heroGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
-  gap: 1.6rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  text-align: center;
 }
 
 .heroCopy {
   display: grid;
-  align-content: start;
-  gap: 0.75rem;
+  gap: 1.25rem;
+  justify-items: center;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .kicker,
@@ -40,132 +31,153 @@
   margin: 0;
   color: var(--brand-primary);
   text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  font-size: 0.7rem;
   font-weight: 700;
 }
 
 .heroCopy h1 {
   margin: 0;
-  max-width: 12ch;
-  font-size: clamp(2.8rem, 4.4vw, 5.25rem);
-  line-height: 0.94;
-  letter-spacing: -0.05em;
+  font-size: clamp(2.2rem, 5vw, 3.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
   text-wrap: balance;
+  color: var(--text-heading);
 }
 
 .heroLead {
   margin: 0;
-  max-width: 62ch;
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: var(--text-primary);
+  max-width: 48ch;
+  font-size: 1.12rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
 }
 
 .heroActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
 }
 
-.heroActions .primaryButton,
-.heroActions .secondaryButton {
-  border-radius: 999px;
-  font-size: 0.82rem;
-  min-height: 2.5rem;
+.authButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.25rem;
   padding: 0 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    transform var(--motion-fast);
 }
 
-.signalGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.6rem;
+.authButton:hover {
+  transform: translateY(-1px);
 }
 
-.signalCard,
-.proofCard,
-.valueCard,
-.routeCard,
-.integrationCard,
-.pricingCard,
-.workflowCard {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow-sm);
+.authButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
-.signalCard {
-  padding: 0.8rem;
-  display: grid;
-  gap: 0.2rem;
+.authButtonGoogle {
+  background: var(--text-heading);
+  color: var(--bg-base);
+  border: 1px solid var(--text-heading);
 }
 
-.signalValue,
-.proofValue {
-  margin: 0;
-  color: var(--text-heading);
-  font-size: 1rem;
-  font-weight: 700;
+.authButtonGoogle:hover {
+  opacity: 0.9;
+  color: var(--bg-base);
 }
 
-.signalLabel,
-.proofLabel {
-  margin: 0;
+.authButtonMicrosoft {
+  background: transparent;
   color: var(--text-primary);
-  font-size: 0.78rem;
-  line-height: 1.45;
+  border: 1px solid var(--border-strong);
 }
+
+.authButtonMicrosoft:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+.authButtonEmail {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.authButtonEmail:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.authIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.authDivider {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- Hero art panel — floating, no frame ---------- */
 
 .heroArtPanel {
   display: flex;
+  justify-content: center;
+  margin-top: 2rem;
 }
 
 .artFrame {
   width: 100%;
-  min-height: 100%;
+  max-width: 560px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-strong);
-  background: var(--surface-panel);
-  box-shadow: inset 0 0 0 1px var(--brand-glow);
-  padding: 1rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
   display: grid;
-  gap: 0.8rem;
+  gap: 1rem;
   align-content: start;
 }
 
-.artHeader,
-.artLegend {
-  display: flex;
-  align-items: center;
-}
-
 .artHeader {
+  display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 0.55rem;
-}
-
-.artEyebrow {
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  gap: 0.4rem;
 }
 
 .artBadge {
   border-radius: 999px;
   border: 1px solid var(--brand-primary);
   color: var(--brand-primary);
-  padding: 0.22rem 0.5rem;
-  font-size: 0.68rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.65rem;
   font-weight: 700;
 }
 
 .artTimezoneText {
   color: var(--text-muted);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   line-height: 1.4;
 }
 
@@ -175,13 +187,15 @@
   height: auto;
   max-width: 44rem;
   justify-self: center;
-  padding: 0.3rem 0 0.15rem;
+  padding: 0;
 }
 
 .artLegend {
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 1rem;
-  color: var(--text-primary);
+  gap: 1.25rem;
+  color: var(--text-muted);
   font-size: 0.72rem;
   text-align: center;
 }
@@ -197,7 +211,7 @@
   height: 0.4rem;
   border-radius: 999px;
   background: var(--text-primary);
-  opacity: 0.42;
+  opacity: 0.35;
 }
 
 .legendDotAccent {
@@ -205,108 +219,109 @@
   opacity: 1;
 }
 
-.proofStrip,
-.valueGrid,
-.workflowGrid,
-.routeGrid,
-.integrationGrid,
-.pricingGrid,
-.footerLinks {
-  display: grid;
-  gap: 0.55rem;
-}
+/* ---------- Proof strip — inline text, no cards ---------- */
 
 .proofStrip {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2.5rem;
 }
 
 .proofCard {
-  padding: 0.85rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  text-align: center;
 }
 
-.valueGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.workflowGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.routeGrid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.integrationGrid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.pricingGrid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.valueCard,
-.integrationCard,
-.workflowCard,
-.pricingCard,
-.routeCard {
-  padding: 1rem;
-}
-
-.valueCard,
-.integrationCard,
-.workflowCard {
-  transition:
-    transform var(--motion-fast),
-    border-color var(--motion-fast),
-    box-shadow var(--motion-fast),
-    background var(--motion-fast);
-}
-
-.valueCard:hover,
-.integrationCard:hover,
-.workflowCard:hover,
-.routeCard:hover {
-  transform: translateY(-2px);
-  background: var(--bg-hover);
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-md);
-}
-
-.valueCard h2,
-.integrationCard h3,
-.workflowCard h3,
-.pricingCard h3,
-.footer h3,
-.routeCard strong {
+.proofValue {
   margin: 0;
   color: var(--text-heading);
-  font-size: 0.95rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--font-space-grotesk);
+  letter-spacing: -0.02em;
 }
 
-.valueCard p,
-.integrationCard p,
-.workflowCard p,
-.pricingCard li,
-.routeCard span:last-child,
-.footer p,
-.routePanel p:not(.sectionEyebrow),
-.ctaBand p:not(.sectionEyebrow) {
-  color: var(--text-primary);
-  font-size: 0.84rem;
+.proofLabel {
+  margin: 0.15rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
+
+/* ---------- Signal cards — killed for cleaner hero ---------- */
+
+.signalGrid {
+  display: none;
+}
+
+.signalCard,
+.signalValue,
+.signalLabel {
+  display: none;
+}
+
+/* ---------- Value pillars — borderless text blocks ---------- */
+
+.valueGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3rem;
+  text-align: center;
+}
+
+.valueCard {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  transition: none;
+}
+
+.valueCard:hover {
+  transform: none;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.valueCard h2 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.valueCard p {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  margin: 0.5rem 0 0;
+}
+
+/* ---------- Section headings — centered ---------- */
 
 .workflowPanel,
 .routePanel,
 .integrationPanel,
 .pricingPanel,
 .ctaBand {
-  padding: 1.15rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
 }
 
 .sectionHeading {
   display: grid;
-  gap: 0.25rem;
-  margin-bottom: 0.65rem;
+  gap: 0.35rem;
+  margin-bottom: 3rem;
+  text-align: center;
 }
 
 .sectionHeading h2,
@@ -316,21 +331,92 @@
 .pricingPanel h2,
 .ctaBand h2 {
   margin: 0;
-  font-size: clamp(1.4rem, 2.4vw, 2rem);
-  line-height: 1.02;
-  letter-spacing: -0.04em;
+  font-size: clamp(2rem, 3.5vw, 2.75rem);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  color: var(--text-heading);
+}
+
+/* ---------- Workflow grid — numbered, minimal ---------- */
+
+.workflowGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3rem;
+  text-align: center;
+}
+
+.workflowCard {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  transition: none;
+}
+
+.workflowCard:hover {
+  transform: none;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.workflowCard h3 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.workflowCard p {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  margin: 0.4rem 0 0;
+}
+
+/* ---------- Routes — clean link list ---------- */
+
+.routeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
 }
 
 .routeCard {
   display: grid;
-  gap: 0.32rem;
+  gap: 0.3rem;
   color: var(--text-primary);
   text-decoration: none;
+  padding: 1.25rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: transparent;
+  box-shadow: none;
   transition:
-    transform var(--motion-fast),
-    background var(--motion-fast),
     border-color var(--motion-fast),
-    box-shadow var(--motion-fast);
+    background var(--motion-fast);
+}
+
+.routeCard:hover {
+  border-color: var(--brand-primary);
+  background: var(--bg-hover);
+  transform: none;
+  box-shadow: none;
+}
+
+.routeCard strong {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.routeCard span:last-child {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .badge {
@@ -338,16 +424,81 @@
   border-radius: 999px;
   border: 1px solid var(--brand-primary);
   color: var(--brand-primary);
-  padding: 0.14rem 0.4rem;
-  font-size: 0.65rem;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
+/* ---------- Integrations — horizontal row ---------- */
+
+.integrationGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2rem;
+  text-align: center;
+}
+
+.integrationCard {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  transition: none;
+}
+
+.integrationCard:hover {
+  transform: none;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.integrationCard h3 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.integrationCard p {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  margin: 0.35rem 0 0;
+}
+
+/* ---------- Pricing — two clean columns ---------- */
+
+.pricingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+}
+
 .pricingCard {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.85rem;
+  padding: 2rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: transparent;
+  box-shadow: none;
+}
+
+.pricingCard h3 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.pricingCard li {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.6;
 }
 
 .pricingCard ul {
@@ -359,169 +510,188 @@
   color: var(--brand-primary);
 }
 
+/* ---------- CTA band — centered, full-width feel ---------- */
+
 .ctaBand {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) auto;
-  gap: 1rem;
-  align-items: center;
+  gap: 1.5rem;
+  text-align: center;
+  justify-items: center;
 }
+
+.ctaBand p:not(.sectionEyebrow) {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.65;
+  max-width: 52ch;
+  margin: 0;
+}
+
+/* ---------- Footer — multi-column ---------- */
 
 .footer {
-  padding: 1rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.footerTop {
   display: grid;
-  gap: 0.8rem;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  grid-template-columns: 1.5fr 2fr;
+  gap: 3rem;
+  padding: 3rem 0 2.5rem;
 }
 
-.footerLinks {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.footerBrand h3 {
+  margin: 0;
+  color: var(--text-heading);
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
 }
 
-.footerLinks a {
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  text-decoration: none;
-  padding: 0.5rem 0.65rem;
-  font-size: 0.82rem;
-  transition:
-    background var(--motion-fast),
-    border-color var(--motion-fast),
-    color var(--motion-fast);
+.footerBrand p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0.5rem 0 0;
+  max-width: 28ch;
 }
 
-.footerLinks a:hover {
-  background: var(--bg-hover);
-  border-color: var(--brand-primary);
+.footerColumns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+
+.footerColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.footerColumn h4 {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   color: var(--text-heading);
 }
 
+.footerColumn a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.84rem;
+  transition: color var(--motion-fast);
+}
+
+.footerColumn a:hover {
+  color: var(--brand-primary);
+}
+
+.footerBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--border-default);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ========== Responsive ========== */
+
 @media (prefers-reduced-motion: reduce) {
 
-  .valueCard,
-  .integrationCard,
-  .workflowCard,
   .routeCard,
-  .footerLinks a,
+  .footerColumn a,
   .primaryButton,
   .secondaryButton {
     transition: none;
-  }
-
-  .valueCard:hover,
-  .integrationCard:hover,
-  .workflowCard:hover,
-  .routeCard:hover {
-    transform: none;
-  }
-}
-
-@media (min-width: 1440px) {
-  .page {
-    width: min(1760px, calc(100% - 4rem));
-  }
-
-  .heroGrid {
-    grid-template-columns: minmax(0, 1.08fr) minmax(540px, 0.92fr);
-    gap: 1.9rem;
-  }
-
-  .heroCopy h1 {
-    font-size: clamp(3.4rem, 4vw, 5.6rem);
-  }
-
-  .proofStrip,
-  .integrationGrid {
-    gap: 0.7rem;
   }
 }
 
 @media (max-width: 1280px) {
   .page {
-    width: min(100% - 2rem, 1440px);
-    padding-top: 1.25rem;
-  }
-
-  .heroGrid {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
-    gap: 1.2rem;
-  }
-
-  .heroCopy h1 {
-    font-size: clamp(2.5rem, 5vw, 4.25rem);
-  }
-
-  .proofStrip,
-  .integrationGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .routeGrid,
-  .workflowGrid,
-  .valueGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .footerLinks {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(100% - 2rem, 1100px);
+    gap: 10rem;
   }
 }
 
 @media (max-width: 1120px) {
 
-  .heroGrid,
-  .ctaBand,
-  .footer {
+  .ctaBand {
+    text-align: center;
+  }
+
+  .footerTop {
     grid-template-columns: 1fr;
   }
+}
 
-  .hero {
-    padding: 0.9rem;
+@media (max-width: 960px) {
+
+  .valueGrid,
+  .workflowGrid {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
   }
 
-  .heroCopy h1 {
-    max-width: 14ch;
+  .integrationGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
   }
 
-  .artFrame {
-    min-height: 0;
+  .pricingGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
 }
 
 @media (max-width: 720px) {
   .page {
-    width: min(100% - 0.75rem, 1240px);
-    padding: 0.75rem 0 2rem;
-  }
-
-  .proofStrip,
-  .valueGrid,
-  .workflowGrid,
-  .routeGrid,
-  .integrationGrid,
-  .pricingGrid,
-  .footerLinks,
-  .signalGrid {
-    grid-template-columns: 1fr;
+    width: min(100% - 1.5rem, 1100px);
+    padding: 3rem 0 4rem;
+    gap: 7rem;
   }
 
   .heroCopy h1 {
-    font-size: clamp(2rem, 13vw, 2.8rem);
+    font-size: clamp(1.8rem, 10vw, 2.4rem);
   }
 
   .heroActions {
-    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
-  .heroActions .primaryButton,
-  .heroActions .secondaryButton {
-    width: 100%;
+  .heroArtPanel {
+    margin-top: 2.5rem;
+  }
+
+  .proofStrip {
+    gap: 1.5rem;
+  }
+
+  .routeGrid,
+  .integrationGrid {
+    grid-template-columns: 1fr;
   }
 
   .artLegend {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.4rem;
+  }
+
+  .footerColumns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .footerBottom {
+    flex-direction: column;
+    gap: 0.3rem;
+    text-align: center;
   }
 }

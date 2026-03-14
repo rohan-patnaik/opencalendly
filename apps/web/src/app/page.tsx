@@ -2,58 +2,53 @@ import Link from 'next/link';
 import { useId } from 'react';
 import { GlobeCanvas } from '../components/globe-canvas';
 import { LinkButton } from '../components/ui/button';
+import { PROJECT_LICENSE } from '../lib/project-metadata';
 import { HeroArtCarousel } from './hero-art-carousel';
 import { HomepageTimezoneBadge } from './homepage-timezone-badge';
 import styles from './page.module.css';
 
-const heroSignals = [
-  { label: 'Safe booking writes', value: 'Txn checked' },
-  { label: 'Calendar sync', value: 'Google + Microsoft' },
-  { label: 'Booking surfaces', value: '1:1, team, embed' },
-];
-
 const proofStrip = [
-  { value: '10+', label: 'Shipped feature tracks' },
-  { value: '40+', label: 'API routes in v1' },
-  { value: 'Neon', label: 'Supported database' },
-  { value: 'OSS', label: 'You own the stack' },
+  { value: '10+', label: 'Feature tracks' },
+  { value: '40+', label: 'API routes' },
+  { value: 'Neon', label: 'Database' },
+  { value: 'OSS', label: 'You own it' },
 ];
 
 const platformPillars = [
   {
-    title: 'Availability is checked twice',
-    copy: 'Slots stay fast to browse, and booking is checked again right before it is written.',
+    title: 'Checked twice',
+    copy: 'Slots load fast, but the booking is verified again inside a transaction before it is written.',
   },
   {
-    title: 'Operators keep control',
-    copy: 'Your team can manage event types, availability, webhooks, and calendars from the app itself.',
+    title: 'Operator control',
+    copy: 'Manage event types, availability, webhooks, and calendars from a single organizer console.',
   },
   {
-    title: 'Shipping stays portable',
+    title: 'Portable stack',
     copy: 'Neon, Cloudflare, Clerk, and Resend stay visible and replaceable because the code is yours.',
   },
 ];
 
 const workflowBlocks = [
   {
-    title: '1. Publish booking links',
-    copy: 'Launch one-on-one and team pages with sensible buffers and timezone support.',
+    title: '1. Publish',
+    copy: 'Launch one-on-one and team booking pages with sensible buffers and timezone support.',
   },
   {
-    title: '2. Route real traffic',
+    title: '2. Route',
     copy: 'Guests book through public pages, embeds, and action links backed by the same APIs.',
   },
   {
-    title: '3. Operate from one console',
-    copy: 'Organizers can check analytics, calendar status, and queue health without jumping to scripts.',
+    title: '3. Operate',
+    copy: 'Check analytics, calendar status, and queue health from one console.',
   },
 ];
 
 const integrationCards = [
-  { title: 'Google Calendar', copy: 'Busy sync, connect flow, and writeback retries.' },
-  { title: 'Microsoft Calendar', copy: 'The same core sync and event controls for Microsoft accounts.' },
-  { title: 'Resend', copy: 'Clear booking, cancel, and reschedule emails.' },
-  { title: 'Cloudflare + Neon', copy: 'Edge delivery with transactional storage underneath.' },
+  { title: 'Google Calendar', copy: 'Busy sync and writeback retries.' },
+  { title: 'Microsoft Calendar', copy: 'Same sync and event controls.' },
+  { title: 'Resend', copy: 'Booking, cancel, and reschedule emails.' },
+  { title: 'Cloudflare + Neon', copy: 'Edge delivery with txn storage.' },
 ];
 
 const pricingPreview = [
@@ -102,10 +97,10 @@ function CalendarDotArt() {
     >
       <defs>
         <pattern id={baseId} width="6" height="6" patternUnits="userSpaceOnUse">
-          <circle cx="3" cy="3" r="1" fill="var(--text-primary)" opacity="0.4" />
+          <circle cx="3" cy="3" r="1" fill="var(--text-primary)" opacity="0.65" />
         </pattern>
         <pattern id={accentId} width="6" height="6" patternUnits="userSpaceOnUse">
-          <circle cx="3" cy="3" r="1" fill="var(--brand-primary)" />
+          <circle cx="3" cy="3" r="1.1" fill="var(--brand-primary)" />
         </pattern>
       </defs>
 
@@ -117,7 +112,7 @@ function CalendarDotArt() {
         rx="12"
         fill="none"
         stroke="var(--border-strong)"
-        strokeOpacity="0.9"
+
         strokeWidth="10"
       />
       <rect x="74" y="54" width="292" height="48" rx="6" fill={`url(#${accentId})`} />
@@ -130,7 +125,7 @@ function CalendarDotArt() {
         x2="366"
         y2="116"
         stroke="var(--border-strong)"
-        strokeOpacity="0.75"
+
         strokeWidth="6"
         strokeLinecap="round"
       />
@@ -150,9 +145,9 @@ function CalendarDotArt() {
       )}
 
       {/* Extra ambient dot fields to fill more space */}
-      <rect x="420" y="40" width="120" height="140" rx="6" fill={`url(#${baseId})`} opacity="0.5" />
-      <rect x="420" y="200" width="120" height="120" rx="6" fill={`url(#${accentId})`} opacity="0.25" />
-      <rect x="10" y="360" width="540" height="50" rx="6" fill={`url(#${baseId})`} opacity="0.3" />
+      <rect x="420" y="40" width="120" height="140" rx="6" fill={`url(#${baseId})`} opacity="0.7" />
+      <rect x="420" y="200" width="120" height="120" rx="6" fill={`url(#${accentId})`} opacity="0.4" />
+      <rect x="10" y="360" width="540" height="50" rx="6" fill={`url(#${baseId})`} opacity="0.5" />
     </svg>
   );
 }
@@ -160,65 +155,68 @@ function CalendarDotArt() {
 export default function HomePage() {
   return (
     <main className={styles.page}>
+      {/* ────── Hero: centered single-column ────── */}
       <section className={styles.hero}>
-        <div className={styles.heroGrid}>
-          <div className={styles.heroCopy}>
-            <p className={styles.kicker}>Open scheduling, built with care.</p>
-            <h1>Polished scheduling on infrastructure your team owns.</h1>
-            <p className={styles.heroLead}>
-              OpenCalendly gives teams a clean booking experience without hiding the stack. Run it
-              with the services you choose and the APIs you control.
-            </p>
-            <div className={styles.heroActions}>
-              <LinkButton
-                className={styles.primaryButton ?? ''}
-                href="/demo/intro-call"
-                variant="primary"
-                size="lg"
-              >
-                Start booking demo
-              </LinkButton>
-              <LinkButton
-                className={styles.secondaryButton ?? ''}
-                href="/organizer"
-                variant="secondary"
-                size="lg"
-              >
-                Open organizer console
-              </LinkButton>
-            </div>
-            <div className={styles.signalGrid}>
-              {heroSignals.map((item) => (
-                <article key={item.label} className={styles.signalCard}>
-                  <p className={styles.signalValue}>{item.value}</p>
-                  <p className={styles.signalLabel}>{item.label}</p>
-                </article>
-              ))}
-            </div>
+        <div className={styles.heroCopy}>
+          <p className={styles.kicker}>Open scheduling, built with care.</p>
+          <h1>Polished scheduling on infrastructure you own.</h1>
+          <p className={styles.heroLead}>
+            Calendar sync, transaction-safe booking, and a clean UI — on a stack you control.
+            Google &amp; Microsoft calendars, 1:1 &amp; team pages, embeds, and webhooks included.
+          </p>
+          <div className={styles.heroActions}>
+            <Link
+              className={`${styles.authButton} ${styles.authButtonGoogle}`}
+              href="/auth/sign-up"
+            >
+              <span className={styles.authIcon}>
+                {/* Google "G" logo */}
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A11.96 11.96 0 0 0 1 12c0 1.94.46 3.77 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+              </span>
+              Sign up with Google
+            </Link>
+            <Link
+              className={`${styles.authButton} ${styles.authButtonMicrosoft}`}
+              href="/auth/sign-up"
+            >
+              <span className={styles.authIcon}>
+                {/* Microsoft 4-square logo */}
+                <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
+                  <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+                  <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+                  <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+                  <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+                </svg>
+              </span>
+              Sign up with Microsoft
+            </Link>
+            <span className={styles.authDivider}>or</span>
+            <Link
+              className={`${styles.authButton} ${styles.authButtonEmail}`}
+              href="/auth/sign-up"
+            >
+              Sign up with email →
+            </Link>
           </div>
+        </div>
 
-          <div className={styles.heroArtPanel} aria-hidden="true">
-            <div className={styles.artFrame}>
-              <HomepageTimezoneBadge />
-              <HeroArtCarousel labels={['Calendar view', 'Globe view']}>
-                <CalendarDotArt />
-                <GlobeCanvas />
-              </HeroArtCarousel>
-              <div className={styles.artLegend}>
-                <div>
-                  <span className={styles.legendDot} />
-                  <span>open slots</span>
-                </div>
-                <div>
-                  <span className={`${styles.legendDot} ${styles.legendDotAccent}`} />
-                  <span>selected flow</span>
-                </div>
-              </div>
-            </div>
+        <div className={styles.heroArtPanel} aria-hidden="true">
+          <div className={styles.artFrame}>
+            <HomepageTimezoneBadge />
+            <HeroArtCarousel>
+              <CalendarDotArt />
+              <GlobeCanvas />
+            </HeroArtCarousel>
           </div>
         </div>
       </section>
 
+      {/* ────── Proof strip: compact stats ────── */}
       <section className={styles.proofStrip}>
         {proofStrip.map((item) => (
           <article key={item.label} className={styles.proofCard}>
@@ -228,15 +226,23 @@ export default function HomePage() {
         ))}
       </section>
 
-      <section className={styles.valueGrid}>
-        {platformPillars.map((card) => (
-          <article key={card.title} className={styles.valueCard}>
-            <h2>{card.title}</h2>
-            <p>{card.copy}</p>
-          </article>
-        ))}
+      {/* ────── Platform pillars ────── */}
+      <section>
+        <div className={styles.sectionHeading}>
+          <p className={styles.sectionEyebrow}>Core principles</p>
+          <h2>Built for correctness and control</h2>
+        </div>
+        <div className={styles.valueGrid}>
+          {platformPillars.map((card) => (
+            <article key={card.title} className={styles.valueCard}>
+              <h2>{card.title}</h2>
+              <p>{card.copy}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
+      {/* ────── Workflow ────── */}
       <section className={styles.workflowPanel}>
         <div className={styles.sectionHeading}>
           <p className={styles.sectionEyebrow}>Product loop</p>
@@ -252,6 +258,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ────── Live routes ────── */}
       <section className={styles.routePanel}>
         <div className={styles.sectionHeading}>
           <p className={styles.sectionEyebrow}>Live routes</p>
@@ -268,6 +275,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ────── Integrations ────── */}
       <section className={styles.integrationPanel}>
         <div className={styles.sectionHeading}>
           <p className={styles.sectionEyebrow}>Platform stack</p>
@@ -283,6 +291,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ────── Pricing ────── */}
       <section className={styles.pricingPanel}>
         <div className={styles.sectionHeading}>
           <p className={styles.sectionEyebrow}>Plan preview</p>
@@ -305,15 +314,13 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ────── CTA band ────── */}
       <section className={styles.ctaBand}>
-        <div>
-          <p className={styles.sectionEyebrow}>Next move</p>
-          <h2>Try the demos, then step into the operator tools.</h2>
-          <p>
-            Get a booking link live quickly, keep the workflow easy to follow, and stay in control
-            as the app grows.
-          </p>
-        </div>
+        <p className={styles.sectionEyebrow}>Next move</p>
+        <h2>Try the demos, then step into the operator tools.</h2>
+        <p>
+          Get a booking link live, keep the workflow simple, stay in control as the app grows.
+        </p>
         <div className={styles.heroActions}>
           <LinkButton
             className={styles.primaryButton ?? ''}
@@ -329,25 +336,43 @@ export default function HomePage() {
             variant="secondary"
             size="lg"
           >
-            Read implementation notes
+            Read the docs
           </LinkButton>
         </div>
       </section>
 
+      {/* ────── Footer ────── */}
       <footer className={styles.footer}>
-        <div>
-          <h3>OpenCalendly</h3>
-          <p>Open-source scheduling for teams that want a polished product and a readable stack.</p>
+        <div className={styles.footerTop}>
+          <div className={styles.footerBrand}>
+            <h3>OpenCalendly</h3>
+            <p>Open-source scheduling for teams that want a polished product and a readable stack.</p>
+          </div>
+          <div className={styles.footerColumns}>
+            <div className={styles.footerColumn}>
+              <h4>Product</h4>
+              <Link href="/features">Features</Link>
+              <Link href="/pricing">Pricing</Link>
+              <Link href="/demo/intro-call">Book a demo</Link>
+              <Link href="/embed/playground">Embed</Link>
+            </div>
+            <div className={styles.footerColumn}>
+              <h4>Resources</h4>
+              <Link href="/resources">Docs</Link>
+              <Link href="/solutions">Solutions</Link>
+              <Link href="/dashboard">Dashboard</Link>
+            </div>
+            <div className={styles.footerColumn}>
+              <h4>App</h4>
+              <Link href="/organizer">Organizer</Link>
+              <Link href="/auth/sign-in">Sign in</Link>
+              <Link href="/auth/sign-up">Create account</Link>
+            </div>
+          </div>
         </div>
-        <div className={styles.footerLinks}>
-          <Link href="/features">Features</Link>
-          <Link href="/solutions">Solutions</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/resources">Resources</Link>
-          <Link href="/embed/playground">Embed playground</Link>
-          <Link href="/organizer">Organizer console</Link>
-          <Link href="/dashboard">Analytics dashboard</Link>
-          <Link href="/demo/intro-call">Booking demo</Link>
+        <div className={styles.footerBottom}>
+          <span>© {new Date().getFullYear()} OpenCalendly</span>
+          <span>{`Open source · ${PROJECT_LICENSE}`}</span>
         </div>
       </footer>
     </main>

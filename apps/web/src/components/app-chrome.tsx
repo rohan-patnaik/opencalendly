@@ -10,17 +10,21 @@ import { resolveApiBaseUrl } from '../lib/api-base-url';
 import { revokeApiSession } from '../lib/api-client';
 import { useAuthSession } from '../lib/use-auth-session';
 import styles from './app-chrome.module.css';
+import { ThemeToggle } from './theme-toggle';
 
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/features', label: 'Features' },
-  { href: '/solutions', label: 'Solutions' },
   { href: '/pricing', label: 'Pricing' },
-  { href: '/resources', label: 'Resources' },
   { href: '/demo/intro-call', label: 'Book Demo' },
+  { href: '/organizer', label: 'Organizer' },
+];
+
+const mobileOnlyLinks = [
+  { href: '/solutions', label: 'Solutions' },
+  { href: '/resources', label: 'Resources' },
   { href: '/team/demo-team/team-intro-call', label: 'Team Demo' },
   { href: '/embed/playground', label: 'Embed' },
-  { href: '/organizer', label: 'Organizer' },
   { href: '/dashboard', label: 'Dashboard' },
 ];
 
@@ -149,16 +153,20 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className={styles.right}>
+          <ThemeToggle />
           {ready && session ? (
             <>
               <span className={styles.sessionChip}>{session.user.email}</span>
-              <button type="button" className={styles.actionButton} onClick={() => void handleSignOut()}>
+              <Link href="/organizer" className={styles.goToAppButton}>
+                Go to app →
+              </Link>
+              <button type="button" className={styles.signOutLink} onClick={() => void handleSignOut()}>
                 Sign out
               </button>
             </>
           ) : (
-            <Link href="/auth/sign-in" className={styles.actionButton}>
-              Sign in
+            <Link href="/auth/sign-in" className={styles.goToAppButton}>
+              Go to app →
             </Link>
           )}
         </div>
@@ -187,7 +195,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           </button>
         </div>
         <nav className={styles.mobileNav} aria-label="Mobile main navigation">
-          {navLinks.map((link) => (
+          {[...navLinks, ...mobileOnlyLinks].map((link) => (
             <Link
               key={link.href}
               href={link.href}
