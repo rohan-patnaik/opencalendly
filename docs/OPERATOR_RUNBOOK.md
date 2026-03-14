@@ -38,7 +38,7 @@ Authentication requirements for webhook operations:
    - validate endpoint URL and secret mismatch on receiver side
    - inspect provider/network errors
    - confirm destination DNS still resolves to public IP space
-   - confirm runtime egress policy still allows outbound `443` to the public webhook host
+   - confirm runtime egress policy still allows outbound HTTPS to `cloudflare-dns.com` and to the public webhook host/port encoded in the destination URL
 
 ## 3) Calendar sync recovery
 
@@ -53,7 +53,7 @@ Authentication requirements for webhook operations:
    - `POST /v0/calendar/writeback/run`
 5. Verify conflict enforcement is restored by checking availability against known busy windows.
 6. If sync or writeback still fails:
-   - confirm runtime egress still permits `accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, and `graph.microsoft.com`
+   - confirm runtime egress still permits `accounts.google.com`, `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, and `graph.microsoft.com`
    - treat provider DNS/firewall failures as operational incidents before debugging booking logic
 
 ## 4) Database restore drill (Neon)

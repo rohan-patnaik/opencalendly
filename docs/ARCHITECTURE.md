@@ -16,16 +16,17 @@ flowchart LR
 
 - The API runtime is expected to make outbound HTTPS requests only to:
   - organizer-approved public webhook destinations
-  - Google OAuth and Calendar APIs (`accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`)
+  - Google OAuth, profile, and Calendar APIs (`accounts.google.com`, `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`)
   - Microsoft OAuth and Graph APIs (`login.microsoftonline.com`, `graph.microsoft.com`)
   - Resend (`api.resend.com`)
+  - Cloudflare DNS-over-HTTPS for webhook target safety checks (`cloudflare-dns.com`)
 - Organizer-managed webhook destinations are dynamic, so they cannot be pinned to a small static hostname allowlist. The application instead enforces:
   - `https://` only
   - public hostnames only
   - no embedded credentials
   - DNS resolution that stays out of private, loopback, link-local, carrier-grade NAT, metadata-service, and other internal IP space before each delivery attempt
 - Production networking should still block private-network egress from the API runtime. The app-level webhook validation is a second line of defense, not the only one.
-- If the hosting platform supports explicit outbound policy controls, keep the static provider domains above reachable and keep organizer-supplied webhooks constrained to public-Internet egress on `443`.
+- If the hosting platform supports explicit outbound policy controls, keep the static provider domains above reachable and keep organizer-supplied webhooks constrained to public-Internet egress for whatever HTTPS port is encoded in the validated destination URL.
 - Failures from DNS policy, firewall policy, or provider outages should surface as explicit webhook delivery or calendar sync/writeback errors. They should never silently degrade into successful booking commits.
 
 ## Data model overview

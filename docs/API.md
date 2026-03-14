@@ -1219,11 +1219,12 @@ Behavior:
 
 - Picks eligible due deliveries.
 - Resolves allowed hostnames before network I/O and rejects targets that resolve to private or unsafe IP space.
+- Performs DNS lookups through `https://cloudflare-dns.com/dns-query` before each delivery attempt.
 - Sends signed payloads with retry backoff and does not follow redirects automatically.
 - Fails deliveries immediately when the stored target URL is no longer allowed by the webhook URL policy.
 - Transparently migrates legacy plaintext webhook secrets to encrypted-at-rest storage before dispatch when an old row is encountered.
 - Updates attempt count + next attempt timestamp.
-- Requires outbound HTTPS reachability from the API runtime to the organizer's public webhook host on port `443`.
+- Requires outbound HTTPS reachability from the API runtime to both `cloudflare-dns.com` and the organizer's validated public webhook host, including any explicit HTTPS port encoded in the destination URL.
 
 Success response:
 
@@ -1799,7 +1800,7 @@ Error responses:
 
 Runtime note:
 
-- Production must allow outbound HTTPS to `oauth2.googleapis.com` and `www.googleapis.com`.
+- Production must allow outbound HTTPS to `oauth2.googleapis.com`, `openidconnect.googleapis.com`, and `www.googleapis.com`.
 
 ### `POST /v0/calendar/google/disconnect`
 
