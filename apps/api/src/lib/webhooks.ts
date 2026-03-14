@@ -11,6 +11,16 @@ import {
 export const WEBHOOK_DEFAULT_MAX_ATTEMPTS = 6;
 export const WEBHOOK_RETRY_BASE_SECONDS = 30;
 export const WEBHOOK_RETRY_MAX_SECONDS = 60 * 60;
+const DNS_OVER_HTTPS_URL = 'https://cloudflare-dns.com/dns-query';
+
+type DnsAnswer = {
+  type?: number;
+  data?: string;
+};
+
+type DnsJsonResponse = {
+  Answer?: DnsAnswer[];
+};
 
 export type BuildWebhookEventInput = {
   type: WebhookEventType;
@@ -87,4 +97,171 @@ export const isWebhookDeliveryExhausted = (attemptCount: number, maxAttempts: nu
 
 export const isAllowedWebhookTargetUrl = (value: string): boolean => {
   return isSafeWebhookTargetUrl(value);
+};
+
+const parseIpv4 = (value: string): number[] | null => {
+  const parts = value.split('.');
+  if (parts.length !== 4) {
+    return null;
+  }
+
+  const octets = parts.map((part) => Number.parseInt(part, 10));
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+    return null;
+  }
+
+  return octets;
+};
+
+const isUnsafeResolvedIpv4 = (value: string): boolean => {
+  const octets = parseIpv4(value);
+  if (!octets) {
+    return false;
+  }
+
+  const a = octets[0]!;
+  const b = octets[1]!;
+  return (
+    a === 0 ||
+    a === 10 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    a >= 224
+  );
+};
+
+const expandIpv6Segments = (value: string): number[] | null => {
+  const normalized = value.toLowerCase();
+  if (!normalized.includes(':')) {
+    return null;
+  }
+
+  const [head, tail = ''] = normalized.split('::');
+  if (normalized.split('::').length > 2) {
+    return null;
+  }
+
+  const headSegments = head
+    ? head.split(':').filter(Boolean).map((segment) => Number.parseInt(segment, 16))
+    : [];
+  const tailSegments = tail
+    ? tail.split(':').filter(Boolean).map((segment) => Number.parseInt(segment, 16))
+    : [];
+
+  if (
+    [...headSegments, ...tailSegments].some(
+      (segment) => !Number.isInteger(segment) || segment < 0 || segment > 0xffff,
+    )
+  ) {
+    return null;
+  }
+
+  if (headSegments.length + tailSegments.length > 8) {
+    return null;
+  }
+
+  const fillerLength = 8 - headSegments.length - tailSegments.length;
+  return [...headSegments, ...new Array(fillerLength).fill(0), ...tailSegments];
+};
+
+const isUnsafeResolvedIpv6 = (value: string): boolean => {
+  const segments = expandIpv6Segments(value);
+  if (!segments) {
+    return false;
+  }
+
+  const [first = 0] = segments;
+  const second = segments[1] ?? 0;
+
+  return (
+    segments.every((segment) => segment === 0) ||
+    (first === 0 && second === 1) ||
+    (first & 0xfe00) === 0xfc00 ||
+    (first & 0xffc0) === 0xfe80 ||
+    (first & 0xff00) === 0xff00
+  );
+};
+
+const extractResolvedAddresses = (payload: DnsJsonResponse): string[] => {
+  return (payload.Answer ?? [])
+    .map((answer) => answer.data?.trim())
+    .filter((answer): answer is string => Boolean(answer));
+};
+
+const resolveDnsJson = async (hostname: string, type: 'A' | 'AAAA'): Promise<string[]> => {
+  const url = new URL(DNS_OVER_HTTPS_URL);
+  url.searchParams.set('name', hostname);
+  url.searchParams.set('type', type);
+
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/dns-json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`DNS resolution failed with HTTP ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as DnsJsonResponse;
+  return extractResolvedAddresses(payload);
+};
+
+export const resolveWebhookTargetSafety = async (
+  value: string,
+): Promise<{ ok: true } | { ok: false; retryable: boolean; reason: string }> => {
+  if (!isAllowedWebhookTargetUrl(value)) {
+    return {
+      ok: false,
+      retryable: false,
+      reason: 'Webhook target URL is not allowed. Use an HTTPS URL with a public hostname.',
+    };
+  }
+
+  let hostname: string;
+  try {
+    hostname = new URL(value).hostname;
+  } catch {
+    return {
+      ok: false,
+      retryable: false,
+      reason: 'Webhook target URL is not allowed. Use an HTTPS URL with a public hostname.',
+    };
+  }
+
+  try {
+    const [ipv4Addresses, ipv6Addresses] = await Promise.all([
+      resolveDnsJson(hostname, 'A'),
+      resolveDnsJson(hostname, 'AAAA'),
+    ]);
+    const addresses = [...ipv4Addresses, ...ipv6Addresses];
+
+    if (addresses.length === 0) {
+      return {
+        ok: false,
+        retryable: true,
+        reason: 'Unable to verify the webhook target address.',
+      };
+    }
+
+    if (addresses.some((address) => isUnsafeResolvedIpv4(address) || isUnsafeResolvedIpv6(address))) {
+      return {
+        ok: false,
+        retryable: false,
+        reason: 'Webhook target resolves to a private or otherwise unsafe network address.',
+      };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      retryable: true,
+      reason: error instanceof Error ? error.message : 'Unable to verify the webhook target address.',
+    };
+  }
 };

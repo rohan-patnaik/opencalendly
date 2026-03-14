@@ -9,8 +9,8 @@ import {
   buildWebhookSignatureHeader,
   computeNextWebhookAttemptAt,
   isWebhookDeliveryExhausted,
-  isAllowedWebhookTargetUrl,
   parseWebhookEventTypes,
+  resolveWebhookTargetSafety,
 } from '../lib/webhooks';
 import type {
   Database,
@@ -122,20 +122,41 @@ export const executeWebhookDelivery = async (
   delivery: PendingWebhookDelivery,
 ): Promise<'succeeded' | 'retried' | 'failed'> => {
   const now = new Date();
-  if (!isAllowedWebhookTargetUrl(delivery.url)) {
+  const targetSafety = await resolveWebhookTargetSafety(delivery.url);
+  if (!targetSafety.ok && !targetSafety.retryable) {
     await db
       .update(webhookDeliveries)
       .set({
         status: 'failed',
         attemptCount: delivery.maxAttempts,
         lastAttemptAt: now,
-        lastError: 'Webhook target URL is not allowed. Use an HTTPS URL with a public hostname.',
+        lastError: targetSafety.reason,
         nextAttemptAt: now,
         updatedAt: now,
       })
       .where(eq(webhookDeliveries.id, delivery.id));
 
     return 'failed';
+  }
+
+  if (!targetSafety.ok) {
+    const attemptedCount = delivery.attemptCount + 1;
+    const exhausted = isWebhookDeliveryExhausted(attemptedCount, delivery.maxAttempts);
+    const status = exhausted ? 'failed' : 'pending';
+
+    await db
+      .update(webhookDeliveries)
+      .set({
+        status,
+        attemptCount: attemptedCount,
+        lastAttemptAt: now,
+        lastError: targetSafety.reason,
+        nextAttemptAt: exhausted ? now : computeNextWebhookAttemptAt(attemptedCount, now),
+        updatedAt: now,
+      })
+      .where(eq(webhookDeliveries.id, delivery.id));
+
+    return exhausted ? 'failed' : 'retried';
   }
 
   const serializedPayload = JSON.stringify(delivery.payload);
@@ -148,6 +169,7 @@ export const executeWebhookDelivery = async (
   try {
     const response = await fetch(delivery.url, {
       method: 'POST',
+      redirect: 'manual',
       headers: {
         'Content-Type': 'application/json',
         'X-OpenCalendly-Signature': signature,

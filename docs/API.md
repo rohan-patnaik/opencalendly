@@ -1216,7 +1216,8 @@ Query params:
 Behavior:
 
 - Picks eligible due deliveries.
-- Sends signed payloads with retry backoff.
+- Resolves allowed hostnames before network I/O and rejects targets that resolve to private or unsafe IP space.
+- Sends signed payloads with retry backoff and does not follow redirects automatically.
 - Fails deliveries immediately when the stored target URL is no longer allowed by the webhook URL policy.
 - Updates attempt count + next attempt timestamp.
 
