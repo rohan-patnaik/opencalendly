@@ -30,6 +30,22 @@ Guardrails:
 - General authored modules: `<400` LOC unless schema or test file.
 - `npm run complexity:check:enforce` is enabled in CI and must stay green.
 
+## Feature 55 (PR#63): Outbound Egress Security Runbook
+
+Scope:
+
+- Document the production outbound-network assumptions for webhook delivery, calendar sync/writeback, Clerk/Auth, and email delivery.
+- Keep the change scoped to docs and operational checklists; do not change runtime behavior or add new network dependencies.
+- Clarify what production must allow, what remains blocked, and how operators should validate or triage outbound-network failures.
+
+Acceptance criteria:
+
+- `docs/ARCHITECTURE.md` explicitly documents the intended outbound egress boundary for provider APIs and organizer-managed webhook targets.
+- `docs/API.md` notes the runtime egress expectations for webhook delivery and calendar provider calls.
+- `docs/PROD_DEPLOY_CHECKLIST.md` includes pre-deploy and post-deploy checks for outbound network assumptions.
+- `docs/OPERATOR_RUNBOOK.md` includes webhook/calendar egress triage steps.
+- `docs/SECURITY_CHECKLIST.md` reflects the documented outbound-network boundary.
+
 ## Feature 54 (PR#61): Security Headers and CSP Hardening
 
 Scope:
