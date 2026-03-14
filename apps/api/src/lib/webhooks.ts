@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from 'node:crypto';
 
 import {
+  isSafeWebhookTargetUrl,
   webhookEventSchema,
   webhookEventTypeSchema,
   type WebhookEvent,
@@ -82,4 +83,8 @@ export const computeNextWebhookAttemptAt = (attemptNumber: number, now: Date = n
 
 export const isWebhookDeliveryExhausted = (attemptCount: number, maxAttempts: number): boolean => {
   return attemptCount >= maxAttempts;
+};
+
+export const isAllowedWebhookTargetUrl = (value: string): boolean => {
+  return isSafeWebhookTargetUrl(value);
 };

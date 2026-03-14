@@ -50,6 +50,23 @@ describe('shared schemas', () => {
     expect(payload.events).toHaveLength(2);
   });
 
+  it.each([
+    'http://example.com/webhooks/opencalendly',
+    'https://localhost/webhooks/opencalendly',
+    'https://internal/webhooks/opencalendly',
+    'https://127.0.0.1/webhooks/opencalendly',
+    'https://[::1]/webhooks/opencalendly',
+    'https://user:pass@example.com/webhooks/opencalendly',
+  ])('rejects unsafe webhook subscription create payload URLs: %s', (url) => {
+    const result = webhookSubscriptionCreateSchema.safeParse({
+      url,
+      events: ['booking.created'],
+      secret: 'whsec_super_secret',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('rejects empty webhook subscription update payloads', () => {
     const result = webhookSubscriptionUpdateSchema.safeParse({});
     expect(result.success).toBe(false);
