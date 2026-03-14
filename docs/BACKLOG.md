@@ -30,7 +30,7 @@ Guardrails:
 - General authored modules: `<400` LOC unless schema or test file.
 - `npm run complexity:check:enforce` is enabled in CI and must stay green.
 
-## Feature 55 (PR#TBD): Outbound Egress Security Runbook
+## Feature 55 (PR#63): Outbound Egress Security Runbook
 
 Scope:
 
