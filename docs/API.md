@@ -5,6 +5,7 @@
 - JSON REST endpoints under `/v0`.
 - Zod-validated request and response contracts.
 - Booking correctness checks happen at write time, not only at UI time.
+- API responses emit a baseline hardening header set (`Content-Security-Policy`, `X-Frame-Options`, `Referrer-Policy`, `X-Content-Type-Options`, `Permissions-Policy`).
 
 ## Auth model
 

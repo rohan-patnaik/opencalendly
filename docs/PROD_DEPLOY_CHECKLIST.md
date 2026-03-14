@@ -8,7 +8,9 @@ Last updated: 28 Feb 2026 (IST)
   - `lint-test-typecheck`
   - `GitGuardian Security Checks`
   - `trigger-coderabbit-review`
-- [ ] If CodeRabbit or Greptile posted actionable PR comments, they are resolved before merge.
+- [ ] Qodo has completed its code-review pass on the latest commit.
+- [ ] CodeRabbit has completed its review pass on the latest commit.
+- [ ] If Qodo, CodeRabbit, or Greptile posted actionable PR comments, they are resolved before merge.
 - [ ] All PR review threads are resolved.
 - [ ] `npm run env:check` passes in deployment environment.
 - [ ] Neon `DATABASE_URL` points to production branch/database.
