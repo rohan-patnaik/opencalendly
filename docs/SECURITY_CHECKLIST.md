@@ -27,6 +27,11 @@ Last reviewed: 27 Feb 2026 (IST)
 - [x] Signature payload format is deterministic (`t=<timestamp>,v1=<signature>`).
 - [x] Retry delivery flow preserves signature behavior across attempts.
 
+## Outbound network boundary
+
+- [x] Organizer-managed webhook targets are restricted to public HTTPS hostnames and rejected when they resolve to private or unsafe IP space.
+- [x] Runtime expectations for provider APIs and webhook egress are documented in architecture, API, deploy, and operator docs.
+
 ## Residual hardening queue (post-v1.0)
 
 - [ ] Add optional IP allow-listing for admin-only operational endpoints.

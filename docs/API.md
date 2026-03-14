@@ -1219,10 +1219,12 @@ Behavior:
 
 - Picks eligible due deliveries.
 - Resolves allowed hostnames before network I/O and rejects targets that resolve to private or unsafe IP space.
+- Performs DNS lookups through `https://cloudflare-dns.com/dns-query` before each delivery attempt.
 - Sends signed payloads with retry backoff and does not follow redirects automatically.
 - Fails deliveries immediately when the stored target URL is no longer allowed by the webhook URL policy.
 - Transparently migrates legacy plaintext webhook secrets to encrypted-at-rest storage before dispatch when an old row is encountered.
 - Updates attempt count + next attempt timestamp.
+- Requires outbound HTTPS reachability from the API runtime to both `cloudflare-dns.com` and the organizer's validated public webhook host, including any explicit HTTPS port encoded in the destination URL.
 
 Success response:
 
@@ -1728,6 +1730,7 @@ Success response:
 Notes:
 
 - If Google is not connected, response still includes a `google` provider row with `connected: false`.
+- Runtime health for this feature depends on outbound HTTPS access from the API worker to Google and Microsoft OAuth/Calendar APIs.
 
 ### `POST /v0/calendar/google/connect/start`
 
@@ -1794,6 +1797,10 @@ Error responses:
 - `500` Google OAuth env config missing.
 - `502` provider exchange/profile fetch failure.
 
+Runtime note:
+
+- Production must allow outbound HTTPS to `oauth2.googleapis.com`, `openidconnect.googleapis.com`, and `www.googleapis.com`.
+
 ### `POST /v0/calendar/google/disconnect`
 
 Deletes Google connection(s) and associated cached busy windows for the authenticated user.
@@ -1852,6 +1859,10 @@ Error responses:
 - `500` Google OAuth env config missing.
 - `502` provider sync failure (also records `lastError` + `nextSyncAt`).
 
+Runtime note:
+
+- Production must allow outbound HTTPS to `www.googleapis.com` for free/busy sync.
+
 ## Feature 7 Endpoints (Outlook + Calendar Writeback)
 
 ### Microsoft calendar connection/sync
@@ -1866,6 +1877,7 @@ Behavior:
 - Same auth model and encrypted credential handling as Google endpoints.
 - Same sync status representation under `GET /v0/calendar/sync/status`.
 - `/v0/calendar/microsoft/sync` response shape matches Google sync endpoint and returns `provider: "microsoft"`.
+- Production must allow outbound HTTPS to `login.microsoftonline.com` and `graph.microsoft.com`.
 
 ### `GET /v0/calendar/writeback/status`
 

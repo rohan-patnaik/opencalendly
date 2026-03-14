@@ -22,8 +22,10 @@ Last updated: 27 Feb 2026 (IST)
 
 Authentication requirements for webhook operations:
 
-- Use `Authorization: Bearer <session-token>` (authenticated organizer session token).
-- Obtain the token through the normal login flow for an operator/organizer account in the target environment.
+- Use an authenticated organizer session in the target environment.
+- Browser-driven operator flows use the cookie-backed API session established by the normal login flow.
+- Scripted/API-client flows may reuse the same organizer session with `Authorization: Bearer <session-token>` when cookie auth is not available.
+- Scripted/API-client flows must still present the same authenticated organizer context used by `/v0/auth/me`.
 - `GET /v0/webhooks` and `POST /v0/webhooks/deliveries/run` require that authenticated organizer context.
 
 1. Inspect current delivery status (authenticated):
@@ -36,6 +38,8 @@ Authentication requirements for webhook operations:
 4. If still failing:
    - validate endpoint URL and secret mismatch on receiver side
    - inspect provider/network errors
+   - confirm destination DNS still resolves to public IP space
+   - confirm runtime egress policy still allows outbound HTTPS to `cloudflare-dns.com` and to the public webhook host/port encoded in the destination URL
 
 ## 3) Calendar sync recovery
 
@@ -49,6 +53,9 @@ Authentication requirements for webhook operations:
 4. If writeback backlog exists:
    - `POST /v0/calendar/writeback/run`
 5. Verify conflict enforcement is restored by checking availability against known busy windows.
+6. If sync or writeback still fails:
+   - confirm runtime egress still permits `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, and `graph.microsoft.com`
+   - treat provider DNS/firewall failures as operational incidents before debugging booking logic
 
 ## 4) Database restore drill (Neon)
 

@@ -59,6 +59,17 @@ Current code example: `apps/api/src/index.ts` uses `pg.Client` with `env.HYPERDR
   - Domain verification: `npm run domain:check:production`
 - Domain wiring steps (Porkbun + Cloudflare): `docs/CLOUDFLARE_DOMAIN_SETUP.md`
 
+## Outbound egress assumptions
+
+- API runtime needs outbound HTTPS access to:
+  - Clerk backend APIs for token verification and user lookup
+  - `api.resend.com`
+  - Google token + profile + Calendar APIs: `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`
+  - Microsoft OAuth + Graph APIs: `login.microsoftonline.com`, `graph.microsoft.com`
+  - `cloudflare-dns.com` for webhook target DNS-over-HTTPS safety checks
+- Organizer-managed webhook destinations are dynamic. They should stay limited to public HTTPS hosts and must not depend on private-network reachability from the worker runtime.
+- Private-network, loopback, link-local, and metadata-service egress should remain blocked at the platform level even though the app also validates webhook targets.
+
 Useful references:
 
 - [Neon docs](https://neon.com/docs)
