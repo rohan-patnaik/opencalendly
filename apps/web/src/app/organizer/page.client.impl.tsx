@@ -72,10 +72,10 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       <PageShell
         eyebrow="Feature 12"
         title="Organizer Console"
-        description="Manage event types, availability, teams, webhooks, and calendar status."
+        description="Manage event types, availability, teams, webhooks, and calendars."
       >
         <Card>
-          <p>Restoring your session…</p>
+          <p>Restoring your workspace…</p>
         </Card>
       </PageShell>
     );
@@ -86,7 +86,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       <PageShell
         eyebrow="Authentication required"
         title="Organizer Console"
-        description="Sign in to manage event types, teams, webhooks, and calendars."
+        description="Sign in to manage your scheduling setup."
       >
         <Card>
           <OrganizerSignedOutState authError={authError} styles={styles} />
@@ -99,7 +99,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     <PageShell
       eyebrow="Feature 12"
       title="Organizer Console"
-      description="Manage all shipped organizer APIs from UI: event types, availability, teams, webhooks, calendar sync, and writeback queue controls."
+      description="Run the core scheduling controls from one place."
     >
       <OrganizerHero
         apiBaseUrl={apiBaseUrl}
@@ -126,7 +126,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           <section id="event-types" className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Event types</h2>
-              <p>Create, list, and edit one-on-one event types.</p>
+              <p>Create and update one-on-one event types.</p>
             </div>
             <EventTypesPanel
               apiBaseUrl={apiBaseUrl}
@@ -163,7 +163,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           <section id="availability" className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Availability rules + overrides</h2>
-              <p>Read and replace organizer availability definitions used by slot computation.</p>
+              <p>Set the rules that shape bookable time.</p>
             </div>
             <AvailabilityPanel
               apiBaseUrl={apiBaseUrl}
@@ -183,7 +183,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           <section id="time-off" className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Time off + holiday import</h2>
-              <p>Create hard blocking windows and import yearly holiday presets.</p>
+              <p>Block time and pull in holiday presets.</p>
             </div>
             <TimeOffPanel
               apiBaseUrl={apiBaseUrl}
@@ -202,7 +202,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           <section id="teams" className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Teams + members + team event types</h2>
-              <p>Create teams, add members, and configure round-robin / collective event types.</p>
+              <p>Set up teams, members, and shared event types.</p>
             </div>
             <TeamsPanel
               apiBaseUrl={apiBaseUrl}
@@ -229,7 +229,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           <section id="webhooks" className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Webhooks + delivery runner</h2>
-              <p>Create/list/update subscriptions and trigger delivery processing.</p>
+              <p>Manage subscriptions and run deliveries when needed.</p>
             </div>
             <WebhooksPanel
               apiBaseUrl={apiBaseUrl}
@@ -248,7 +248,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           <section id="calendars" className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Calendar integrations (Google + Microsoft)</h2>
-              <p>Connect, sync, and disconnect provider calendars using the existing API contracts.</p>
+              <p>Connect calendars, sync them, and check provider status.</p>
             </div>
             <CalendarsPanel
               apiBaseUrl={apiBaseUrl}
@@ -267,7 +267,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
           <section id="writeback" className={styles.card}>
             <div className={styles.sectionHeader}>
               <h2>Calendar writeback queue</h2>
-              <p>Inspect pending/failed writebacks and trigger retry processing.</p>
+              <p>Review writebacks and retry anything that got stuck.</p>
             </div>
             <WritebackPanel
               apiBaseUrl={apiBaseUrl}

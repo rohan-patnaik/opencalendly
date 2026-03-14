@@ -16,7 +16,7 @@ export const BookingActionLoadingState = ({ styles }: { styles: BookingActionSty
     <main className={styles.page}>
       <section className={styles.heroCard}>
         <p className={styles.kicker}>Booking actions</p>
-        <h1>Loading action link...</h1>
+        <h1>Loading link...</h1>
       </section>
     </main>
   );
@@ -89,10 +89,10 @@ export const BookingActionUnavailableState = ({
       <section className={styles.heroCard}>
         <p className={styles.kicker}>Booking actions</p>
         <p className={styles.statusPill}>Link status: {actionStatusLabel}</p>
-        <h1>{actionStatus === 'expired' ? 'Action link expired' : 'Action link unavailable'}</h1>
-        <p className={styles.error}>{error || 'Action link is invalid or expired.'}</p>
+        <h1>{actionStatus === 'expired' ? 'This link has expired' : 'This link is unavailable'}</h1>
+        <p className={styles.error}>{error || 'This booking link is no longer active.'}</p>
         <Link className={styles.secondaryButton} href="/">
-          Return to home
+          Go home
         </Link>
       </section>
     </main>
@@ -119,7 +119,7 @@ export const BookingActionHero = ({
         Invitee: <strong>{actionData.booking.inviteeName}</strong> ({actionData.booking.inviteeEmail})
       </p>
       <p>
-        Current status: <strong>{statusLabel(actionData.booking.status)}</strong>
+        Status: <strong>{statusLabel(actionData.booking.status)}</strong>
       </p>
       <p>
         Scheduled for <strong>{formatSlot(actionData.booking.startsAt, actionData.booking.timezone)}</strong>
@@ -204,7 +204,7 @@ export const BookingActionRescheduleSection = ({
   return (
     <section className={styles.layout}>
       <div className={styles.card}>
-        <h2>Choose a new slot</h2>
+        <h2>Choose a new time</h2>
         <label className={styles.label} htmlFor="reschedule-timezone">
           Timezone
         </label>
@@ -221,9 +221,9 @@ export const BookingActionRescheduleSection = ({
           ))}
         </select>
 
-        {loadingAvailability ? <p className={styles.muted}>Loading available slots...</p> : null}
+        {loadingAvailability ? <p className={styles.muted}>Loading available times...</p> : null}
         {!loadingAvailability && slots.length === 0 ? (
-          <p className={styles.muted}>No slots are currently available. Try changing timezone.</p>
+          <p className={styles.muted}>No times are available right now. Try another timezone.</p>
         ) : null}
 
         <div className={styles.slotDayStack}>
@@ -254,18 +254,18 @@ export const BookingActionRescheduleSection = ({
         <h2>Confirm reschedule</h2>
         {selectedSlotLabel ? (
           <p className={styles.selection}>
-            New slot: <strong>{selectedSlotLabel}</strong>
+            New time: <strong>{selectedSlotLabel}</strong>
           </p>
         ) : (
-          <p className={styles.selection}>Select a slot before continuing.</p>
+          <p className={styles.selection}>Choose a time before continuing.</p>
         )}
         <form className={styles.form} onSubmit={onSubmit}>
           <button className={styles.primaryButton} type="submit" disabled={submittingReschedule}>
-            {submittingReschedule ? 'Rescheduling...' : 'Reschedule booking'}
+            {submittingReschedule ? 'Rescheduling...' : 'Reschedule'}
           </button>
         </form>
         <Link className={styles.inlineLink} href={bookingPageHref}>
-          Open booking page instead
+          Open booking page
         </Link>
       </div>
     </section>
@@ -288,10 +288,10 @@ export const BookingActionCancelSection = ({
   return (
     <section className={styles.card}>
       <h2>Cancel booking</h2>
-      <p className={styles.muted}>Provide an optional reason. Cancellation is idempotent.</p>
+      <p className={styles.muted}>Add an optional note for the host.</p>
       <form className={styles.form} onSubmit={onSubmit}>
         <label className={styles.label} htmlFor="cancel-reason">
-          Reason (optional)
+          Note (optional)
         </label>
         <textarea
           id="cancel-reason"
@@ -323,13 +323,13 @@ export const BookingActionCompleteSection = ({
       <h2>Action complete</h2>
       {actionData.booking.status === 'rescheduled' && actionData.booking.rescheduledTo ? (
         <p>
-          This booking has already been rescheduled to{' '}
+          This booking was already moved to{' '}
           <strong>{formatSlot(actionData.booking.rescheduledTo.startsAt, actionData.booking.timezone)}</strong>.
         </p>
       ) : null}
-      {actionData.booking.status === 'canceled' ? <p>This booking has already been canceled.</p> : null}
+      {actionData.booking.status === 'canceled' ? <p>This booking was already canceled.</p> : null}
       <Link className={styles.secondaryButton} href={bookingPageHref}>
-        Open public booking page
+        Open booking page
       </Link>
     </section>
   );

@@ -5,25 +5,25 @@ import styles from '../marketing-pages.module.css';
 const resources = [
   {
     title: 'Backlog and acceptance criteria',
-    description: 'Roadmap source of truth for feature slices and merge gates.',
+    description: 'The running plan for feature slices and merge gates.',
     href: 'https://github.com/rohan-patnaik/opencalendly/blob/main/docs/BACKLOG.md',
     external: true,
   },
   {
     title: 'API contracts',
-    description: 'REST routes, payload contracts, and auth requirements.',
+    description: 'Routes, payloads, and auth expectations.',
     href: 'https://github.com/rohan-patnaik/opencalendly/blob/main/docs/API.md',
     external: true,
   },
   {
     title: 'Architecture notes',
-    description: 'System structure across web, API, db, and deployment policies.',
+    description: 'How web, API, database, and deploy choices fit together.',
     href: 'https://github.com/rohan-patnaik/opencalendly/blob/main/docs/ARCHITECTURE.md',
     external: true,
   },
   {
     title: 'GitHub repository',
-    description: 'Implementation history, PR reviews, and retained feature branches.',
+    description: 'Implementation history, PRs, and retained feature branches.',
     href: 'https://github.com/rohan-patnaik/opencalendly',
     external: true,
   },
@@ -34,10 +34,10 @@ export default function ResourcesPage() {
     <main className={styles.page}>
       <section className={styles.hero}>
         <p className={styles.kicker}>Resources</p>
-        <h1>Docs-first implementation workflow.</h1>
+        <h1>Docs that make the product easier to work with.</h1>
         <p>
-          Product scope, API behavior, and architecture decisions remain visible so contributors can
-          ship features in-policy with review traceability.
+          Product scope, API behavior, and architecture notes stay visible so contributors can move
+          quickly without guessing.
         </p>
       </section>
 
@@ -63,7 +63,7 @@ export default function ResourcesPage() {
       </section>
 
       <section className={styles.cta}>
-        <h2>Prefer to start from product flows?</h2>
+        <h2>Want to start in the product instead?</h2>
         <div className={styles.actions}>
           <Link href="/embed/playground" className={styles.primaryButton}>
             Open embed playground
