@@ -1,6 +1,7 @@
 .carousel {
   width: 100%;
   display: grid;
+  gap: 0.75rem;
 }
 
 .slide {
@@ -8,9 +9,51 @@
   animation: hero-art-fade-in 0.8s ease;
 }
 
+.controls {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.control {
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast),
+    background-color var(--motion-fast),
+    color var(--motion-fast);
+}
+
+.control:hover {
+  border-color: var(--border-strong);
+}
+
+.control:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.controlActive {
+  border-color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 14%, var(--bg-elevated));
+  color: var(--text-heading);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .slide {
     animation: none;
+  }
+
+  .control {
+    transition: none;
   }
 }
 

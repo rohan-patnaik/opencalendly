@@ -6,11 +6,15 @@ import styles from './hero-art-carousel.module.css';
 
 interface HeroArtCarouselProps {
   children: [ReactNode, ReactNode];
+  labels?: [string, string];
 }
 
 const INTERVAL_MS = 5000;
 
-export function HeroArtCarousel({ children }: HeroArtCarouselProps) {
+export function HeroArtCarousel({
+  children,
+  labels = ['Calendar view', 'Globe view'],
+}: HeroArtCarouselProps) {
   const slides = useMemo(() => Children.toArray(children), [children]);
   const reducedMotion = usePrefersReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
@@ -45,6 +49,26 @@ export function HeroArtCarousel({ children }: HeroArtCarouselProps) {
       <div key={activeIndex} className={styles.slide} data-slide-index={activeIndex}>
         {slides[activeIndex]}
       </div>
+      {slides.length > 1 ? (
+        <div className={styles.controls} aria-label="Hero artwork view switcher" role="tablist">
+          {slides.map((_, index) => {
+            const isActive = index === activeIndex;
+
+            return (
+              <button
+                key={labels[index] ?? `Slide ${index + 1}`}
+                type="button"
+                className={isActive ? `${styles.control} ${styles.controlActive}` : styles.control}
+                onClick={() => setActiveIndex(index)}
+                aria-pressed={isActive}
+                aria-label={`Show ${labels[index] ?? `slide ${index + 1}`}`}
+              >
+                {labels[index] ?? `Slide ${index + 1}`}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
