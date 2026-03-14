@@ -1,5 +1,22 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 60 (PR#TBD): README homepage media + production link refresh
+
+Scope:
+
+- Refresh the committed README homepage GIF so it reflects the current hero treatment after the OpenNote-inspired redesign.
+- Move the production site link to the top section of the README so repo visitors can find the live app immediately.
+- Keep the change scoped to README presentation and the committed homepage media asset.
+
+Acceptance criteria:
+
+- `README.md` renders the homepage GIF from `docs/assets/readme/homepage-tour.gif`.
+- The refreshed GIF stays on the homepage hero fold and shows both hero art states within one loop.
+- `README.md` surfaces the production link to `https://opencalendly.com` near the top of the document.
+- Validation passes:
+  - `npm run env:check`
+  - `git diff --check`
+
 ## Feature 59 (PR#TBD): OpenNote-Inspired UI Redesign
 
 Scope:

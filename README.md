@@ -1,5 +1,7 @@
 # OpenCalendly
 
+Live site: [opencalendly.com](https://opencalendly.com)
+
 OpenCalendly is an open-source scheduling app for teams that want Calendly-class booking flows without giving up runtime ownership. It ships public booking pages, team scheduling, embeds, organizer tooling, calendar sync, analytics, and the operational guardrails needed to run the stack yourself.
 
 ![OpenCalendly homepage tour](docs/assets/readme/homepage-tour.gif)
@@ -77,5 +79,3 @@ npm run dev:web
 - Stack and operational choices: [docs/STACK.md](docs/STACK.md)
 - Production deploy checklist: [docs/PROD_DEPLOY_CHECKLIST.md](docs/PROD_DEPLOY_CHECKLIST.md)
 - Environment reference: [.env.example](.env.example)
-
-Live site: [opencalendly.com](https://opencalendly.com)
