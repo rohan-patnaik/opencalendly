@@ -16,7 +16,7 @@ export function GlobeCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -50,6 +50,10 @@ export function GlobeCanvas() {
 
   /* ---- cobe globe ---- */
   useEffect(() => {
+    if (isDark === null) {
+      return undefined;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) {
       return undefined;
