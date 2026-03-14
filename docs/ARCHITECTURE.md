@@ -16,6 +16,7 @@ flowchart LR
 
 - The API runtime is expected to make outbound HTTPS requests only to:
   - organizer-approved public webhook destinations
+  - Clerk backend APIs for token verification and user lookup during `/v0/auth/clerk/exchange`
   - Google OAuth, profile, and Calendar APIs (`accounts.google.com`, `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`)
   - Microsoft OAuth and Graph APIs (`login.microsoftonline.com`, `graph.microsoft.com`)
   - Resend (`api.resend.com`)

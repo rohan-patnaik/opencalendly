@@ -1760,7 +1760,6 @@ Error responses:
 
 - `400` invalid request body.
 - `500` Google OAuth env config missing (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`).
-- Provider/network policy failures surface as upstream auth URL or redirect issues rather than request validation errors.
 
 ### `POST /v0/calendar/google/connect/complete`
 
