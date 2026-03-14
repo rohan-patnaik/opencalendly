@@ -11,13 +11,13 @@ describe('marketing route surface', () => {
   it('homepage includes parity sections and product route links', () => {
     const source = readAppFile('page.tsx');
 
-    expect(source).toContain('Open scheduling, quietly opinionated.');
+    expect(source).toContain('Open scheduling, built with care.');
     expect(source).toContain('<HeroArtCarousel>');
     expect(source).toContain('<GlobeCanvas />');
     expect(source).toContain('How teams run OpenCalendly');
-    expect(source).toContain('Built for practical ownership');
-    expect(source).toContain('Pricing clarity before any team scales usage');
-    expect(source).toContain('Use the public demos, then step into the operator surfaces.');
+    expect(source).toContain('Built for real ownership');
+    expect(source).toContain('Simple plan shape, clear tradeoffs');
+    expect(source).toContain('Try the demos, then step into the operator tools.');
 
     expect(source).toContain('href="/features"');
     expect(source).toContain('href="/solutions"');
