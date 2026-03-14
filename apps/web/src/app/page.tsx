@@ -200,7 +200,7 @@ export default function HomePage() {
           <div className={styles.heroArtPanel} aria-hidden="true">
             <div className={styles.artFrame}>
               <HomepageTimezoneBadge />
-              <HeroArtCarousel>
+              <HeroArtCarousel labels={['Calendar view', 'Globe view']}>
                 <CalendarDotArt />
                 <GlobeCanvas />
               </HeroArtCarousel>

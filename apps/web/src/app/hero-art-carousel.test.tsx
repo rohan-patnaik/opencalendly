@@ -123,4 +123,26 @@ describe('HeroArtCarousel', () => {
     expect(container?.textContent).toContain('Calendar art');
     expect(container?.textContent).not.toContain('Globe art');
   });
+
+  it('allows manual slide switching when reduced motion is enabled', () => {
+    vi.useFakeTimers();
+    renderCarousel(true);
+
+    const globeButton = container?.querySelector<HTMLButtonElement>('button[aria-label="Show Globe view"]');
+    expect(globeButton).not.toBeNull();
+
+    act(() => {
+      globeButton?.click();
+    });
+
+    expect(container?.textContent).toContain('Globe art');
+    expect(container?.textContent).not.toContain('Calendar art');
+
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
+
+    expect(container?.textContent).toContain('Globe art');
+    expect(container?.textContent).not.toContain('Calendar art');
+  });
 });

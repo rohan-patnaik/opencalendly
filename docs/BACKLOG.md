@@ -1,5 +1,20 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 57 (PR#66): Homepage Hero Art Manual Switch Fallback
+
+Scope:
+
+- Keep the homepage hero art rotation as-is for browsers that allow motion.
+- Add an explicit manual switch so users can move between the calendar and globe art even when reduced-motion settings disable auto-rotation.
+- Keep the change scoped to the homepage hero art component, styling, and tests.
+
+Acceptance criteria:
+
+- The homepage hero art still auto-rotates between calendar and globe slides when reduced motion is not requested.
+- The homepage shows clear manual controls to switch between the calendar and globe slides.
+- Reduced-motion users can switch slides manually without re-enabling auto-rotation.
+- Homepage tests cover both the timed rotation behavior and the manual reduced-motion fallback.
+
 ## Maintainability Program (PR#56-PR#61)
 
 Goal:

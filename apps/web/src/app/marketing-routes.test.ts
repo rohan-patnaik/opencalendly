@@ -12,7 +12,7 @@ describe('marketing route surface', () => {
     const source = readAppFile('page.tsx');
 
     expect(source).toContain('Open scheduling, built with care.');
-    expect(source).toContain('<HeroArtCarousel>');
+    expect(source).toContain('<HeroArtCarousel');
     expect(source).toContain('<GlobeCanvas />');
     expect(source).toContain('How teams run OpenCalendly');
     expect(source).toContain('Built for real ownership');
