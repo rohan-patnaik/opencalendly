@@ -5,15 +5,15 @@ import styles from '../marketing-pages.module.css';
 const solutions = [
   {
     title: 'Founder-led product teams',
-    copy: 'Ship one-on-one and team scheduling without waiting for enterprise plan upgrades.',
+    copy: 'Launch one-on-one and team scheduling without waiting on enterprise tooling.',
   },
   {
     title: 'Ops and support teams',
-    copy: 'Use organizer controls to manage availability, recover failed queues, and rerun automations quickly.',
+    copy: 'Manage availability, recover queues, and keep scheduling moving from one console.',
   },
   {
     title: 'Developer-first orgs',
-    copy: 'Extend typed APIs and frontend primitives while keeping review gates strict across every feature PR.',
+    copy: 'Extend typed APIs and UI primitives while keeping review standards high.',
   },
 ];
 
@@ -22,10 +22,10 @@ export default function SolutionsPage() {
     <main className={styles.page}>
       <section className={styles.hero}>
         <p className={styles.kicker}>Solutions</p>
-        <h1>Built for teams that want control over scheduling architecture.</h1>
+        <h1>Built for teams that want more control over scheduling.</h1>
         <p>
-          OpenCalendly is optimized for teams balancing product speed, infra spend, and audit-ready
-          engineering workflows.
+          OpenCalendly fits teams that care about speed, cost, and knowing exactly how the stack
+          works.
         </p>
       </section>
 
@@ -42,8 +42,8 @@ export default function SolutionsPage() {
       </section>
 
       <section className={styles.cta}>
-        <h2>Move from evaluation to operation</h2>
-        <p>Start with public booking routes, then switch into organizer and analytics surfaces.</p>
+        <h2>Move from trial to day-to-day use</h2>
+        <p>Start with the public booking flows, then move into organizer and analytics.</p>
         <div className={styles.actions}>
           <Link href="/demo/intro-call" className={styles.primaryButton}>
             Start with one-on-one demo

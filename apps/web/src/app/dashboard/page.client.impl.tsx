@@ -45,10 +45,10 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
       <PageShell
         eyebrow="Feature 8"
         title="Analytics Dashboard"
-        description="Read-only organizer analytics for funnel, team distribution, and operator health."
+        description="Track funnel, team load, and operator health."
       >
         <Card>
-          <p>Restoring your session…</p>
+          <p>Restoring your dashboard…</p>
         </Card>
       </PageShell>
     );
@@ -59,7 +59,7 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
       <PageShell
         eyebrow="Authentication required"
         title="Analytics Dashboard"
-        description="Sign in to access organizer analytics dashboards."
+        description="Sign in to view scheduling analytics."
       >
         <DashboardSignedOutState authError={authError} styles={styles} />
       </PageShell>
@@ -70,7 +70,7 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
     <PageShell
       eyebrow="Feature 8"
       title="Analytics Dashboard"
-      description="Read-only organizer analytics for funnel, team scheduling distribution, and operator health."
+      description="Track bookings, team distribution, and operational health."
     >
       <DashboardSignedInHeader
         authedUser={authedUser}

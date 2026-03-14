@@ -37,7 +37,7 @@ export default function TeamBookingPageClient({
         styles={styles}
         kicker="Launch demo"
         title="Sign in to book the team demo"
-        body="Team demo traffic is gated during launch so anonymous users cannot burn the shared pool."
+        body="Please sign in first so the shared team demo capacity stays available for real sessions."
         apiBaseUrl={apiBaseUrl}
         session={booking.session}
         status={booking.demoQuotaStatus}
@@ -83,7 +83,7 @@ export default function TeamBookingPageClient({
       <section className={styles.layout}>
         <BookingSlotPicker
           styles={styles}
-          title="Choose a slot"
+          title="Choose a time"
           timezoneId="team-timezone"
           timezone={booking.timezone}
           timezoneOptions={booking.timezoneOptions}
@@ -111,7 +111,7 @@ export default function TeamBookingPageClient({
               {booking.selectedSlotDetails.assignmentUserIds.length} assigned member(s)
             </p>
           ) : (
-            <p className={styles.selection}>Select a slot to continue.</p>
+            <p className={styles.selection}>Choose a time to continue.</p>
           )}
 
           {booking.isLaunchDemoPage ? (

@@ -5,29 +5,29 @@ import styles from '../marketing-pages.module.css';
 const plans = [
   {
     title: 'Community',
-    subtitle: 'Build and evaluate the full scheduling stack.',
+    subtitle: 'A good place to build and explore.',
     points: [
       'One-on-one + team scheduling routes',
-      'Organizer console and analytics dashboard',
+      'Organizer and analytics surfaces',
       'Embeds, webhooks, and lifecycle emails',
     ],
   },
   {
     title: 'Operator',
-    subtitle: 'For teams actively running scheduling operations.',
+    subtitle: 'For teams running scheduling every day.',
     points: [
-      'Calendar sync + writeback runner controls',
-      'Operational queue visibility and retries',
-      'Action-link based cancel/reschedule UX',
+      'Calendar sync and writeback controls',
+      'Queue visibility and retries',
+      'Cancel and reschedule links',
     ],
   },
   {
     title: 'Enterprise-ready',
-    subtitle: 'Self-hosted control with architecture ownership.',
+    subtitle: 'For teams that want ownership and room to extend.',
     points: [
       'Neon + Cloudflare deployment model',
-      'Typed API contracts and OSS review workflow',
-      'Extensible frontend parity track',
+      'Typed API contracts and review workflow',
+      'Extensible frontend architecture',
     ],
   },
 ];
@@ -37,10 +37,10 @@ export default function PricingPage() {
     <main className={styles.page}>
       <section className={styles.hero}>
         <p className={styles.kicker}>Pricing</p>
-        <h1>Transparent pricing model for an open scheduling stack.</h1>
+        <h1>Clear pricing for teams that want control.</h1>
         <p>
-          OpenCalendly keeps product capabilities visible up front so teams can map infra cost to
-          real scheduling volume before scaling.
+          See the product shape up front, try the live flows, and decide what fits before you scale
+          usage.
         </p>
       </section>
 
@@ -62,8 +62,8 @@ export default function PricingPage() {
       </section>
 
       <section className={styles.cta}>
-        <h2>Validate with live flows first</h2>
-        <p>Run the demos, then evaluate organizer operations with your own environment values.</p>
+        <h2>Try the product first</h2>
+        <p>Run the demos, then test the organizer flow with your own environment values.</p>
         <div className={styles.actions}>
           <Link href="/demo/intro-call" className={styles.primaryButton}>
             Open booking demo

@@ -1104,3 +1104,20 @@ Acceptance criteria:
   - `npm run lint`
   - `npm run test`
   - `npm run typecheck`
+
+### Feature 56: Concise warm copy refresh across app surfaces
+
+Scope:
+- Tighten copy across the highest-traffic OpenCalendly web surfaces so pages feel faster to scan.
+- Keep product meaning intact while shifting tone away from dense implementation language toward clearer, warmer phrasing.
+- Focus on marketing, organizer shell, dashboard shell, and public booking/action-link flows without changing behavior.
+
+Acceptance criteria:
+
+- Homepage, `features`, `solutions`, `pricing`, and `resources` copy is shorter and easier to scan.
+- Organizer and dashboard shell descriptions feel human and concise instead of internal or overly technical.
+- Public booking and booking-action flows keep necessary clarity but reduce repetitive or heavy wording.
+- Navigation labels and core CTAs remain accurate and do not become vague.
+- Validation passes:
+  - `npm run lint`
+  - `npm run typecheck`

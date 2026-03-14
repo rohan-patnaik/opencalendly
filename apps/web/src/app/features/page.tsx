@@ -6,25 +6,25 @@ const featureGroups = [
   {
     title: 'Booking correctness',
     items: [
-      'Transactional booking commit with unique slot constraints',
-      'Request idempotency keys for conflict-safe retries',
-      'Recheck external busy windows before booking write',
+      'Booking writes are checked inside a transaction',
+      'Idempotency keys keep retries safe',
+      'External busy windows are checked again before save',
     ],
   },
   {
     title: 'Organizer operations',
     items: [
-      'Event type create/edit/list controls',
-      'Availability rule + override management',
-      'Team member and team event type administration',
+      'Create, edit, and review event types',
+      'Manage availability rules and overrides',
+      'Run teams and team event types from one place',
     ],
   },
   {
     title: 'Lifecycle automation',
     items: [
-      'Resend-backed confirmation/cancel/reschedule emails',
-      'Webhook subscriptions and delivery runner',
-      'Calendar writeback queue with retry visibility',
+      'Confirmation, cancel, and reschedule emails',
+      'Webhook subscriptions with delivery controls',
+      'Writeback queue visibility and retries',
     ],
   },
 ];
@@ -34,10 +34,10 @@ export default function FeaturesPage() {
     <main className={styles.page}>
       <section className={styles.hero}>
         <p className={styles.kicker}>Features</p>
-        <h1>Every major scheduling capability is exposed in product and API.</h1>
+        <h1>Scheduling features you can use in the app and the API.</h1>
         <p>
-          Feature development is tracked by PR-gated milestones and keeps parity between backend
-          correctness and web experience surfaces.
+          OpenCalendly keeps the product experience and backend behavior close together, so what you
+          click in the UI matches what runs underneath.
         </p>
       </section>
 
@@ -58,7 +58,7 @@ export default function FeaturesPage() {
       </section>
 
       <section className={styles.cta}>
-        <h2>Try the flows behind the matrix</h2>
+        <h2>Try the live flows</h2>
         <div className={styles.actions}>
           <Link href="/team/demo-team/team-intro-call" className={styles.primaryButton}>
             Try team booking

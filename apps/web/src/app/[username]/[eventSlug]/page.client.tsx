@@ -23,7 +23,7 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
   const booking = useOneOnOneBooking({ username, eventSlug, apiBaseUrl });
 
   if (booking.loadingEvent || (booking.isLaunchDemoPage && !booking.ready)) {
-    return <BookingLoadingState styles={styles} kicker="Public booking" title="Loading event..." />;
+    return <BookingLoadingState styles={styles} kicker="Booking" title="Loading event..." />;
   }
 
   if (booking.isLaunchDemoPage && !booking.session) {
@@ -32,7 +32,7 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
         styles={styles}
         kicker="Launch demo"
         title="Sign in to book the demo"
-        body="The launch demo requires authentication so anonymous traffic cannot consume today’s pool."
+        body="Please sign in first so the shared demo capacity stays available for real sessions."
         apiBaseUrl={apiBaseUrl}
         session={booking.session}
         status={booking.demoQuotaStatus}
@@ -78,8 +78,8 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
       <section className={styles.layout}>
         <BookingSlotPicker
           styles={styles}
-          title="Pick your time"
-          description="Slots are shown in your selected timezone."
+          title="Pick a time"
+          description="Times are shown in your timezone."
           timezoneId="timezone"
           timezone={booking.timezone}
           timezoneOptions={booking.timezoneOptions}
@@ -107,15 +107,15 @@ export default function BookingPageClient({ username, eventSlug, apiBaseUrl }: B
         <div className={styles.card}>
           <div className={styles.sectionHead}>
             <h2>Your details</h2>
-            <p>We will email your booking confirmation and action links.</p>
+            <p>We’ll send your confirmation and booking links by email.</p>
           </div>
 
           {booking.selectedSlotLabel ? (
             <p className={styles.selection}>
-              Selected slot: <strong>{booking.selectedSlotLabel}</strong>
+              Selected time: <strong>{booking.selectedSlotLabel}</strong>
             </p>
           ) : (
-            <p className={styles.selection}>Select a slot to continue.</p>
+            <p className={styles.selection}>Choose a time to continue.</p>
           )}
 
           {booking.isLaunchDemoPage ? (
