@@ -15,6 +15,7 @@ import { jsonError } from '../server/core';
 import { withDatabase, isUniqueViolation } from '../server/database';
 import { consumeDemoFeatureCredits, jsonDemoQuotaError } from '../server/demo-quota';
 import { buildDemoFeatureSourceKey } from '../server/idempotency';
+import { createWebhookSecretValues } from '../server/webhook-secret-storage';
 import type { ApiApp, DemoQuotaDb } from '../server/types';
 import { DemoQuotaAdmissionError, DemoQuotaCreditsError } from '../server/types';
 
@@ -74,7 +75,7 @@ export const registerWebhookRoutes = (app: ApiApp): void => {
             .values({
               userId: authedUser.id,
               url: parsed.data.url,
-              secret: parsed.data.secret,
+              ...createWebhookSecretValues(parsed.data.secret, context.env),
               events: normalizeWebhookEvents(parsed.data.events),
               isActive: true,
             })
@@ -150,7 +151,7 @@ export const registerWebhookRoutes = (app: ApiApp): void => {
         updateValues.url = parsed.data.url;
       }
       if (parsed.data.secret !== undefined) {
-        updateValues.secret = parsed.data.secret;
+        Object.assign(updateValues, createWebhookSecretValues(parsed.data.secret, context.env));
       }
       if (parsed.data.events !== undefined) {
         updateValues.events = normalizeWebhookEvents(parsed.data.events);

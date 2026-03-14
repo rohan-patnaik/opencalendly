@@ -12,7 +12,9 @@ import {
   parseWebhookEventTypes,
   resolveWebhookTargetSafety,
 } from '../lib/webhooks';
+import { migrateWebhookSecretIfNeeded } from './webhook-secret-storage';
 import type {
+  Bindings,
   Database,
   PendingWebhookDelivery,
   WebhookEventType,
@@ -31,7 +33,6 @@ const toWebhookSubscriptionRecord = (value: {
   id: string;
   userId: string;
   url: string;
-  secret: string;
   events: unknown;
   isActive: boolean;
 }): WebhookSubscriptionRecord => {
@@ -39,7 +40,6 @@ const toWebhookSubscriptionRecord = (value: {
     id: value.id,
     userId: value.userId,
     url: value.url,
-    secret: value.secret,
     events: parseWebhookEventTypes(value.events),
     isActive: value.isActive,
   };
@@ -67,7 +67,6 @@ export const enqueueWebhookDeliveries = async (
       id: webhookSubscriptions.id,
       userId: webhookSubscriptions.userId,
       url: webhookSubscriptions.url,
-      secret: webhookSubscriptions.secret,
       events: webhookSubscriptions.events,
       isActive: webhookSubscriptions.isActive,
     })
@@ -241,7 +240,7 @@ export const executeWebhookDelivery = async (
 
 export const runWebhookDeliveryBatch = async (
   db: Database,
-  input: { organizerId: string; limit: number; now?: Date },
+  input: { organizerId: string; env: Bindings; limit: number; now?: Date },
 ): Promise<WebhookDeliveryRunResult> => {
   const now = input.now ?? new Date();
   const dueRows = await db
@@ -255,6 +254,7 @@ export const runWebhookDeliveryBatch = async (
       maxAttempts: webhookDeliveries.maxAttempts,
       url: webhookSubscriptions.url,
       secret: webhookSubscriptions.secret,
+      secretEncrypted: webhookSubscriptions.secretEncrypted,
     })
     .from(webhookDeliveries)
     .innerJoin(webhookSubscriptions, eq(webhookSubscriptions.id, webhookDeliveries.subscriptionId))
@@ -291,11 +291,35 @@ export const runWebhookDeliveryBatch = async (
       continue;
     }
 
+    let signingSecret: string;
+    try {
+      signingSecret = await migrateWebhookSecretIfNeeded(db, input.env, {
+        id: row.subscriptionId,
+        secret: row.secret,
+        secretEncrypted: row.secretEncrypted,
+      });
+    } catch (error) {
+      const invalidNow = new Date();
+      await db
+        .update(webhookDeliveries)
+        .set({
+          status: 'failed',
+          attemptCount: row.maxAttempts,
+          lastAttemptAt: invalidNow,
+          lastError: error instanceof Error ? error.message : 'Webhook subscription secret is invalid.',
+          nextAttemptAt: invalidNow,
+          updatedAt: invalidNow,
+        })
+        .where(eq(webhookDeliveries.id, row.id));
+      failed += 1;
+      continue;
+    }
+
     deliveries.push({
       id: row.id,
       subscriptionId: row.subscriptionId,
       url: row.url,
-      secret: row.secret,
+      secret: signingSecret,
       eventId: row.eventId,
       eventType,
       payload: payload.data,
