@@ -1,6 +1,6 @@
 # Ordered Backlog (One Feature per PR)
 
-## Feature 56 (PR#66): Homepage Hero Art Manual Switch Fallback
+## Feature 57 (PR#66): Homepage Hero Art Manual Switch Fallback
 
 Scope:
 

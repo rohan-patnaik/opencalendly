@@ -50,7 +50,7 @@ export function HeroArtCarousel({
         {slides[activeIndex]}
       </div>
       {slides.length > 1 ? (
-        <div className={styles.controls} aria-label="Hero artwork view switcher" role="tablist">
+        <div className={styles.controls} aria-label="Hero artwork view switcher" role="group">
           {slides.map((_, index) => {
             const isActive = index === activeIndex;
 
