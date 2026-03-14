@@ -4,7 +4,7 @@ import { SignUp, useAuth, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { Card, LinkButton, PageShell, Toast } from '../../../../components/ui';
+import { LinkButton, PageShell, Toast } from '../../../../components/ui';
 import { useAuthSession } from '../../../../lib/use-auth-session';
 import uiStyles from '../../../../components/ui/primitives.module.css';
 import styles from '../../shared.module.css';
@@ -46,12 +46,12 @@ export default function SignUpPageClient() {
         title="Create account"
         description="Clerk is required for authentication in this build."
       >
-        <Card>
+        <section>
           <Toast variant="error">
             Missing <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code>. Add it to <code>.env</code>{' '}
             and restart <code>npm run dev:web</code>.
           </Toast>
-        </Card>
+        </section>
       </PageShell>
     );
   }
@@ -62,51 +62,54 @@ export default function SignUpPageClient() {
       title="Create your account"
       description="Use email, Google, or Microsoft to create your OpenCalendly account."
     >
-      <Card>
-        <div className={styles.clerkContainer}>
-          <SignUp
-            path="/auth/sign-up"
-            routing="path"
-            signInUrl="/auth/sign-in"
-            forceRedirectUrl="/auth/sign-in"
-            fallbackRedirectUrl="/auth/sign-in"
-          />
-        </div>
-        {isLoaded && isSignedIn && sessionReady && !session ? (
-          sessionBridgeTimedOut ? (
-            <Toast variant="error">
-              Session setup is taking longer than expected.
-              <button
-                type="button"
-                className={uiStyles.inlineActionButton}
-                onClick={() => {
-                  setSessionBridgeTimedOut(false);
-                  setSessionBridgeRetryKey((value) => value + 1);
-                  router.refresh();
-                }}
-              >
-                Retry
-              </button>{' '}
-              <button
-                type="button"
-                className={uiStyles.inlineActionButton}
-                onClick={() => {
-                  void signOut();
-                }}
-              >
-                Sign out
-              </button>
-            </Toast>
-          ) : (
-            <Toast variant="info">Finalizing your OpenCalendly session…</Toast>
-          )
-        ) : null}
-        <div className={uiStyles.actions}>
-          <LinkButton href="/auth/sign-in" variant="secondary">
-            Back to sign in
-          </LinkButton>
-        </div>
-      </Card>
+      <div className={styles.clerkContainerBare}>
+        <SignUp
+          path="/auth/sign-up"
+          routing="path"
+          signInUrl="/auth/sign-in"
+          forceRedirectUrl="/auth/sign-in"
+          fallbackRedirectUrl="/auth/sign-in"
+          appearance={{
+            elements: {
+              footer: styles.clerkFooterHidden,
+            },
+          }}
+        />
+      </div>
+      {isLoaded && isSignedIn && sessionReady && !session ? (
+        sessionBridgeTimedOut ? (
+          <Toast variant="error">
+            Session setup is taking longer than expected.
+            <button
+              type="button"
+              className={uiStyles.inlineActionButton}
+              onClick={() => {
+                setSessionBridgeTimedOut(false);
+                setSessionBridgeRetryKey((value) => value + 1);
+                router.refresh();
+              }}
+            >
+              Retry
+            </button>{' '}
+            <button
+              type="button"
+              className={uiStyles.inlineActionButton}
+              onClick={() => {
+                void signOut();
+              }}
+            >
+              Sign out
+            </button>
+          </Toast>
+        ) : (
+          <Toast variant="info">Finalizing your OpenCalendly session…</Toast>
+        )
+      ) : null}
+      <div className={`${uiStyles.actions} ${styles.authActions}`}>
+        <LinkButton href="/auth/sign-in" variant="secondary">
+          Back to sign in
+        </LinkButton>
+      </div>
     </PageShell>
   );
 }

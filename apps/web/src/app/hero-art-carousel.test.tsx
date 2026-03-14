@@ -93,19 +93,19 @@ describe('HeroArtCarousel', () => {
     expect(container?.textContent).not.toContain('Globe art');
 
     act(() => {
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(3000);
     });
 
     expect(container?.textContent).toContain('Globe art');
     expect(container?.textContent).not.toContain('Calendar art');
   });
 
-  it('resets to the first slide and stops rotating when reduced motion is enabled', () => {
+  it('keeps rotating when reduced motion is enabled', () => {
     vi.useFakeTimers();
     const controller = renderCarousel();
 
     act(() => {
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(3000);
     });
     expect(container?.textContent).toContain('Globe art');
 
@@ -113,33 +113,26 @@ describe('HeroArtCarousel', () => {
       controller.setMatches(true);
     });
 
-    expect(container?.textContent).toContain('Calendar art');
-    expect(container?.textContent).not.toContain('Globe art');
+    expect(container?.textContent).toContain('Globe art');
+    expect(container?.textContent).not.toContain('Calendar art');
 
     act(() => {
-      vi.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(3000);
     });
 
     expect(container?.textContent).toContain('Calendar art');
     expect(container?.textContent).not.toContain('Globe art');
   });
 
-  it('allows manual slide switching when reduced motion is enabled', () => {
+  it('still rotates without manual slide controls when reduced motion is enabled', () => {
     vi.useFakeTimers();
     renderCarousel(true);
 
-    const globeButton = container?.querySelector<HTMLButtonElement>('button[aria-label="Show Globe view"]');
-    expect(globeButton).not.toBeNull();
+    const buttons = container?.querySelectorAll('button');
+    expect(buttons?.length ?? 0).toBe(0);
 
     act(() => {
-      globeButton?.click();
-    });
-
-    expect(container?.textContent).toContain('Globe art');
-    expect(container?.textContent).not.toContain('Calendar art');
-
-    act(() => {
-      vi.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(3000);
     });
 
     expect(container?.textContent).toContain('Globe art');

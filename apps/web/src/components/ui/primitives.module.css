@@ -71,13 +71,19 @@
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   font-family: inherit;
   font-weight: 600;
   font-size: var(--text-sm);
+  line-height: 1;
   min-height: 2.5rem;
   padding: 0 var(--spacing-4);
+  text-decoration: none;
   transition:
     background var(--motion-fast),
     border-color var(--motion-fast),
@@ -107,11 +113,13 @@
 .buttonPrimary:hover:not(:disabled) {
   background: var(--brand-primary-hover);
   border-color: var(--brand-primary-hover);
+  color: var(--on-brand);
 }
 
 .buttonPrimary:active:not(:disabled) {
   background: var(--brand-primary-active);
   border-color: var(--brand-primary-active);
+  color: var(--on-brand);
 }
 
 .buttonSecondary {

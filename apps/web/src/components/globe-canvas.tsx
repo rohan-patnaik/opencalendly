@@ -20,11 +20,32 @@ export function GlobeCanvas() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    const resolveTheme = (): boolean => {
+      const explicit = document.documentElement.getAttribute('data-theme');
+      if (explicit === 'light') return false;
+      if (explicit === 'dark') return true;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    };
+
+    setIsDark(resolveTheme());
+
+    // Watch for data-theme attribute changes (from ThemeToggle)
+    const observer = new MutationObserver(() => setIsDark(resolveTheme()));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    // Also listen for system preference changes as fallback
     const matcher = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDark(matcher.matches);
-    const onChange = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    const onChange = () => setIsDark(resolveTheme());
     matcher.addEventListener('change', onChange);
-    return () => matcher.removeEventListener('change', onChange);
+
+    return () => {
+      observer.disconnect();
+      matcher.removeEventListener('change', onChange);
+    };
   }, []);
 
   /* ---- cobe globe ---- */
@@ -54,6 +75,10 @@ export function GlobeCanvas() {
 
     let globe: ReturnType<typeof createGlobe> | null = null;
 
+    /*
+     * Light mode: warm cream surface with deep amber/brown land dots.
+     * Dark mode:  rich dark surface with glowing amber land dots.
+     */
     try {
       globe = createGlobe(canvas, {
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
@@ -62,13 +87,13 @@ export function GlobeCanvas() {
         phi: 0,
         theta: 0.25,
         dark: isDark ? 1 : 0,
-        diffuse: 2.4,
+        diffuse: isDark ? 2.4 : 1.6,
         mapSamples: 20000,
-        mapBrightness: 10,
-        mapBaseBrightness: 0.05,
-        baseColor: isDark ? [0.18, 0.15, 0.12] : [0.99, 0.98, 0.97],
-        markerColor: [0.85, 0.63, 0.4],
-        glowColor: isDark ? [0.22, 0.16, 0.1] : [0.94, 0.93, 0.9],
+        mapBrightness: isDark ? 10 : 3.5,
+        mapBaseBrightness: isDark ? 0.05 : 0.02,
+        baseColor: isDark ? [0.18, 0.15, 0.12] : [0.96, 0.94, 0.9],
+        markerColor: isDark ? [0.85, 0.63, 0.4] : [0.72, 0.45, 0.15],
+        glowColor: isDark ? [0.22, 0.16, 0.1] : [0.92, 0.88, 0.82],
         markers: [],
         onRender: (state) => {
           state.phi = phi;

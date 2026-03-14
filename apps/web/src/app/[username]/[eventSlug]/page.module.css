@@ -203,11 +203,13 @@
 .primaryButton:hover {
   background: var(--brand-primary-hover);
   border-color: var(--brand-primary-hover);
+  color: var(--on-brand);
 }
 
 .primaryButton:active {
   background: var(--brand-primary-active);
   border-color: var(--brand-primary-active);
+  color: var(--on-brand);
 }
 
 .secondaryButton {

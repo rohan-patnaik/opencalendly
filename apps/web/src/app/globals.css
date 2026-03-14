@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  /* Light canvas with charcoal type and amber accents (OpenNote inspired) */
+  /* Light canvas — warm off-white with charcoal type */
   --bg-base: #fdfcf8;
   --bg-surface: #ffffff;
   --bg-elevated: #f4f3ed;
@@ -30,7 +30,7 @@
   --disabled-bg: #f4f3ed;
   --disabled-text: #a8a8a8;
   --disabled-border: #eae7df;
-  --on-brand: #ffffff;
+  --on-brand: #080808;
   --white: #ffffff;
   --grid-line: rgba(26, 26, 27, 0.04);
   --app-header-bg: rgba(253, 252, 248, 0.94);
@@ -46,12 +46,15 @@
   --text-2xl: 1.5rem;
   --text-3xl: 1.875rem;
   --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --text-6xl: 3.75rem;
 
-  /* radius scale (Soft OpenNote Radii) */
+  /* radius scale */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-pill: 999px;
 
   /* spacing scale */
   --spacing-1: 0.25rem;
@@ -62,8 +65,12 @@
   --spacing-6: 1.5rem;
   --spacing-8: 2rem;
   --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
 
-  /* shadows (Soft Floating OpenNote Shadows) */
+  /* shadows — used sparingly (modals/overlays only in redesign) */
   --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
@@ -101,59 +108,14 @@
   --success-text: var(--state-success);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --bg-base: #080808;
-    --bg-surface: #111111;
-    --bg-elevated: #171717;
-    --surface-panel: #0d0d0d;
-    --text-heading: #d9a066;
-    --text-primary: #e0e0e0;
-    --text-secondary: #b8b8b8;
-    --text-muted: #a3a3a3;
-    --border-default: #2a2a2a;
-    --border-strong: #3a3a3a;
-    --brand-primary: #d9a066;
-    --brand-primary-hover: #e4b27a;
-    --brand-primary-active: #bf8549;
-    --brand-secondary: #c68a4b;
-    --brand-secondary-hover: #d3a368;
-    --brand-glow: rgba(217, 160, 102, 0.05);
-    --state-success: #69836c;
-    --state-warning: #e0a24c;
-    --state-error: #a84535;
-    --state-info: #425b81;
-    --state-error-hover: #8f362b;
-    --focus-ring: #d9a066;
-    --bg-hover: #1d1d1d;
-    --bg-pressed: #161616;
-    --border-hover: #4a4a4a;
-    --border-focus: #d9a066;
-    --disabled-bg: #181818;
-    --disabled-text: #686868;
-    --disabled-border: #282828;
-    --on-brand: #080808;
-    --white: #ffffff;
-    --grid-line: rgba(217, 160, 102, 0.08);
-    --app-header-bg: rgba(8, 8, 8, 0.94);
-    --app-nav-hover-bg: rgba(217, 160, 102, 0.08);
-    
-    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
-    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8);
-    --shadow-soft: 0 24px 64px rgba(0, 0, 0, 0.3);
-    --overlay-strong: rgba(0, 0, 0, 0.85);
-  }
-}
-
-:root[data-theme='obsidian-amber'] {
+/* ---------- Explicit dark theme ---------- */
+:root[data-theme='dark'] {
   color-scheme: dark;
   --bg-base: #080808;
   --bg-surface: #111111;
   --bg-elevated: #171717;
   --surface-panel: #0d0d0d;
-  --text-heading: #d9a066;
+  --text-heading: #f0f0f0;
   --text-primary: #e0e0e0;
   --text-secondary: #b8b8b8;
   --text-muted: #a3a3a3;
@@ -180,7 +142,7 @@
   --disabled-border: #282828;
   --on-brand: #080808;
   --white: #ffffff;
-  --grid-line: rgba(217, 160, 102, 0.08);
+  --grid-line: rgba(217, 160, 102, 0.06);
   --app-header-bg: rgba(8, 8, 8, 0.94);
   --app-nav-hover-bg: rgba(217, 160, 102, 0.08);
 
@@ -189,6 +151,53 @@
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8);
   --shadow-soft: 0 24px 64px rgba(0, 0, 0, 0.3);
   --overlay-strong: rgba(0, 0, 0, 0.85);
+}
+
+/* Auto dark via OS preference when no explicit theme set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    color-scheme: dark;
+    --bg-base: #080808;
+    --bg-surface: #111111;
+    --bg-elevated: #171717;
+    --surface-panel: #0d0d0d;
+    --text-heading: #f0f0f0;
+    --text-primary: #e0e0e0;
+    --text-secondary: #b8b8b8;
+    --text-muted: #a3a3a3;
+    --border-default: #2a2a2a;
+    --border-strong: #3a3a3a;
+    --brand-primary: #d9a066;
+    --brand-primary-hover: #e4b27a;
+    --brand-primary-active: #bf8549;
+    --brand-secondary: #c68a4b;
+    --brand-secondary-hover: #d3a368;
+    --brand-glow: rgba(217, 160, 102, 0.05);
+    --state-success: #69836c;
+    --state-warning: #e0a24c;
+    --state-error: #a84535;
+    --state-info: #425b81;
+    --state-error-hover: #8f362b;
+    --focus-ring: #d9a066;
+    --bg-hover: #1d1d1d;
+    --bg-pressed: #161616;
+    --border-hover: #4a4a4a;
+    --border-focus: #d9a066;
+    --disabled-bg: #181818;
+    --disabled-text: #686868;
+    --disabled-border: #282828;
+    --on-brand: #080808;
+    --white: #ffffff;
+    --grid-line: rgba(217, 160, 102, 0.06);
+    --app-header-bg: rgba(8, 8, 8, 0.94);
+    --app-nav-hover-bg: rgba(217, 160, 102, 0.08);
+
+    --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8);
+    --shadow-soft: 0 24px 64px rgba(0, 0, 0, 0.3);
+    --overlay-strong: rgba(0, 0, 0, 0.85);
+  }
 }
 
 *,
@@ -207,14 +216,14 @@ body {
   color: var(--text-primary);
   background: var(--bg-base);
   font-family:
-    var(--font-jetbrains-mono), 'JetBrains Mono', var(--font-inter), 'Helvetica Neue', Arial,
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+    var(--font-inter), 'Inter', 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.55;
   transition:
     background var(--motion-slow),
     color var(--motion-fast);
   position: relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body::before {
@@ -243,8 +252,8 @@ h3,
 h4 {
   margin-top: 0;
   color: var(--text-heading);
-  font-family: var(--font-space-grotesk), Inter, 'Helvetica Neue', sans-serif;
-  line-height: 1.2;
+  font-family: var(--font-space-grotesk), 'Space Grotesk', Inter, 'Helvetica Neue', sans-serif;
+  line-height: 1.15;
 }
 
 p {
