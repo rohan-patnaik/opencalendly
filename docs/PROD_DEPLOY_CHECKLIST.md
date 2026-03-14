@@ -13,6 +13,10 @@ Last updated: 28 Feb 2026 (IST)
 - [ ] `npm run env:check` passes in deployment environment.
 - [ ] Neon `DATABASE_URL` points to production branch/database.
 - [ ] Required OAuth and email provider env vars are present.
+- [ ] Outbound egress assumptions are reviewed for production:
+  - provider APIs: `accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, `graph.microsoft.com`, `api.resend.com`
+  - organizer-managed webhooks are limited to public HTTPS destinations on port `443`
+  - private-network and metadata-service egress remains blocked
 - [ ] GitHub Actions deploy workflow is enabled:
   - `.github/workflows/deploy-production.yml`
 - [ ] Required GitHub repository secrets are configured:
@@ -43,6 +47,8 @@ Last updated: 28 Feb 2026 (IST)
   - `GET /health`
   - public availability route
   - booking mutation route with `Idempotency-Key`
+  - organizer webhook delivery to a public HTTPS receiver
+  - Google or Microsoft calendar sync/writeback path in the target environment
 
 ## Web deploy (Cloudflare Pages)
 
@@ -60,6 +66,8 @@ Last updated: 28 Feb 2026 (IST)
 - [ ] Team round-robin and collective booking happy paths succeed.
 - [ ] Webhook delivery run can process pending retries.
 - [ ] Calendar sync status endpoint reports healthy provider states.
+- [ ] Production response headers match the documented CSP/security-header baseline.
+- [ ] No webhook or calendar provider failures are caused by outbound firewall/DNS policy.
 - [ ] Dashboard analytics endpoint returns expected data.
 - [ ] `npm run domain:check:production` passes.
 

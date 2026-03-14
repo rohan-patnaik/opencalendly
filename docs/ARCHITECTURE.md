@@ -12,6 +12,22 @@ flowchart LR
   A --> E["Resend"]
 ```
 
+## Outbound network boundary
+
+- The API runtime is expected to make outbound HTTPS requests only to:
+  - organizer-approved public webhook destinations
+  - Google OAuth and Calendar APIs (`accounts.google.com`, `oauth2.googleapis.com`, `www.googleapis.com`)
+  - Microsoft OAuth and Graph APIs (`login.microsoftonline.com`, `graph.microsoft.com`)
+  - Resend (`api.resend.com`)
+- Organizer-managed webhook destinations are dynamic, so they cannot be pinned to a small static hostname allowlist. The application instead enforces:
+  - `https://` only
+  - public hostnames only
+  - no embedded credentials
+  - DNS resolution that stays out of private, loopback, link-local, carrier-grade NAT, metadata-service, and other internal IP space before each delivery attempt
+- Production networking should still block private-network egress from the API runtime. The app-level webhook validation is a second line of defense, not the only one.
+- If the hosting platform supports explicit outbound policy controls, keep the static provider domains above reachable and keep organizer-supplied webhooks constrained to public-Internet egress on `443`.
+- Failures from DNS policy, firewall policy, or provider outages should surface as explicit webhook delivery or calendar sync/writeback errors. They should never silently degrade into successful booking commits.
+
 ## Data model overview
 
 - `users`: account identity and timezone.
@@ -164,6 +180,10 @@ flowchart LR
 5. Availability + booking commit paths treat those windows as hard conflict blocks.
 6. Disconnect removes connection + busy-window cache atomically.
 
+Network assumption:
+
+- Production must allow outbound HTTPS to the Google and Microsoft domains listed in the outbound network boundary section. Blocking those domains turns sync/connect flows into operational failures rather than application bugs.
+
 ### Calendar writeback hardening (Feature 7)
 
 1. Booking lifecycle events enqueue provider writeback rows in `booking_external_events`.
@@ -171,6 +191,10 @@ flowchart LR
 3. Provider adapters (Google + Microsoft) execute external event writes using encrypted connection tokens.
 4. Failures retry with bounded exponential backoff (`next_attempt_at`) until `max_attempts`.
 5. Final failed rows remain visible through writeback status endpoints for operator action.
+
+Network assumption:
+
+- Writeback uses the same provider egress boundary as sync/connect flows. Firewall or DNS policy mistakes should be diagnosed as provider-network failures first.
 
 ### Analytics + operator dashboard (Feature 8)
 
