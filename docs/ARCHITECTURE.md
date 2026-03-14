@@ -28,7 +28,7 @@ flowchart LR
 - `calendar_connections`: encrypted OAuth credentials + sync cursor/status per user/provider.
 - `calendar_busy_windows`: normalized external busy windows used for slot conflict blocking.
 - `booking_external_events`: provider writeback state per booking (`create`/`cancel`/`reschedule`) with retry metadata.
-- `webhook_subscriptions`: organizer-managed outbound webhook endpoints/secrets/event filters.
+- `webhook_subscriptions`: organizer-managed outbound webhook endpoints/event filters, with signing secrets stored encrypted at rest (`secret_encrypted`) and plaintext retained only during migration/backfill.
 - `webhook_deliveries`: queued delivery attempts with retry state and final status.
 - `analytics_funnel_events`: page/slot/booking funnel stages keyed by organizer + event type.
 - `email_deliveries`: best-effort delivery telemetry for confirmation/cancellation/reschedule emails.
@@ -55,6 +55,7 @@ flowchart LR
   - calendar connect/sync/writeback
   - webhooks, demo, and embed
 - Shared server-side workflow helpers live under `apps/api/src/server` and keep booking, rate-limit, auth-session, demo-quota, and writeback logic out of route registration files.
+- Webhook secret storage is application-encrypted and decrypted only at delivery-signing time; a post-deploy backfill command removes remaining plaintext legacy rows.
 - Web route shells are intentionally thin:
   - route-level `page.client.tsx` files delegate feature logic into adjacent `page.client.impl.tsx` or `apps/web/src/features/*`
   - organizer, dashboard, and booking flows keep state and UI split into feature-local hooks, panels, and API clients

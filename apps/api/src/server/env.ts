@@ -56,6 +56,15 @@ export const resolveCalendarEncryptionSecret = (env: Bindings): string | null =>
   return !secret || secret.length < MIN_CALENDAR_SECRET_LENGTH ? null : secret;
 };
 
+export const resolveWebhookEncryptionSecret = (env: Bindings): string | null => {
+  const dedicated = env.WEBHOOK_SECRET_ENCRYPTION_KEY?.trim();
+  if (dedicated) {
+    return dedicated.length < MIN_CALENDAR_SECRET_LENGTH ? null : dedicated;
+  }
+
+  return resolveCalendarEncryptionSecret(env);
+};
+
 export const resolveTelemetryHmacKey = (env: Bindings): string | null => {
   const telemetryHmacKey = env.TELEMETRY_HMAC_KEY?.trim();
   return !telemetryHmacKey || telemetryHmacKey.length < MIN_CALENDAR_SECRET_LENGTH

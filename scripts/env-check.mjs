@@ -31,6 +31,8 @@ const OPTIONAL = {
   DEMO_DAILY_CREDIT_LIMIT: 'Optional integer daily credit budget per admitted account (default 20).',
   DEMO_CREDIT_BYPASS_EMAILS:
     'Optional comma-separated email allowlist for dev/internal accounts that bypass demo quota.',
+  WEBHOOK_SECRET_ENCRYPTION_KEY:
+    'Optional dedicated encryption key for webhook signing secrets. Falls back to SESSION_SECRET when omitted.',
   TELEMETRY_HMAC_KEY:
     'Recommended dedicated secret for telemetry HMAC. If unset, email delivery telemetry writes are skipped.',
   MICROSOFT_CLIENT_ID: 'Microsoft Entra -> App registrations -> client ID (Feature 7).',
@@ -179,6 +181,11 @@ if (sessionSecret && sessionSecret.length < 32) {
 const telemetryHmacKey = parsed.TELEMETRY_HMAC_KEY;
 if (telemetryHmacKey && telemetryHmacKey.length < 32) {
   errors.push('TELEMETRY_HMAC_KEY must be at least 32 characters when provided.');
+}
+
+const webhookSecretEncryptionKey = parsed.WEBHOOK_SECRET_ENCRYPTION_KEY;
+if (webhookSecretEncryptionKey && webhookSecretEncryptionKey.length < 32) {
+  errors.push('WEBHOOK_SECRET_ENCRYPTION_KEY must be at least 32 characters when provided.');
 }
 
 const enableDevAuthBootstrap = parsed.ENABLE_DEV_AUTH_BOOTSTRAP;

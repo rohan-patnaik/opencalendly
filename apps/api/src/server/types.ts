@@ -17,6 +17,7 @@ export type Bindings = {
   DATABASE_URL?: string;
   APP_BASE_URL?: string;
   SESSION_SECRET?: string;
+  WEBHOOK_SECRET_ENCRYPTION_KEY?: string;
   TELEMETRY_HMAC_KEY?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
@@ -118,7 +119,6 @@ export type WebhookSubscriptionRecord = {
   id: string;
   userId: string;
   url: string;
-  secret: string;
   events: WebhookEventType[];
   isActive: boolean;
 };

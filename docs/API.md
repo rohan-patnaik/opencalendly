@@ -1163,6 +1163,7 @@ Notes:
 
 - `url` must be an `https://` endpoint with a public hostname.
 - Localhost, private-network targets, direct IP literals, and embedded basic-auth credentials are rejected.
+- Signing secrets are stored encrypted at rest. New writes use `WEBHOOK_SECRET_ENCRYPTION_KEY` when configured, otherwise `SESSION_SECRET`.
 
 Request:
 
@@ -1219,6 +1220,7 @@ Behavior:
 - Resolves allowed hostnames before network I/O and rejects targets that resolve to private or unsafe IP space.
 - Sends signed payloads with retry backoff and does not follow redirects automatically.
 - Fails deliveries immediately when the stored target URL is no longer allowed by the webhook URL policy.
+- Transparently migrates legacy plaintext webhook secrets to encrypted-at-rest storage before dispatch when an old row is encountered.
 - Updates attempt count + next attempt timestamp.
 
 Success response:

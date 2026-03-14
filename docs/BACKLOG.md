@@ -30,6 +30,16 @@ Guardrails:
 - General authored modules: `<400` LOC unless schema or test file.
 - `npm run complexity:check:enforce` is enabled in CI and must stay green.
 
+## Feature 53 (PR#62): Webhook Secret Encryption at Rest
+
+Acceptance criteria:
+
+- New webhook subscriptions store signing secrets encrypted at rest instead of plaintext.
+- Existing plaintext webhook secrets remain backward-compatible during rollout and are auto-migrated when used by the delivery runner.
+- A dedicated backfill command exists to encrypt any remaining plaintext webhook secrets after deploy.
+- Delivery/runtime paths only decrypt secrets immediately before signing outbound webhook requests.
+- `docs/API.md`, `docs/ARCHITECTURE.md`, and env/setup guidance document the new storage model and rollout command.
+
 ### PR 1: Baseline health + review tooling + guardrails
 
 Acceptance criteria:

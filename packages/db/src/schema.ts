@@ -734,7 +734,8 @@ export const webhookSubscriptions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     url: varchar('url', { length: 2000 }).notNull(),
-    secret: text('secret').notNull(),
+    secret: text('secret'),
+    secretEncrypted: text('secret_encrypted'),
     events: jsonb('events').$type<WebhookEventTypeRecord[]>().notNull(),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

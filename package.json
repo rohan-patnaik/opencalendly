@@ -29,6 +29,7 @@
     "db:generate": "node ./scripts/run-with-root-env.mjs npm run generate -w packages/db",
     "db:migrate": "node ./scripts/run-with-root-env.mjs npm run migrate -w packages/db",
     "db:seed": "node ./scripts/run-with-root-env.mjs npm run seed -w packages/db",
+    "webhooks:encrypt-secrets": "node ./scripts/run-with-root-env.mjs tsx scripts/encrypt-webhook-secrets.ts",
     "db:reset:local": "node ./scripts/db-reset-local.mjs",
     "deploy:api:production": "npm run deploy:production -w apps/api",
     "deploy:web:production": "node ./scripts/deploy-pages.mjs --production",

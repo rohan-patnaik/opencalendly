@@ -30,6 +30,7 @@ export const registerWebhookDeliveryRoutes = (app: ApiApp): void => {
 
       const outcome = await runWebhookDeliveryBatch(db, {
         organizerId: authedUser.id,
+        env: context.env,
         limit,
         now,
       });
