@@ -97,7 +97,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   }, [mobileNavOpen]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 921px)');
+    const mediaQuery = window.matchMedia('(min-width: 1101px)');
     const onMediaChange = (event: MediaQueryListEvent) => {
       if (event.matches) {
         setMobileNavOpen(false);
