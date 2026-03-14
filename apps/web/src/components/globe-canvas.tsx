@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import createGlobe from 'cobe';
 import { usePrefersReducedMotion } from '../lib/use-prefers-reduced-motion';
 import styles from './globe-canvas.module.css';
@@ -16,6 +16,16 @@ export function GlobeCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const matcher = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDark(matcher.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    matcher.addEventListener('change', onChange);
+    return () => matcher.removeEventListener('change', onChange);
+  }, []);
 
   /* ---- cobe globe ---- */
   useEffect(() => {
@@ -51,14 +61,14 @@ export function GlobeCanvas() {
         height: width * 2,
         phi: 0,
         theta: 0.25,
-        dark: 1,
+        dark: isDark ? 1 : 0,
         diffuse: 2.4,
         mapSamples: 20000,
         mapBrightness: 10,
         mapBaseBrightness: 0.05,
-        baseColor: [0.18, 0.15, 0.12],
+        baseColor: isDark ? [0.18, 0.15, 0.12] : [0.99, 0.98, 0.97],
         markerColor: [0.85, 0.63, 0.4],
-        glowColor: [0.22, 0.16, 0.1],
+        glowColor: isDark ? [0.22, 0.16, 0.1] : [0.94, 0.93, 0.9],
         markers: [],
         onRender: (state) => {
           state.phi = phi;
@@ -76,7 +86,7 @@ export function GlobeCanvas() {
       globe?.destroy();
       window.removeEventListener('resize', onResize);
     };
-  }, [reducedMotion]);
+  }, [reducedMotion, isDark]);
 
   /* ---- orbiting satellites ---- */
   useEffect(() => {

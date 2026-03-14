@@ -1,5 +1,24 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 59 (PR#TBD): OpenNote-Inspired UI Redesign
+
+Scope:
+
+- Redesign the web app to use an OpenNote-inspired aesthetic with highly refined, cleaner layout structure.
+- Increase negative space (generous margins, padding) for a "canvas" feel instead of confined boxes/cards.
+- Retain the amber/gold (`#d9a066`) brand color and the background gridlines.
+- Retain existing interactive widgets like the dotted globe and calendar UI on the marketing page.
+- Implement explicit light and dark themes utilizing `[data-theme]` attributes and system preference fallback.
+- Avoid deleting existing routes or functional components.
+
+Acceptance criteria:
+
+- `globals.css` defines full light theme (`:root`) and dark theme (`[data-theme='obsidian-amber']`) token sets.
+- `marketing-pages.module.css` and other UI elements remove hard borders and solid backgrounds to embrace open space.
+- The marketing homepage and layout structure accurately match the expansive pacing of the new aesthetic.
+- Light mode incorporates off-white canvas backgrounds and charcoal text; Dark mode preserves the existing `#080808` obsidian feel.
+- Theme switching works properly depending on system preferences or current static config without breaking UI.
+
 ## Feature 58 (PR#TBD): Homepage Responsive Layout Scaling
 
 Scope:
