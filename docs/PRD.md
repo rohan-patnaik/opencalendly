@@ -50,3 +50,9 @@ Build a practical open-source scheduling platform for solo creators, consultants
 - Feature 15 through Feature 18 are merged to `main` with CI green.
 - Required repo-owned checks pass for each feature PR, and actionable CodeRabbit/Greptile comments are resolved when those integrations respond.
 - Frontend architecture and route documentation stay in sync with shipped UX.
+
+## Security baseline
+
+- Web responses emit a baseline CSP plus `nosniff`, `referrer-policy`, and `permissions-policy` headers.
+- Authenticated organizer/account surfaces deny framing, while public booking and embed flows remain embeddable.
+- API responses emit a deny-by-default header set on JSON and script endpoints.

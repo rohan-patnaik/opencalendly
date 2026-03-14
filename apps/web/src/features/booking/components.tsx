@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
 import { DemoQuotaCard } from '../../components/demo-quota-card';
 import type { AuthSession } from '../../lib/auth-session';
 import type { DemoFeatureCostKey, DemoQuotaStatusResponse } from '../../lib/demo-quota';
@@ -240,12 +240,20 @@ export function BookingActionLinks(input: {
   return (
     <div className={input.styles.actionLinks}>
       {input.actionLinks.cancelPageUrl ? (
-        <a className={input.styles.secondaryButton} href={input.actionLinks.cancelPageUrl}>
+        <a
+          className={input.styles.secondaryButton}
+          href={input.actionLinks.cancelPageUrl}
+          target="_top"
+        >
           Open cancel link
         </a>
       ) : null}
       {input.actionLinks.reschedulePageUrl ? (
-        <a className={input.styles.secondaryButton} href={input.actionLinks.reschedulePageUrl}>
+        <a
+          className={input.styles.secondaryButton}
+          href={input.actionLinks.reschedulePageUrl}
+          target="_top"
+        >
           Open reschedule link
         </a>
       ) : null}
