@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { resolveAllowedCorsOrigins, toCorsOrigin } from './lib/cors';
 import { hasSessionCookie } from './server/auth-session';
 import { jsonError, logInternalError } from './server/core';
+import { API_SECURITY_HEADERS } from './server/security-headers';
 import type { Bindings } from './server/types';
 import { registerAnalyticsFunnelRoutes } from './routes/analytics-funnel';
 import { registerAnalyticsOperatorRoutes } from './routes/analytics-operator';
@@ -53,6 +54,16 @@ app.use('*', async (context, next) => {
     credentials: true,
     maxAge: 86_400,
   })(context, next);
+});
+
+app.use('*', async (context, next) => {
+  try {
+    await next();
+  } finally {
+    for (const [key, value] of Object.entries(API_SECURITY_HEADERS)) {
+      context.header(key, value);
+    }
+  }
 });
 
 app.use('*', async (context, next) => {
@@ -112,7 +123,11 @@ registerBookingActionRescheduleRoutes(app);
 
 app.onError((error, context) => {
   logInternalError('api_unhandled_error', error);
-  return jsonError(context, 500, 'Unexpected server error.');
+  const response = jsonError(context, 500, 'Unexpected server error.');
+  for (const [key, value] of Object.entries(API_SECURITY_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
 });
 
 export default app;

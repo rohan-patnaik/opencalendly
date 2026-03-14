@@ -22,6 +22,12 @@ Build a practical open-source scheduling platform for solo creators, consultants
 - OSS maintainers offering office hours.
 - Small teams that need basic meeting links and confirmations.
 
+## Security baseline
+
+- Web responses emit a baseline CSP plus `nosniff`, `referrer-policy`, and `permissions-policy` headers.
+- Authenticated organizer/account surfaces deny framing, while public booking and embed flows remain embeddable.
+- API responses emit a deny-by-default header set on JSON and script endpoints.
+
 ## Roadmap
 
 ### Completed foundation and v1 buildout (PR#2-PR#15)

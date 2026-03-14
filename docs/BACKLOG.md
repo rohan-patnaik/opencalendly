@@ -30,6 +30,22 @@ Guardrails:
 - General authored modules: `<400` LOC unless schema or test file.
 - `npm run complexity:check:enforce` is enabled in CI and must stay green.
 
+## Feature 54 (PR#61): Security Headers and CSP Hardening
+
+Scope:
+
+- Add baseline response hardening headers to the API and web app.
+- Keep the change scoped to headers/CSP generation, route-specific framing policy, tests, and process/docs updates for PR review gating.
+- Do not change auth flows, booking behavior, or embed widget runtime behavior beyond header policy.
+
+Acceptance criteria:
+
+- The web app emits a documented baseline CSP plus `nosniff`, `referrer-policy`, and `permissions-policy` headers.
+- CSP remains compatible with Clerk auth flows, the local/dev Next.js runtime, and the embed playground script preview.
+- Sensitive authenticated web routes deny framing without breaking public booking embeds.
+- The API emits a deny-by-default security header set on all responses.
+- Tests cover the generated web CSP/header policy and API header constants.
+
 ## Feature 53 (PR#62): Webhook Secret Encryption at Rest
 
 Acceptance criteria:

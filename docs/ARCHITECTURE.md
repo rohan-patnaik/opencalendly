@@ -60,6 +60,8 @@ flowchart LR
   - route-level `page.client.tsx` files delegate feature logic into adjacent `page.client.impl.tsx` or `apps/web/src/features/*`
   - organizer, dashboard, and booking flows keep state and UI split into feature-local hooks, panels, and API clients
 - Cross-app request and response contracts that are stable across API and web live in `packages/shared/src/contracts.ts` and existing schema modules.
+- Web responses emit a baseline CSP plus security headers; authenticated organizer/auth surfaces deny framing, while public booking/embed surfaces remain frame-compatible.
+- API responses emit a deny-by-default header set to reduce script, frame, and content-type abuse on JSON/script endpoints.
 
 - Global app chrome wraps all routes and provides:
   - primary navigation
