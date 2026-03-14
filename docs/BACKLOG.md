@@ -1012,6 +1012,21 @@ Acceptance criteria:
 - Validation passes:
   - `npm run env:check`
   - `git diff --check`
+### Feature 49: README homepage GIF hero-only refresh
+
+Scope:
+- Refresh the committed README homepage GIF so it stays on the hero fold instead of scrolling through the rest of the page.
+- Ensure the loop shows both hero art states: the calendar motif and the globe treatment.
+
+Acceptance criteria:
+
+- `README.md` continues to render the committed homepage GIF from `docs/assets/readme/homepage-tour.gif`.
+- The GIF stays pinned to the homepage hero and does not scroll to lower sections.
+- The GIF visibly shows both the calendar art state and the globe art state within one loop.
+- Validation passes:
+  - `npm run env:check`
+  - `git diff --check`
+
 ### Feature 32: Warm Grid Dark UI foundation + navbar route stability
 
 Scope:
