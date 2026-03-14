@@ -1,6 +1,6 @@
 # Ordered Backlog (One Feature per PR)
 
-## Feature 56 (PR#64): Homepage Hero Art Manual Switch Fallback
+## Feature 56 (PR#66): Homepage Hero Art Manual Switch Fallback
 
 Scope:
 
@@ -1152,3 +1152,16 @@ Acceptance criteria:
 - Validation passes:
   - `npm run lint`
   - `npm run typecheck`
+
+### Feature 57: Marketing copy CI parity fix
+
+Scope:
+- Update the marketing route source test so it matches the current homepage copy shipped in Feature 56.
+- Keep the fix limited to the stale CI assertion and do not alter the rendered marketing pages again.
+
+Acceptance criteria:
+
+- `apps/web/src/app/marketing-routes.test.ts` asserts the current homepage copy strings.
+- CI no longer fails on the stale homepage copy expectation introduced by the copy refresh merge.
+- Validation passes:
+  - `npx vitest run apps/web/src/app/marketing-routes.test.ts`
