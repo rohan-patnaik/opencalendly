@@ -38,6 +38,15 @@ describe('web security headers', () => {
     expect(csp).toContain("'unsafe-eval'");
   });
 
+  it('fails closed instead of whitelisting localhost in production', () => {
+    const csp = buildWebCsp({
+      isDevelopment: false,
+    });
+
+    expect(csp).not.toContain('http://localhost:3000');
+    expect(csp).not.toContain('http://localhost:8787');
+  });
+
   it('emits the baseline header set', () => {
     const headers = buildCommonWebSecurityHeaders({
       appBaseUrl: 'https://opencalendly.com',

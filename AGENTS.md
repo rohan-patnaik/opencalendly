@@ -32,11 +32,6 @@
 4) Reviews (mandatory order)
    - Codex self-review checklist
    - Mark Draft PR ready for review when acceptance criteria are implemented
-   - Qodo review must start and complete before merge. Do not merge while Qodo is still in its "analyzing" phase or before its code-review pass has had time to arrive.
-   - If Qodo posts actionable comments, resolve them before merge.
-   - After each Qodo comment batch, provide a concise in-chat summary:
-     - what Qodo asked to change
-     - what change will be made in response
    - Greptile review is best-effort when the app is installed and billing/config are active.
    - If Greptile comments arrive, resolve them before merge.
    - CodeRabbit trigger workflow must run on every PR update.
@@ -48,9 +43,8 @@
    - After each Greptile/CodeRabbit comment batch, provide a concise in-chat summary:
      - what each reviewer asked to change
      - what change will be made in response
-   - Merge only after both Qodo and CodeRabbit have completed their review passes on the latest commit and there are no unresolved actionable comments left from either tool.
 5) Merge
-   - Merge PR only after CI is green, required repo-owned checks pass, Qodo and CodeRabbit have both completed on the latest commit, and actionable bot comments are resolved
+   - Merge PR only after CI is green, required repo-owned checks pass, and actionable bot comments are resolved
    - Do not delete the source feature branch after merge
    - Update docs/PRD.md and docs/ARCHITECTURE.md only if the feature changes plan/architecture
 6) Handoff

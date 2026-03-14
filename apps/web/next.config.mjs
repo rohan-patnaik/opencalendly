@@ -41,6 +41,10 @@ const nextConfig = {
         source: '/settings/:path*',
         headers: buildSensitivePageHeaders(),
       },
+      {
+        source: '/bookings/actions/:path*',
+        headers: buildSensitivePageHeaders(),
+      },
     ];
   },
   turbopack: {

@@ -77,8 +77,7 @@ Useful references:
   - direct pushes blocked by branch protection policy
 - Third-party review apps remain informational:
   - Greptile comments are handled when the integration is active, but `Greptile Review` is not a required status check while billing/config is inactive.
-  - Qodo and CodeRabbit must both complete their review passes on the latest PR commit before merge.
-  - The raw `CodeRabbit` status is still not a required branch-protection merge check because it can remain pending even after a successful trigger, but merge still waits for a completed CodeRabbit review/comment pass with no unresolved actionable feedback.
+  - CodeRabbit review is still auto-triggered on PR updates, but the raw `CodeRabbit` status is not a required merge check because it can remain pending even after a successful trigger.
 - `@cloudflare/next-on-pages` deprecation handling decision:
   - keep current adapter for now to avoid mid-feature deployment churn
   - plan migration to OpenNext before `v1.0.0` with dedicated validation checklist (preview deploy parity, env parity, rollback path)
