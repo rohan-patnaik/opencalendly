@@ -1,12 +1,13 @@
 import { createHmac } from 'node:crypto';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildWebhookEvent,
   buildWebhookSignatureHeader,
   computeNextWebhookAttemptAt,
   computeWebhookRetryDelaySeconds,
+  resolveWebhookTargetSafety,
   isWebhookDeliveryExhausted,
   normalizeWebhookEvents,
 } from './webhooks';
@@ -72,5 +73,33 @@ describe('webhook helpers', () => {
         'booking.canceled',
       ]),
     ).toEqual(['booking.created', 'booking.canceled']);
+  });
+
+  it('rejects hostnames that resolve to loopback or private IPs', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('type=A')) {
+        return new Response(
+          JSON.stringify({
+            Answer: [{ data: '127.0.0.1' }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      return new Response(JSON.stringify({ Answer: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await resolveWebhookTargetSafety('https://hooks.example.com/webhooks/opencalendly');
+
+    expect(result).toEqual({
+      ok: false,
+      retryable: false,
+      reason: 'Webhook target resolves to a private or otherwise unsafe network address.',
+    });
   });
 });

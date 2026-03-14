@@ -52,4 +52,43 @@ describe('executeWebhookDelivery', () => {
       }),
     );
   });
+
+  it('fails hostnames that resolve to private IPs without posting to the target', async () => {
+    const where = vi.fn(async () => undefined);
+    const set = vi.fn(() => ({ where }));
+    const update = vi.fn(() => ({ set }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('cloudflare-dns.com') && url.includes('type=A')) {
+        return new Response(
+          JSON.stringify({
+            Answer: [{ data: '10.0.0.8' }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      return new Response(JSON.stringify({ Answer: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await executeWebhookDelivery(
+      { update } as unknown as Database,
+      buildDelivery('https://hooks.example.com/webhooks/opencalendly'),
+    );
+
+    expect(result).toBe('failed');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(update).toHaveBeenCalledOnce();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed',
+        attemptCount: 6,
+        lastError: 'Webhook target resolves to a private or otherwise unsafe network address.',
+      }),
+    );
+  });
 });
