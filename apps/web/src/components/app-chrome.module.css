@@ -247,7 +247,7 @@
   color: var(--text-heading);
 }
 
-@media (max-width: 920px) {
+@media (max-width: 1100px) {
   .header {
     grid-template-columns: 1fr auto;
   }
@@ -265,7 +265,7 @@
   }
 }
 
-@media (min-width: 921px) {
+@media (min-width: 1101px) {
 
   .mobileOverlay,
   .mobileDrawer {

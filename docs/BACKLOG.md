@@ -1,5 +1,20 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 58 (PR#TBD): Homepage Responsive Layout Scaling
+
+Scope:
+
+- Expand the homepage layout so it uses large desktop screens more effectively instead of staying tightly capped in the center.
+- Keep the homepage readable and stable across large desktop, medium tablet/laptop, and small phone breakpoints.
+- Keep the change scoped to homepage layout, sizing, and responsive behavior without changing route structure or product copy.
+
+Acceptance criteria:
+
+- Large desktop screens render a visibly wider homepage layout with better use of available horizontal space.
+- The hero section, proof strip, content grids, and footer adapt cleanly across large, medium, and small breakpoints.
+- Homepage sections avoid cramped cards on medium screens and avoid oversized empty margins on large screens.
+- Existing homepage interaction behavior remains intact, including the hero art controls and globe/calendar switching.
+
 ## Feature 57 (PR#66): Homepage Hero Art Manual Switch Fallback
 
 Scope:
