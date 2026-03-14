@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCommonWebSecurityHeaders,
+  buildSensitivePageHeaders,
   buildWebCsp,
   resolveClerkFrontendApiOrigin,
 } from './security-headers.mjs';
@@ -49,7 +50,17 @@ describe('web security headers', () => {
         expect.objectContaining({ key: 'Content-Security-Policy' }),
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },
+        {
+          key: 'Permissions-Policy',
+          value: 'camera=(), geolocation=(), microphone=(), payment=(), usb=()',
+        },
       ]),
     );
+  });
+
+  it('denies framing on sensitive pages', () => {
+    expect(buildSensitivePageHeaders()).toEqual([
+      { key: 'X-Frame-Options', value: 'DENY' },
+    ]);
   });
 });

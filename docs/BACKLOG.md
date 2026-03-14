@@ -30,7 +30,7 @@ Guardrails:
 - General authored modules: `<400` LOC unless schema or test file.
 - `npm run complexity:check:enforce` is enabled in CI and must stay green.
 
-## Feature 54 (PR#63): Security Headers and CSP Hardening
+## Feature 54 (PR#61): Security Headers and CSP Hardening
 
 Scope:
 

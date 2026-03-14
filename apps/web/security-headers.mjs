@@ -44,12 +44,15 @@ export const resolveClerkFrontendApiOrigin = (publishableKey) => {
   }
 };
 
-const toDirective = (name, values) => `${name} ${Array.from(new Set(values)).join(' ')}`;
+const toDirective = (name, values) =>
+  `${name} ${Array.from(new Set(values.filter(Boolean))).join(' ')}`;
 
 export const buildWebCsp = (input = {}) => {
   const isDevelopment = input.isDevelopment === true;
-  const appOrigin = normalizeOrigin(input.appBaseUrl) ?? 'http://localhost:3000';
-  const apiOrigin = normalizeOrigin(input.apiBaseUrl) ?? 'http://localhost:8787';
+  const appOrigin = normalizeOrigin(input.appBaseUrl)
+    ?? (isDevelopment ? 'http://localhost:3000' : null);
+  const apiOrigin = normalizeOrigin(input.apiBaseUrl)
+    ?? (isDevelopment ? 'http://localhost:8787' : null);
   const clerkOrigin = resolveClerkFrontendApiOrigin(input.clerkPublishableKey);
 
   const clerkSources = clerkOrigin ? [clerkOrigin] : CLERK_FALLBACK_ORIGINS;
