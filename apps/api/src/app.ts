@@ -57,9 +57,12 @@ app.use('*', async (context, next) => {
 });
 
 app.use('*', async (context, next) => {
-  await next();
-  for (const [key, value] of Object.entries(API_SECURITY_HEADERS)) {
-    context.header(key, value);
+  try {
+    await next();
+  } finally {
+    for (const [key, value] of Object.entries(API_SECURITY_HEADERS)) {
+      context.header(key, value);
+    }
   }
 });
 
@@ -120,7 +123,11 @@ registerBookingActionRescheduleRoutes(app);
 
 app.onError((error, context) => {
   logInternalError('api_unhandled_error', error);
-  return jsonError(context, 500, 'Unexpected server error.');
+  const response = jsonError(context, 500, 'Unexpected server error.');
+  for (const [key, value] of Object.entries(API_SECURITY_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
 });
 
 export default app;

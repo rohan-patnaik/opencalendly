@@ -32,6 +32,12 @@ Guardrails:
 
 ## Feature 54 (PR#63): Security Headers and CSP Hardening
 
+Scope:
+
+- Add baseline response hardening headers to the API and web app.
+- Keep the change scoped to headers/CSP generation, route-specific framing policy, tests, and process/docs updates for PR review gating.
+- Do not change auth flows, booking behavior, or embed widget runtime behavior beyond header policy.
+
 Acceptance criteria:
 
 - The web app emits a documented baseline CSP plus `nosniff`, `referrer-policy`, and `permissions-policy` headers.
