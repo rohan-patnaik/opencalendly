@@ -61,6 +61,9 @@ export default function SignUpPageClient() {
       eyebrow="Authentication"
       title="Create your account"
       description="Use email, Google, or Microsoft to create your OpenCalendly account."
+      className={styles.authShell}
+      stackClassName={styles.authStack}
+      introClassName={styles.authIntro}
     >
       <div className={styles.clerkContainerBare}>
         <SignUp

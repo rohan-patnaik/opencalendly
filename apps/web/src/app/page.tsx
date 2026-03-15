@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { useId } from 'react';
 import { GlobeCanvas } from '../components/globe-canvas';
 import { LinkButton } from '../components/ui/button';
-import { PROJECT_LICENSE } from '../lib/project-metadata';
+import { PROJECT_LICENSE, PROJECT_REPO_URL } from '../lib/project-metadata';
 import { HeroArtCarousel } from './hero-art-carousel';
 import { HomepageTimezoneBadge } from './homepage-timezone-badge';
 import styles from './page.module.css';
@@ -346,7 +346,14 @@ export default function HomePage() {
         <div className={styles.footerTop}>
           <div className={styles.footerBrand}>
             <h3>OpenCalendly</h3>
-            <p>Open-source scheduling for teams that want a polished product and a readable stack.</p>
+            <Link
+              href={PROJECT_REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+              className={styles.footerRepoLink}
+            >
+              GitHub repository
+            </Link>
           </div>
           <div className={styles.footerColumns}>
             <div className={styles.footerColumn}>

@@ -32,8 +32,7 @@ const featureGroups = [
 export default function FeaturesPage() {
   return (
     <main className={styles.page}>
-      <section className={styles.hero}>
-        <p className={styles.kicker}>Features</p>
+      <section className={`${styles.hero} ${styles.heroCentered}`}>
         <h1>Scheduling features you can use in the app and the API.</h1>
         <p>
           OpenCalendly keeps the product experience and backend behavior close together, so what you
@@ -42,7 +41,9 @@ export default function FeaturesPage() {
       </section>
 
       <section className={styles.section}>
-        <h2>Capability matrix</h2>
+        <div className={styles.sectionHeadingCentered}>
+          <h2>Capability matrix</h2>
+        </div>
         <div className={styles.grid}>
           {featureGroups.map((group) => (
             <article key={group.title} className={styles.card}>

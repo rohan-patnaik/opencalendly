@@ -87,8 +87,11 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
         eyebrow="Authentication required"
         title="Organizer Console"
         description="Sign in to manage your scheduling setup."
+        className={styles.signedOutShell}
+        stackClassName={styles.signedOutStack}
+        introClassName={styles.signedOutIntro}
       >
-        <Card>
+        <Card className={styles.signedOutCard}>
           <OrganizerSignedOutState authError={authError} styles={styles} />
         </Card>
       </PageShell>
