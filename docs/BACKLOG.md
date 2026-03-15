@@ -1,5 +1,22 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 61 (PR#TBD): README dark-mode homepage GIF refresh
+
+Scope:
+
+- Replace the current README homepage GIF with a dark-mode recording from `opencalendly.com`.
+- Keep the recording long enough to show the hero art rotate between the calendar state and the globe state.
+- Preserve the existing README media slot and keep the change scoped to the committed homepage asset plus the README reference.
+
+Acceptance criteria:
+
+- `README.md` renders the homepage GIF from `docs/assets/readme/homepage-tour.gif`.
+- The committed GIF shows the production homepage in dark mode.
+- One loop is long enough to show the calendar art and the globe art transition.
+- Validation passes:
+  - `npm run env:check`
+  - `git diff --check`
+
 ## Feature 60 (PR#TBD): README homepage media + production link refresh
 
 Scope:

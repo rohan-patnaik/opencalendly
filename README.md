@@ -4,7 +4,7 @@ Live site: [opencalendly.com](https://opencalendly.com)
 
 OpenCalendly is an open-source scheduling app for teams that want Calendly-class booking flows without giving up runtime ownership. It ships public booking pages, team scheduling, embeds, organizer tooling, calendar sync, analytics, and the operational guardrails needed to run the stack yourself.
 
-![OpenCalendly homepage tour](docs/assets/readme/homepage-tour-dark.gif)
+![OpenCalendly homepage tour](docs/assets/readme/homepage-tour.gif)
 
 ## What It Does
 
