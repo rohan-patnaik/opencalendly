@@ -1,3 +1,18 @@
+.authShell {
+  min-height: calc(100vh - var(--app-header-height) - 2rem);
+  display: grid;
+  align-content: center;
+}
+
+.authStack {
+  justify-items: center;
+}
+
+.authIntro {
+  justify-items: center;
+  text-align: center;
+}
+
 .form {
   display: grid;
   gap: 0.8rem;
@@ -14,6 +29,7 @@
   display: grid;
   place-items: center;
   margin-top: 0.35rem;
+  width: 100%;
 }
 
 .clerkFooterHidden {
@@ -22,6 +38,7 @@
 
 .authActions {
   margin-top: 1rem;
+  justify-content: center;
 }
 
 .grid {

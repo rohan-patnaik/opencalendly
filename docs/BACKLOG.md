@@ -1,5 +1,27 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 61 (PR#TBD): Marketing and auth layout polish follow-ups
+
+Scope:
+
+- Refine the homepage route grid, plan preview cards, and footer content to match the requested alignment and symmetry updates.
+- Center the hero copy and section headings on the marketing features and pricing pages where the route label is redundant.
+- Center the signed-out organizer and demo states and finish the auth page cleanup so sign-in/sign-up no longer show the extra outer shell or Clerk footer content.
+
+Acceptance criteria:
+
+- Homepage live routes render in a 3-card first row and centered 2-card second row on large screens.
+- Homepage plan preview cards are center-aligned and the footer includes a GitHub repository link while removing the extra footer marketing copy.
+- Features and pricing pages remove the redundant top kicker and center the requested hero and section-heading copy.
+- Signed-out organizer and demo surfaces center their content, and sign-in/sign-up remove the extra outer wrapper and Clerk footer rows.
+- Sign-up page intro copy and the back-to-sign-in action are centered to match the auth form.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 60 (PR#TBD): README homepage media + production link refresh
 
 Scope:

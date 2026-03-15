@@ -16,6 +16,23 @@
   padding: 0;
 }
 
+.heroCentered {
+  text-align: center;
+  justify-items: center;
+}
+
+.heroCentered p {
+  max-width: 54rem;
+  margin-inline: auto;
+}
+
+.sectionHeadingCentered {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  text-align: center;
+}
+
 .kicker {
   margin: 0;
   width: fit-content;

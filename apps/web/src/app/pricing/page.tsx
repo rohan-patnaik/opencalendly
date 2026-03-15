@@ -35,8 +35,7 @@ const plans = [
 export default function PricingPage() {
   return (
     <main className={styles.page}>
-      <section className={styles.hero}>
-        <p className={styles.kicker}>Pricing</p>
+      <section className={`${styles.hero} ${styles.heroCentered}`}>
         <h1>Clear pricing for teams that want control.</h1>
         <p>
           See the product shape up front, try the live flows, and decide what fits before you scale
@@ -45,7 +44,9 @@ export default function PricingPage() {
       </section>
 
       <section className={styles.section}>
-        <h2>Plan preview</h2>
+        <div className={styles.sectionHeadingCentered}>
+          <h2>Plan preview</h2>
+        </div>
         <div className={styles.grid}>
           {plans.map((plan) => (
             <article key={plan.title} className={styles.card}>

@@ -6,6 +6,15 @@
   gap: 0.65rem;
 }
 
+.gatePage {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.4rem 1rem 3rem;
+  display: grid;
+  gap: 1rem;
+  justify-items: center;
+}
+
 .heroCard,
 .card {
   border-radius: var(--radius-lg);
@@ -17,6 +26,20 @@
 .heroCard {
   padding: 1.35rem 1.4rem;
   background: var(--bg-surface);
+}
+
+.gateHeroCard {
+  width: min(100%, 84rem);
+  text-align: center;
+}
+
+.gateHeroCard .kicker {
+  margin-inline: auto;
+}
+
+.gateHeroCard p {
+  max-width: 52ch;
+  margin-inline: auto;
 }
 
 .heroCard h1 {
@@ -47,6 +70,10 @@
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: 0.9rem;
+}
+
+.gateLayout {
+  width: min(100%, 46rem);
 }
 
 .card {

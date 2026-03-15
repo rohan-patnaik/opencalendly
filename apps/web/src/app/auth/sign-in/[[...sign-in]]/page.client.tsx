@@ -67,26 +67,32 @@ export default function SignInPageClient() {
       eyebrow="Authentication"
       title="Sign in"
       description="Use email or Google sign-in to start your OpenCalendly session."
+      className={styles.authShell}
+      stackClassName={styles.authStack}
+      introClassName={styles.authIntro}
     >
-      <Card>
-        <div className={styles.clerkContainer}>
-          <SignIn
-            path="/auth/sign-in"
-            routing="path"
-            signUpUrl="/auth/sign-up"
-            forceRedirectUrl={redirectPath}
-            fallbackRedirectUrl={redirectPath}
-          />
-        </div>
-        {isLoaded && isSignedIn && sessionReady && !session ? (
-          <Toast variant="info">Finalizing your OpenCalendly session…</Toast>
-        ) : null}
-        <div className={uiStyles.actions}>
-          <LinkButton href="/demo/intro-call" variant="secondary">
-            Back to booking demo
-          </LinkButton>
-        </div>
-      </Card>
+      <div className={styles.clerkContainerBare}>
+        <SignIn
+          path="/auth/sign-in"
+          routing="path"
+          signUpUrl="/auth/sign-up"
+          forceRedirectUrl={redirectPath}
+          fallbackRedirectUrl={redirectPath}
+          appearance={{
+            elements: {
+              footer: styles.clerkFooterHidden,
+            },
+          }}
+        />
+      </div>
+      {isLoaded && isSignedIn && sessionReady && !session ? (
+        <Toast variant="info">Finalizing your OpenCalendly session…</Toast>
+      ) : null}
+      <div className={`${uiStyles.actions} ${styles.authActions}`}>
+        <LinkButton href="/demo/intro-call" variant="secondary">
+          Back to booking demo
+        </LinkButton>
+      </div>
     </PageShell>
   );
 }

@@ -68,15 +68,19 @@ export function BookingDemoGate(input: {
   featureKeys: DemoFeatureCostKey[];
   onStatusChange: () => Promise<unknown>;
 }) {
+  const pageClassName = input.styles.gatePage ?? input.styles.page;
+  const heroClassName = input.styles.gateHeroCard ?? input.styles.heroCard;
+  const layoutClassName = input.styles.gateLayout ?? input.styles.layout;
+
   return (
-    <main className={input.styles.page}>
-      <section className={input.styles.heroCard}>
+    <main className={pageClassName}>
+      <section className={heroClassName}>
         <p className={input.styles.kicker}>{input.kicker}</p>
         <h1>{input.title}</h1>
         <p>{input.body}</p>
       </section>
 
-      <section className={input.styles.layout}>
+      <section className={layoutClassName}>
         <DemoQuotaCard
           apiBaseUrl={input.apiBaseUrl}
           session={input.session}
