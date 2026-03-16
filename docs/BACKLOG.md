@@ -1,5 +1,21 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 62 (PR#TBD): README recording refresh for current homepage capture
+
+Scope:
+
+- Replace the committed README homepage recording with the new capture prepared for repository documentation.
+- Update the README media reference to the new optimized asset format without changing any product docs content.
+- Keep the change scoped to README presentation and the committed homepage media asset.
+
+Acceptance criteria:
+
+- `README.md` renders the homepage recording from `docs/assets/readme/homepage-tour.webp`.
+- The previous `docs/assets/readme/homepage-tour.gif` asset is removed from the repository.
+- Validation passes:
+  - `npm run env:check`
+  - `git diff --check`
+
 ## Feature 61 (PR#TBD): Marketing and auth layout polish follow-ups
 
 Scope:
