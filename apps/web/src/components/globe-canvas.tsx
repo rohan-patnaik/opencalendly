@@ -74,6 +74,11 @@ export function GlobeCanvas() {
 
     measure();
 
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+
     const observer = new ResizeObserver(measure);
     observer.observe(wrapper);
 
