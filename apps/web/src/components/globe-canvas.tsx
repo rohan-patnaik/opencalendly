@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import createGlobe from 'cobe';
 import { usePrefersReducedMotion } from '../lib/use-prefers-reduced-motion';
 import styles from './globe-canvas.module.css';
@@ -17,6 +17,7 @@ export function GlobeCanvas() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const reducedMotion = usePrefersReducedMotion();
   const [isDark, setIsDark] = useState<boolean | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -48,9 +49,40 @@ export function GlobeCanvas() {
     };
   }, []);
 
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return undefined;
+    }
+
+    const measure = () => {
+      const rect = wrapper.getBoundingClientRect();
+      setSize((currentSize) => {
+        const nextWidth = Math.round(rect.width);
+        const nextHeight = Math.round(rect.height);
+
+        if (currentSize.width === nextWidth && currentSize.height === nextHeight) {
+          return currentSize;
+        }
+
+        return {
+          width: nextWidth,
+          height: nextHeight,
+        };
+      });
+    };
+
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrapper);
+
+    return () => observer.disconnect();
+  }, []);
+
   /* ---- cobe globe ---- */
   useEffect(() => {
-    if (isDark === null) {
+    if (isDark === null || size.width === 0 || size.height === 0) {
       return undefined;
     }
 
@@ -68,14 +100,9 @@ export function GlobeCanvas() {
     }
 
     let phi = 0;
-    let width = 0;
-
-    const onResize = () => {
-      width = canvas.offsetWidth;
-    };
-
-    window.addEventListener('resize', onResize);
-    onResize();
+    const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    let pixelWidth = Math.round(size.width * devicePixelRatio);
+    let pixelHeight = Math.round(size.height * devicePixelRatio);
 
     let globe: ReturnType<typeof createGlobe> | null = null;
 
@@ -85,9 +112,9 @@ export function GlobeCanvas() {
      */
     try {
       globe = createGlobe(canvas, {
-        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-        width: width * 2,
-        height: width * 2,
+        devicePixelRatio,
+        width: pixelWidth,
+        height: pixelHeight,
         phi: 0,
         theta: 0.25,
         dark: isDark ? 1 : 0,
@@ -102,20 +129,20 @@ export function GlobeCanvas() {
         onRender: (state) => {
           state.phi = phi;
           phi += reducedMotion ? 0 : 0.005;
-          state.width = width * 2;
-          state.height = width * 2;
+          pixelWidth = Math.round(size.width * devicePixelRatio);
+          pixelHeight = Math.round(size.height * devicePixelRatio);
+          state.width = pixelWidth;
+          state.height = pixelHeight;
         },
       });
     } catch {
-      window.removeEventListener('resize', onResize);
       return undefined;
     }
 
     return () => {
       globe?.destroy();
-      window.removeEventListener('resize', onResize);
     };
-  }, [reducedMotion, isDark]);
+  }, [reducedMotion, isDark, size.height, size.width]);
 
   /* ---- orbiting satellites ---- */
   useEffect(() => {
