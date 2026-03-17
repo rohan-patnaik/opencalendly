@@ -1,5 +1,25 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 63 (PR#TBD): Homepage globe render sizing fix
+
+Scope:
+
+- Fix the homepage hero globe so it renders consistently across Windows and other lower-DPR browser environments.
+- Keep the change scoped to the globe canvas sizing logic and regression coverage for that render path.
+- Do not change homepage copy, route structure, or the calendar/globe rotation behavior.
+
+Acceptance criteria:
+
+- The homepage globe renders fully within its intended square art slot across DPR 1 and DPR 2 browser environments.
+- Globe sizing uses the measured canvas box and device pixel ratio instead of a hardcoded multiplier.
+- Regression coverage exists for the globe sizing contract passed into `cobe`.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 62 (PR#TBD): README recording refresh for current homepage capture
 
 Scope:
