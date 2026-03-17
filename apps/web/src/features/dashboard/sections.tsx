@@ -340,7 +340,7 @@ export const DashboardSignedOutState = ({
   styles: DashboardStyles;
 }) => {
   return (
-    <Card>
+    <Card className={styles.signedOutCard}>
       {authError ? <Toast variant="error">{authError}</Toast> : null}
       <div className={styles.actions}>
         <LinkButton href="/auth/sign-in" variant="primary">

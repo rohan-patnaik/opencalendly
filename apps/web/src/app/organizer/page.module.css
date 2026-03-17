@@ -499,4 +499,14 @@
   .page {
     width: min(1160px, 94vw);
   }
+
+  .signedOutCard {
+    text-align: center;
+  }
+
+  .signedOutCard .rowActions,
+  .rowActions,
+  .metaStrip {
+    justify-content: center;
+  }
 }

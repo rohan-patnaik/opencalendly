@@ -60,6 +60,9 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
         eyebrow="Authentication required"
         title="Analytics Dashboard"
         description="Sign in to view scheduling analytics."
+        className={styles.signedOutShell}
+        stackClassName={styles.signedOutStack}
+        introClassName={styles.signedOutIntro}
       >
         <DashboardSignedOutState authError={authError} styles={styles} />
       </PageShell>

@@ -184,3 +184,51 @@
 .cta .actions {
   justify-content: center;
 }
+
+@media (max-width: 720px) {
+  .page {
+    padding: 3rem 1rem 4.5rem;
+    gap: 4.5rem;
+  }
+
+  .hero,
+  .section,
+  .cta {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .hero p,
+  .section p,
+  .cta p {
+    margin-inline: auto;
+  }
+
+  .section h2,
+  .cta h2 {
+    text-align: center;
+  }
+
+  .grid {
+    gap: 1.5rem;
+  }
+
+  .card {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .card ul {
+    padding-left: 0;
+    list-style-position: inside;
+    justify-items: center;
+  }
+
+  .card li {
+    text-align: center;
+  }
+
+  .actions {
+    justify-content: center;
+  }
+}

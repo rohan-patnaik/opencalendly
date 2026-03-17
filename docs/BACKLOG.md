@@ -1,5 +1,27 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 64 (PR#TBD): Marketing cards and mobile alignment polish
+
+Scope:
+
+- Refine homepage live-route cards, homepage plan-preview cards, and footer layout for better visual alignment on desktop and phone.
+- Center the requested marketing-page sections on phone across features, pricing, solutions, and resources.
+- Bring the signed-out demo, organizer, and dashboard states closer to the app’s dark surface palette and center the requested phone layouts.
+
+Acceptance criteria:
+
+- Homepage live-route cards are center-aligned and use the darker surfaced card treatment on desktop and phone.
+- Homepage plan-preview cards and list rows use the surfaced card treatment and remain visually centered.
+- The homepage footer reads cleanly on desktop and collapses into a centered single-column layout on phone.
+- Features, pricing, solutions, and resources center the requested hero/section/card content on phone.
+- The signed-out one-on-one demo, team demo, organizer, and dashboard states center the requested phone elements, and the demo quota card uses dark-surface styling in dark theme.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 63 (PR#TBD): Homepage globe render sizing fix
 
 Scope:
