@@ -388,16 +388,19 @@
   grid-column: span 2;
   display: grid;
   gap: 0.3rem;
+  justify-items: center;
+  text-align: center;
   color: var(--text-primary);
   text-decoration: none;
   padding: 1.25rem;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  background: transparent;
-  box-shadow: none;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
   transition:
     border-color var(--motion-fast),
-    background var(--motion-fast);
+    background var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 
 .routeCard:nth-child(4):nth-last-child(2) {
@@ -408,7 +411,7 @@
   border-color: var(--brand-primary);
   background: var(--bg-hover);
   transform: none;
-  box-shadow: none;
+  box-shadow: var(--shadow-md);
 }
 
 .routeCard strong {
@@ -491,8 +494,8 @@
   padding: 2rem;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  background: transparent;
-  box-shadow: none;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .pricingCard h3 {
@@ -506,11 +509,13 @@
   color: var(--text-secondary);
   font-size: 0.92rem;
   line-height: 1.6;
+  width: 100%;
 }
 
 .pricingCard ul {
   margin: 0;
-  padding-left: 0;
+  width: min(100%, 26rem);
+  padding: 0;
   list-style-position: inside;
   display: grid;
   gap: 0.65rem;
@@ -557,6 +562,13 @@
   grid-template-columns: 1.5fr 2fr;
   gap: 3rem;
   padding: 3rem 0 2.5rem;
+  align-items: start;
+}
+
+.footerBrand {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
 }
 
 .footerBrand h3 {
@@ -584,6 +596,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
+  align-items: start;
 }
 
 .footerColumn {
@@ -711,6 +724,8 @@
 
   .routeCard {
     grid-column: auto;
+    justify-items: center;
+    text-align: center;
   }
 
   .artLegend {
@@ -720,7 +735,20 @@
   }
 
   .footerColumns {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .footerTop,
+  .footerBrand {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .footerColumn {
+    align-items: center;
   }
 
   .footerBottom {

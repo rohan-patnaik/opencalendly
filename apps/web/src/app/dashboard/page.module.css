@@ -6,6 +6,29 @@
   gap: 0.65rem;
 }
 
+.signedOutShell {
+  min-height: calc(100vh - var(--app-header-height) - 2rem);
+  display: grid;
+  align-content: center;
+}
+
+.signedOutStack {
+  justify-items: center;
+}
+
+.signedOutIntro {
+  justify-items: center;
+  text-align: center;
+}
+
+.signedOutCard {
+  width: min(100%, 860px);
+}
+
+.signedOutCard .actions {
+  justify-content: center;
+}
+
 .card {
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
@@ -192,4 +215,22 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-secondary);
+}
+
+@media (max-width: 720px) {
+  .signedOutCard {
+    text-align: center;
+  }
+
+  .actions,
+  .quickLinks,
+  .metaRow {
+    justify-content: center;
+  }
+
+  .grid,
+  .statGrid,
+  .quickLinks {
+    grid-template-columns: 1fr;
+  }
 }

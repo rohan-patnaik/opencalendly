@@ -10,10 +10,10 @@
 }
 
 .metric {
-  border: 1px solid rgba(15, 23, 42, 0.14);
+  border: 1px solid var(--border-default);
   border-radius: 0.9rem;
   padding: 0.9rem 1rem;
-  background: rgba(248, 250, 252, 0.85);
+  background: var(--bg-elevated);
 }
 
 .metricLabel {
@@ -21,25 +21,25 @@
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(15, 23, 42, 0.64);
+  color: var(--text-muted);
 }
 
 .metricValue {
   margin: 0.35rem 0 0;
   font-size: 1.35rem;
   font-weight: 700;
-  color: rgba(15, 23, 42, 0.92);
+  color: var(--text-heading);
 }
 
 .metricHint {
   margin: 0.35rem 0 0;
-  color: rgba(15, 23, 42, 0.72);
+  color: var(--text-secondary);
   font-size: 0.92rem;
 }
 
 .helper {
   margin: 0;
-  color: rgba(15, 23, 42, 0.72);
+  color: var(--text-muted);
 }
 
 .costList {
@@ -57,17 +57,18 @@
   gap: 1rem;
   padding: 0.7rem 0.85rem;
   border-radius: 0.85rem;
-  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
 }
 
 .costName {
   font-weight: 600;
-  color: rgba(15, 23, 42, 0.88);
+  color: var(--text-heading);
 }
 
 .costValue {
   font-variant-numeric: tabular-nums;
-  color: rgba(15, 23, 42, 0.68);
+  color: var(--text-secondary);
 }
 
 .waitlistForm {
@@ -83,20 +84,38 @@
 .waitlistField label {
   font-size: 0.92rem;
   font-weight: 600;
-  color: rgba(15, 23, 42, 0.8);
+  color: var(--text-primary);
 }
 
 .input {
   width: 100%;
   border-radius: 0.85rem;
-  border: 1px solid rgba(15, 23, 42, 0.16);
-  background: white;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
   padding: 0.8rem 0.9rem;
-  color: rgba(15, 23, 42, 0.92);
+  color: var(--text-primary);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+@media (max-width: 720px) {
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    justify-content: center;
+  }
+
+  .costItem {
+    text-align: center;
+    justify-items: center;
+    justify-content: center;
+    grid-template-columns: 1fr;
+    display: grid;
+  }
 }
