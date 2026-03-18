@@ -42,6 +42,15 @@ const OPTIONAL = {
 const PLACEHOLDER_PATTERN = /(replace-with|your[_-]|changeme|todo|example\.com|YOUR_|dummy|sample)/i;
 const NEON_HOST_PATTERN = /\.neon\.tech(?::\d+)?(?:\/|$)/i;
 const LOCAL_HOSTNAME_SET = new Set(['localhost', '127.0.0.1']);
+const PRODUCTION_ONLY_REQUIRED = {
+  WEBHOOK_SECRET_ENCRYPTION_KEY:
+    'Production requires a dedicated encryption key for webhook signing secrets.',
+  TELEMETRY_HMAC_KEY:
+    'Production requires a dedicated telemetry HMAC key so operational writes and alerts remain enabled.',
+};
+const PRODUCTION_ONLY_HTTPS_URLS = ['APP_BASE_URL', 'API_BASE_URL', 'NEXT_PUBLIC_API_BASE_URL'];
+const isProductionValidation =
+  process.argv.includes('--production') || process.env.OPENCALENDLY_ENV_CHECK_MODE === 'production';
 
 const resolveHostname = (value) => {
   if (!value) {
@@ -197,6 +206,43 @@ if (apiBaseUrl && publicApiBaseUrl && apiBaseUrl !== publicApiBaseUrl) {
   warnings.push('API_BASE_URL and NEXT_PUBLIC_API_BASE_URL differ.');
 }
 
+if (isProductionValidation) {
+  for (const [key, help] of Object.entries(PRODUCTION_ONLY_REQUIRED)) {
+    const value = parsed[key];
+    if (!value) {
+      errors.push(`${key} is empty. ${help}`);
+      continue;
+    }
+
+    if (value.length < 32) {
+      errors.push(`${key} must be at least 32 characters in production.`);
+    }
+  }
+
+  for (const key of PRODUCTION_ONLY_HTTPS_URLS) {
+    const value = parsed[key];
+    if (!value) {
+      continue;
+    }
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(value);
+    } catch {
+      errors.push(`${key} must be a valid absolute URL in production.`);
+      continue;
+    }
+
+    if (parsedUrl.protocol !== 'https:') {
+      errors.push(`${key} must use https in production.`);
+    }
+
+    if (LOCAL_HOSTNAME_SET.has(parsedUrl.hostname.toLowerCase())) {
+      errors.push(`${key} must not point at a local hostname in production.`);
+    }
+  }
+}
+
 for (const [key, help] of Object.entries(OPTIONAL)) {
   const value = parsed[key];
   if (!value) {
@@ -224,6 +270,10 @@ if (errors.length > 0) {
 }
 
 console.log('Environment validation passed for required variables.');
+
+if (isProductionValidation) {
+  console.log('Production-only validation checks passed.');
+}
 
 if (warnings.length > 0) {
   console.log('\nWarnings:');

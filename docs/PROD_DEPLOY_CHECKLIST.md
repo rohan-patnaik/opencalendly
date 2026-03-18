@@ -1,6 +1,6 @@
-# Production Deployment Checklist (v1.0.0)
+# Production Deployment Checklist (GA)
 
-Last updated: 28 Feb 2026 (IST)
+Last updated: 19 Mar 2026 (IST)
 
 ## Pre-deploy
 
@@ -11,8 +11,17 @@ Last updated: 28 Feb 2026 (IST)
 - [ ] If CodeRabbit or Greptile posted actionable PR comments, they are resolved before merge.
 - [ ] All PR review threads are resolved.
 - [ ] `npm run env:check` passes in deployment environment.
+- [ ] `npm run env:check:production` passes in the deployment environment.
 - [ ] Neon `DATABASE_URL` points to production branch/database.
 - [ ] Required OAuth and email provider env vars are present.
+- [ ] Dedicated production-only secrets are set:
+  - `WEBHOOK_SECRET_ENCRYPTION_KEY`
+  - `TELEMETRY_HMAC_KEY`
+- [ ] `APP_BASE_URL`, `API_BASE_URL`, and `NEXT_PUBLIC_API_BASE_URL` all resolve to the production `https:` domains.
+- [ ] Provider redirect URIs are reviewed against production domains:
+  - Clerk social login/callback settings
+  - Google OAuth callback
+  - Microsoft OAuth callback
 - [ ] Outbound egress assumptions are reviewed for production:
   - provider/auth APIs: Clerk, `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, `graph.microsoft.com`, `api.resend.com`
   - webhook safety checks can reach `cloudflare-dns.com`
@@ -28,6 +37,10 @@ Last updated: 28 Feb 2026 (IST)
   - `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` (default: `main`)
 - [ ] Porkbun URL forwarding is disabled for `opencalendly.com`/`www`.
 - [ ] Domain wiring doc has been applied: `docs/CLOUDFLARE_DOMAIN_SETUP.md`.
+- [ ] External observability vendors are configured:
+  - Sentry project created for Web/API exception capture
+  - Better Stack (or equivalent) uptime checks configured for Web and API health probes
+- [ ] Alert routing points to a real operator channel with an owner on call.
 
 ## Database and schema
 
@@ -44,6 +57,9 @@ Last updated: 28 Feb 2026 (IST)
 - [ ] Confirm Hyperdrive binding points to production Neon connection.
 - [ ] Confirm secrets are set in Worker environment:
   - `DATABASE_URL`, `SESSION_SECRET`, provider secrets, `RESEND_API_KEY`
+- [ ] Confirm the Worker environment contains:
+  - `WEBHOOK_SECRET_ENCRYPTION_KEY`
+  - `TELEMETRY_HMAC_KEY`
 - [ ] Smoke test:
   - `GET /health`
   - public availability route
@@ -60,6 +76,9 @@ Last updated: 28 Feb 2026 (IST)
   - `www.opencalendly.com`
 - [ ] Confirm runtime env vars on Pages include API base URL and public config.
 - [ ] Verify homepage, public booking page, and booking submission path.
+- [ ] Confirm production security headers on sensitive routes:
+  - `X-Frame-Options: DENY` on dashboard/organizer/auth/settings/booking-action pages
+  - CSP references the production app/API origins only
 
 ## Post-deploy validation
 
@@ -67,13 +86,25 @@ Last updated: 28 Feb 2026 (IST)
 - [ ] Team round-robin and collective booking happy paths succeed.
 - [ ] Webhook delivery run can process pending retries.
 - [ ] Calendar sync status endpoint reports healthy provider states.
+- [ ] Operator health endpoint reports the expected status and queue summaries:
+  - `GET /v0/analytics/operator/health`
 - [ ] Production response headers match the documented CSP/security-header baseline.
 - [ ] No webhook or calendar provider failures are caused by outbound firewall/DNS policy.
 - [ ] Dashboard analytics endpoint returns expected data.
 - [ ] `npm run domain:check:production` passes.
+- [ ] Better Stack uptime checks are green for:
+  - web homepage
+  - API `/health`
+- [ ] Sentry receives and groups server-side exceptions from a smoke-test path.
 
 ## Rollback readiness
 
 - [ ] Previous known-good API/Web deploy IDs are recorded.
 - [ ] Neon restore branch procedure is prepared (see `docs/OPERATOR_RUNBOOK.md`).
 - [ ] Incident communication channel is prepared before rollout.
+- [ ] Alert thresholds are recorded in the on-call handoff:
+  - auth exchange failure spikes
+  - booking conflict/failure spikes
+  - webhook queue backlog > 25
+  - writeback queue backlog > 25
+  - stale calendar provider sync > 30 minutes past expected freshness

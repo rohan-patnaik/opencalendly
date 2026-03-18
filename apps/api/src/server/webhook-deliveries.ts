@@ -12,6 +12,7 @@ import {
   parseWebhookEventTypes,
   resolveWebhookTargetSafety,
 } from '../lib/webhooks';
+import { emitAuditEvent } from './audit';
 import { migrateWebhookSecretIfNeeded } from './webhook-secret-storage';
 import type {
   Bindings,
@@ -135,6 +136,17 @@ export const executeWebhookDelivery = async (
       })
       .where(eq(webhookDeliveries.id, delivery.id));
 
+    emitAuditEvent({
+      event: 'webhook_delivery_failed_permanently',
+      level: 'warn',
+      route: 'webhook_delivery_runner',
+      statusCode: 422,
+      deliveryId: delivery.id,
+      subscriptionId: delivery.subscriptionId,
+      reason: targetSafety.reason,
+      attempts: delivery.maxAttempts,
+    });
+
     return 'failed';
   }
 
@@ -219,6 +231,16 @@ export const executeWebhookDelivery = async (
         updatedAt: now,
       })
       .where(eq(webhookDeliveries.id, delivery.id));
+    emitAuditEvent({
+      event: 'webhook_delivery_failed_permanently',
+      level: 'warn',
+      route: 'webhook_delivery_runner',
+      statusCode: responseStatus ?? 500,
+      deliveryId: delivery.id,
+      subscriptionId: delivery.subscriptionId,
+      reason: errorMessage,
+      attempts: attemptedCount,
+    });
     return 'failed';
   }
 

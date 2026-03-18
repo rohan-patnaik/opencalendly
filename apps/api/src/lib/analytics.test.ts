@@ -159,51 +159,135 @@ describe('summarizeTeamAnalytics', () => {
 });
 
 describe('summarizeOperatorHealth', () => {
-  it('aggregates webhook and email delivery health', () => {
+  it('aggregates webhook, queue, calendar, and email health into an ok status', () => {
     const result = summarizeOperatorHealth({
       webhookRows: [{ status: 'pending' }, { status: 'succeeded' }, { status: 'failed' }],
+      webhookQueueRows: [{ status: 'pending' }, { status: 'succeeded' }],
+      writebackRows: [{ status: 'succeeded' }],
       emailRows: [
         { status: 'succeeded', emailType: 'booking_confirmation' },
         { status: 'failed', emailType: 'booking_confirmation' },
         { status: 'succeeded', emailType: 'booking_cancellation' },
       ],
+      calendarRows: [
+        {
+          provider: 'google',
+          externalEmail: 'ops@example.com',
+          lastSyncedAt: new Date('2026-03-15T17:55:00.000Z'),
+          nextSyncAt: new Date('2026-03-15T18:15:00.000Z'),
+          lastError: null,
+          createdAt: new Date('2026-03-15T17:00:00.000Z'),
+        },
+      ],
+      now: new Date('2026-03-15T18:00:00.000Z'),
     });
 
+    expect(result.status).toBe('ok');
+    expect(result.alerts).toEqual([]);
     expect(result.webhookDeliveries).toEqual({
       total: 3,
       pending: 1,
       succeeded: 1,
       failed: 1,
     });
+    expect(result.webhookQueue).toEqual({
+      total: 2,
+      pending: 1,
+      succeeded: 1,
+      failed: 0,
+    });
+    expect(result.calendarWriteback).toEqual({
+      total: 1,
+      pending: 0,
+      succeeded: 1,
+      failed: 0,
+    });
+    expect(result.calendarProviders.totalConnected).toBe(1);
+    expect(result.calendarProviders.stale).toBe(0);
+    expect(result.calendarProviders.byProvider[0]?.status).toBe('ok');
     expect(result.emailDeliveries.total).toBe(3);
     expect(result.emailDeliveries.succeeded).toBe(2);
     expect(result.emailDeliveries.failed).toBe(1);
     expect(result.emailDeliveries.byType).toHaveLength(2);
   });
 
-  it('counts unknown statuses as failed and supports aggregated row counts', () => {
+  it('marks degraded queue and calendar states explicitly', () => {
     const result = summarizeOperatorHealth({
       webhookRows: [
         { status: 'pending', count: 2 },
         { status: 'succeeded', count: 1 },
         { status: 'timed_out', count: 3 },
       ],
+      webhookQueueRows: [
+        { status: 'pending', count: 26 },
+        { status: 'timed_out', count: 1 },
+      ],
+      writebackRows: [
+        { status: 'pending', count: 30 },
+        { status: 'failed', count: 2 },
+      ],
       emailRows: [
         { status: 'succeeded', emailType: 'booking_confirmation', count: 2 },
         { status: 'bounced', emailType: 'booking_confirmation', count: 1 },
         { status: 'failed', emailType: 'booking_rescheduled', count: 4 },
       ],
+      calendarRows: [
+        {
+          provider: 'google',
+          externalEmail: 'ops@example.com',
+          lastSyncedAt: new Date('2026-03-15T16:00:00.000Z'),
+          nextSyncAt: new Date('2026-03-15T17:00:00.000Z'),
+          lastError: 'quota exceeded',
+          createdAt: new Date('2026-03-15T15:00:00.000Z'),
+        },
+        {
+          provider: 'microsoft',
+          externalEmail: null,
+          lastSyncedAt: null,
+          nextSyncAt: null,
+          lastError: null,
+          createdAt: null,
+        },
+      ],
+      now: new Date('2026-03-15T18:00:00.000Z'),
     });
 
+    expect(result.status).toBe('degraded');
+    expect(result.alerts).toEqual([
+      'webhook_backlog_high',
+      'webhook_failures_present',
+      'writeback_backlog_high',
+      'writeback_failures_present',
+      'calendar_sync_stale',
+      'calendar_provider_errors',
+    ]);
     expect(result.webhookDeliveries).toEqual({
       total: 6,
       pending: 2,
       succeeded: 1,
       failed: 3,
     });
+    expect(result.webhookQueue).toEqual({
+      total: 27,
+      pending: 26,
+      succeeded: 0,
+      failed: 1,
+    });
+    expect(result.calendarWriteback).toEqual({
+      total: 32,
+      pending: 30,
+      succeeded: 0,
+      failed: 2,
+    });
     expect(result.emailDeliveries.total).toBe(7);
     expect(result.emailDeliveries.succeeded).toBe(2);
     expect(result.emailDeliveries.failed).toBe(5);
+    expect(result.calendarProviders).toMatchObject({
+      totalConnected: 1,
+      disconnected: 1,
+      stale: 1,
+      errored: 1,
+    });
     expect(result.emailDeliveries.byType).toEqual([
       {
         emailType: 'booking_confirmation',

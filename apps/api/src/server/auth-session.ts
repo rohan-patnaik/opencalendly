@@ -45,7 +45,7 @@ const isLocalHostname = (hostname: string): boolean => {
   return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
 };
 
-const shouldUseSecureSessionCookie = (request: Request, env: Bindings): boolean => {
+export const shouldUseSecureSessionCookie = (request: Request, env: Bindings): boolean => {
   const configuredAppUrl = env.APP_BASE_URL?.trim();
   if (configuredAppUrl) {
     try {
@@ -66,7 +66,7 @@ const shouldUseSecureSessionCookie = (request: Request, env: Bindings): boolean 
   return requestUrl.protocol === 'https:';
 };
 
-const buildSessionCookieHeader = (input: {
+export const buildSessionCookieHeader = (input: {
   request: Request;
   env: Bindings;
   value: string;

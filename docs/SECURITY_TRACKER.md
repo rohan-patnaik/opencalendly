@@ -1,12 +1,43 @@
 # Security / Beta Blocker Tracker
 
-Last updated: 2026-03-19T01:18:00+05:30
+Last updated: 2026-03-19T10:32:00+05:30
 
 This document tracks the highest-priority blockers discovered during authenticated QA before beta access is opened wider. Some items are reliability defects rather than traditional security issues, but they are tracked here per release-review request.
 
 ## Open / In Progress
 
 No open P1 blockers in the flows verified in this pass.
+
+### GA hardening and reliability verification
+
+Status: In progress on feature branch
+
+Current implementation status:
+
+- Production env validation now fails when dedicated webhook-secret and telemetry keys are missing.
+- Structured audit events now cover:
+  - auth exchange failures
+  - availability reads
+  - booking commit outcomes
+  - booking-action misuse
+  - calendar connect/disconnect/sync
+  - webhook subscription create/update/toggle
+  - webhook delivery batches and permanent failures
+  - calendar writeback batches and permanent failures
+- Operator health now includes:
+  - overall `status`
+  - machine-readable `alerts`
+  - webhook queue backlog/failure summary
+  - calendar writeback backlog/failure summary
+  - provider freshness/error summary by provider
+- Security regression tests now cover:
+  - production env validation
+  - sensitive-route frame denial
+  - embed route compatibility
+  - session cookie secure-flag behavior
+- Remaining work in this feature:
+  - GA docs/checklists/runbook updates
+  - repeatable `k6` harness and GA readiness artifact
 
 ### Google calendar integration verification
 

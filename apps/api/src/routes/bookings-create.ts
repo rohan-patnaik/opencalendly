@@ -2,6 +2,7 @@ import { bookingCreateSchema } from '@opencalendly/shared';
 
 import { createOneOnOneBooking } from '../server/one-on-one-booking';
 import { resolveAuthenticatedUser } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { actionTokenMap, buildActionUrls } from '../server/booking-action-links';
 import { jsonError, normalizeTimezone } from '../server/core';
 import { withDatabase } from '../server/database';
@@ -32,6 +33,7 @@ import {
 
 export const registerBookingCreateRoutes = (app: ApiApp): void => {
   app.post('/v0/bookings', async (context) => {
+    const startedAt = Date.now();
     const body = await context.req.json().catch(() => null);
     const parsed = bookingCreateSchema.safeParse(body);
     if (!parsed.success) {
@@ -163,6 +165,17 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
           responseBody,
         });
 
+        emitAuditEvent({
+          event: 'booking_commit_completed',
+          level: 'info',
+          route: '/v0/bookings',
+          statusCode: 200,
+          durationMs: Date.now() - startedAt,
+          organizerUsername: payload.username,
+          eventSlug: payload.eventSlug,
+          bookingId: result.booking.id,
+        });
+
         return context.json(responseBody);
       } catch (error) {
         if (error instanceof BookingNotFoundError) {
@@ -172,6 +185,15 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
             keyHash: idempotencyState.keyHash,
             statusCode: 404,
             responseBody,
+          });
+          emitAuditEvent({
+            event: 'booking_commit_completed',
+            level: 'warn',
+            route: '/v0/bookings',
+            statusCode: 404,
+            durationMs: Date.now() - startedAt,
+            organizerUsername: payload.username,
+            eventSlug: payload.eventSlug,
           });
           return context.json(responseBody, 404);
         }
@@ -183,6 +205,16 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
             statusCode: 400,
             responseBody,
           });
+          emitAuditEvent({
+            event: 'booking_commit_completed',
+            level: 'warn',
+            route: '/v0/bookings',
+            statusCode: 400,
+            durationMs: Date.now() - startedAt,
+            organizerUsername: payload.username,
+            eventSlug: payload.eventSlug,
+            error: error.message,
+          });
           return context.json(responseBody, 400);
         }
         if (error instanceof BookingConflictError) {
@@ -192,6 +224,16 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
             keyHash: idempotencyState.keyHash,
             statusCode: 409,
             responseBody,
+          });
+          emitAuditEvent({
+            event: 'booking_commit_completed',
+            level: 'warn',
+            route: '/v0/bookings',
+            statusCode: 409,
+            durationMs: Date.now() - startedAt,
+            organizerUsername: payload.username,
+            eventSlug: payload.eventSlug,
+            error: error.message,
           });
           return context.json(responseBody, 409);
         }
@@ -211,6 +253,16 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
           keyHash: idempotencyState.keyHash,
           statusCode: 500,
           responseBody,
+        });
+        emitAuditEvent({
+          event: 'booking_commit_completed',
+          level: 'error',
+          route: '/v0/bookings',
+          statusCode: 500,
+          durationMs: Date.now() - startedAt,
+          organizerUsername: payload.username,
+          eventSlug: payload.eventSlug,
+          error: error instanceof Error ? error.message : 'unknown',
         });
         return context.json(responseBody, 500);
       }

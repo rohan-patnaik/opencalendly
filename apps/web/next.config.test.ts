@@ -14,7 +14,7 @@ describe('next config security headers', () => {
     vi.resetModules();
   });
 
-  it('applies deny-framing headers to booking action pages', async () => {
+  it('applies deny-framing headers to authenticated and sensitive pages', async () => {
     process.env.APP_BASE_URL = 'https://opencalendly.com';
     process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.opencalendly.com';
     process.env.NODE_ENV = 'production';
@@ -22,14 +22,22 @@ describe('next config security headers', () => {
     const nextConfigModule = await import('./next.config.mjs');
     const routes = await nextConfigModule.default.headers();
 
-    expect(routes).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          source: '/bookings/actions/:path*',
-          headers: [{ key: 'X-Frame-Options', value: 'DENY' }],
-        }),
-      ]),
-    );
+    for (const source of [
+      '/dashboard/:path*',
+      '/organizer/:path*',
+      '/auth/:path*',
+      '/settings/:path*',
+      '/bookings/actions/:path*',
+    ]) {
+      expect(routes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            source,
+            headers: [{ key: 'X-Frame-Options', value: 'DENY' }],
+          }),
+        ]),
+      );
+    }
   });
 
   it('builds the common CSP with the configured app origin', async () => {
@@ -44,5 +52,17 @@ describe('next config security headers', () => {
 
     expect(csp?.value).toContain('https://opencalendly.com');
     expect(csp?.value).not.toContain('http://localhost:3000');
+  });
+
+  it('does not apply sensitive deny-framing headers to the embed playground route', async () => {
+    process.env.APP_BASE_URL = 'https://opencalendly.com';
+    process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.opencalendly.com';
+    process.env.NODE_ENV = 'production';
+
+    const nextConfigModule = await import('./next.config.mjs');
+    const routes = await nextConfigModule.default.headers();
+    const embedRoute = routes.find((route) => route.source === '/embed/:path*');
+
+    expect(embedRoute).toBeUndefined();
   });
 });

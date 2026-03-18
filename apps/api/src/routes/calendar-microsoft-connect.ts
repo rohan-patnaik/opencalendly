@@ -14,6 +14,7 @@ import {
   fetchMicrosoftUserProfile,
 } from '../lib/microsoft-calendar';
 import { resolveAuthenticatedUser } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { jsonError, logInternalError } from '../server/core';
 import { withDatabase } from '../server/database';
 import { assertDemoFeatureAvailable, consumeDemoFeatureCredits, jsonDemoQuotaError } from '../server/demo-quota';
@@ -218,6 +219,16 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           return jsonError(context, 500, 'Unable to persist calendar connection.');
         }
 
+        emitAuditEvent({
+          event: 'calendar_connect_completed',
+          level: 'info',
+          actorUserId: authedUser.id,
+          provider: MICROSOFT_CALENDAR_PROVIDER,
+          route: '/v0/calendar/microsoft/connect/complete',
+          statusCode: 200,
+          connected: true,
+        });
+
         return context.json({
           ok: true,
           connection: toCalendarConnectionStatus({
@@ -232,6 +243,16 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
           return jsonDemoQuotaError(context, db, context.env, authedUser, error);
         }
+        emitAuditEvent({
+          event: 'calendar_connect_completed',
+          level: 'error',
+          actorUserId: authedUser.id,
+          provider: MICROSOFT_CALENDAR_PROVIDER,
+          route: '/v0/calendar/microsoft/connect/complete',
+          statusCode: 502,
+          connected: false,
+          error: error instanceof Error ? error.message : 'unknown',
+        });
         logInternalError('microsoft_calendar_connect_failed', error);
         return jsonError(context, 502, 'Microsoft OAuth exchange failed.');
       }

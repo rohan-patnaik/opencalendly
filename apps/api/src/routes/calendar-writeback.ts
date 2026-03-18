@@ -4,6 +4,7 @@ import { bookingExternalEvents } from '@opencalendly/db';
 import { calendarWritebackRunSchema } from '@opencalendly/shared';
 
 import { resolveAuthenticatedUser } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { jsonError } from '../server/core';
 import { withDatabase } from '../server/database';
 import { assertDemoFeatureAvailable, consumeDemoFeatureCredits, jsonDemoQuotaError } from '../server/demo-quota';
@@ -65,6 +66,19 @@ export const registerCalendarWritebackRoutes = (app: ApiApp): void => {
       const outcome = await runCalendarWritebackBatch(db, context.env, {
         organizerId: authedUser.id,
         limit,
+      });
+
+      emitAuditEvent({
+        event: 'calendar_writeback_batch_completed',
+        level: outcome.failed > 0 ? 'warn' : 'info',
+        actorUserId: authedUser.id,
+        route: '/v0/calendar/writeback/run',
+        statusCode: 200,
+        limit,
+        processed: outcome.processed,
+        succeeded: outcome.succeeded,
+        retried: outcome.retried,
+        failed: outcome.failed,
       });
 
       if (outcome.processed > 0) {

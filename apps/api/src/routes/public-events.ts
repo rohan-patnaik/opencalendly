@@ -3,6 +3,7 @@ import { inArray } from 'drizzle-orm';
 import { users } from '@opencalendly/db';
 
 import { resolveAuthenticatedUser } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { jsonError, normalizeTimezone } from '../server/core';
 import { withDatabase } from '../server/database';
 import { requiresLaunchDemoAuthForTeamRoute, requiresLaunchDemoAuthForUserRoute } from '../server/demo-quota';
@@ -15,19 +16,48 @@ import type { ApiApp } from '../server/types';
 export const registerPublicEventRoutes = (app: ApiApp): void => {
   app.get('/v0/users/:username/event-types/:slug', async (context) => {
     return withDatabase(context, async (db) => {
+      const startedAt = Date.now();
       const username = context.req.param('username');
       const slug = context.req.param('slug');
       if (requiresLaunchDemoAuthForUserRoute(username)) {
         const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
         if (!authedUser) {
+          emitAuditEvent({
+            event: 'availability_read_completed',
+            level: 'warn',
+            route: '/v0/users/:username/event-types/:slug',
+            statusCode: 401,
+            durationMs: Date.now() - startedAt,
+            username,
+            eventSlug: slug,
+          });
           return jsonError(context, 401, 'Sign in to access the launch demo.');
         }
       }
 
       const result = await findPublicEventView(db, username, slug);
       if (!result) {
+        emitAuditEvent({
+          event: 'availability_read_completed',
+          level: 'warn',
+          route: '/v0/users/:username/event-types/:slug',
+          statusCode: 404,
+          durationMs: Date.now() - startedAt,
+          username,
+          eventSlug: slug,
+        });
         return jsonError(context, 404, 'Event type not found.');
       }
+
+      emitAuditEvent({
+        event: 'availability_read_completed',
+        level: 'info',
+        route: '/v0/users/:username/event-types/:slug',
+        statusCode: 200,
+        durationMs: Date.now() - startedAt,
+        username,
+        eventSlug: slug,
+      });
 
       return context.json({
         ok: true,
@@ -43,11 +73,21 @@ export const registerPublicEventRoutes = (app: ApiApp): void => {
 
   app.get('/v0/teams/:teamSlug/event-types/:eventSlug', async (context) => {
     return withDatabase(context, async (db) => {
+      const startedAt = Date.now();
       const teamSlug = context.req.param('teamSlug');
       const eventSlug = context.req.param('eventSlug');
       if (requiresLaunchDemoAuthForTeamRoute(teamSlug)) {
         const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
         if (!authedUser) {
+          emitAuditEvent({
+            event: 'availability_read_completed',
+            level: 'warn',
+            route: '/v0/teams/:teamSlug/event-types/:eventSlug',
+            statusCode: 401,
+            durationMs: Date.now() - startedAt,
+            teamSlug,
+            eventSlug,
+          });
           return jsonError(context, 401, 'Sign in to access the launch demo.');
         }
       }
@@ -60,11 +100,29 @@ export const registerPublicEventRoutes = (app: ApiApp): void => {
           perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
         })
       ) {
+        emitAuditEvent({
+          event: 'availability_read_completed',
+          level: 'warn',
+          route: '/v0/teams/:teamSlug/event-types/:eventSlug',
+          statusCode: 429,
+          durationMs: Date.now() - startedAt,
+          teamSlug,
+          eventSlug,
+        });
         return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
       }
 
       const teamEventContext = await findTeamEventTypeContext(db, teamSlug, eventSlug);
       if (!teamEventContext) {
+        emitAuditEvent({
+          event: 'availability_read_completed',
+          level: 'warn',
+          route: '/v0/teams/:teamSlug/event-types/:eventSlug',
+          statusCode: 404,
+          durationMs: Date.now() - startedAt,
+          teamSlug,
+          eventSlug,
+        });
         return jsonError(context, 404, 'Team event type not found.');
       }
 
@@ -82,6 +140,16 @@ export const registerPublicEventRoutes = (app: ApiApp): void => {
               .where(inArray(users.id, memberIds))
           : [];
       const memberById = new Map(memberRows.map((member) => [member.id, member]));
+
+      emitAuditEvent({
+        event: 'availability_read_completed',
+        level: 'info',
+        route: '/v0/teams/:teamSlug/event-types/:eventSlug',
+        statusCode: 200,
+        durationMs: Date.now() - startedAt,
+        teamSlug,
+        eventSlug,
+      });
 
       return context.json({
         ok: true,

@@ -217,6 +217,59 @@
   color: var(--text-secondary);
 }
 
+.healthStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 0.24rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.healthStatusOk {
+  border-color: rgba(37, 125, 65, 0.45);
+  background: rgba(37, 125, 65, 0.12);
+  color: #7dd59a;
+}
+
+.healthStatusDegraded {
+  border-color: rgba(224, 168, 82, 0.45);
+  background: rgba(224, 168, 82, 0.14);
+  color: #f0ba67;
+}
+
+.healthStatusDisconnected {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.alertList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+}
+
+.alertBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.24rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(224, 168, 82, 0.14);
+  border: 1px solid rgba(224, 168, 82, 0.35);
+  color: var(--brand-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 720px) {
   .signedOutCard {
     text-align: center;

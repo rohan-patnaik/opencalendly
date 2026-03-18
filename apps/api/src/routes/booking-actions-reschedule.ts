@@ -2,6 +2,7 @@ import { bookingActionTokenSchema, bookingRescheduleSchema } from '@opencalendly
 
 import { BookingConflictError, BookingValidationError } from '../lib/booking';
 import { resolveAuthenticatedUser } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { actionTokenMap, buildActionUrls, hashActionToken } from '../server/booking-action-links';
 import { runBookingRescheduleSideEffects } from '../server/booking-side-effects';
 import { jsonError, normalizeTimezone } from '../server/core';
@@ -27,8 +28,17 @@ import {
 
 export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
   app.post('/v0/bookings/actions/:token/reschedule', async (context) => {
+    const startedAt = Date.now();
     const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
     if (!tokenParam.success) {
+      emitAuditEvent({
+        event: 'booking_action_misuse_detected',
+        level: 'warn',
+        route: '/v0/bookings/actions/:token/reschedule',
+        statusCode: 404,
+        actionType: 'reschedule',
+        reason: 'invalid_token',
+      });
       return jsonError(context, 404, 'Action link is invalid or expired.');
     }
 
@@ -156,6 +166,15 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
           statusCode: 200,
           responseBody,
         });
+        emitAuditEvent({
+          event: 'booking_commit_completed',
+          level: 'info',
+          route: '/v0/bookings/actions/:token/reschedule',
+          statusCode: 200,
+          durationMs: Date.now() - startedAt,
+          actionType: 'reschedule',
+          bookingId: result.newBooking.id,
+        });
         return context.json(responseBody);
       } catch (error) {
         if (error instanceof LaunchDemoAuthError) {
@@ -174,6 +193,14 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
             statusCode: 404,
             responseBody,
           });
+          emitAuditEvent({
+            event: 'booking_action_misuse_detected',
+            level: 'warn',
+            route: '/v0/bookings/actions/:token/reschedule',
+            statusCode: 404,
+            actionType: 'reschedule',
+            reason: 'not_found',
+          });
           return context.json(responseBody, 404);
         }
         if (error instanceof BookingActionGoneError) {
@@ -183,6 +210,14 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
             keyHash: idempotencyState.keyHash,
             statusCode: 410,
             responseBody,
+          });
+          emitAuditEvent({
+            event: 'booking_action_misuse_detected',
+            level: 'warn',
+            route: '/v0/bookings/actions/:token/reschedule',
+            statusCode: 410,
+            actionType: 'reschedule',
+            reason: 'gone',
           });
           return context.json(responseBody, 410);
         }
@@ -204,6 +239,15 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
             statusCode: 409,
             responseBody,
           });
+          emitAuditEvent({
+            event: 'booking_action_misuse_detected',
+            level: 'warn',
+            route: '/v0/bookings/actions/:token/reschedule',
+            statusCode: 409,
+            actionType: 'reschedule',
+            reason: 'conflict',
+            error: error.message,
+          });
           return context.json(responseBody, 409);
         }
 
@@ -214,6 +258,15 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
           keyHash: idempotencyState.keyHash,
           statusCode: 500,
           responseBody,
+        });
+        emitAuditEvent({
+          event: 'booking_commit_completed',
+          level: 'error',
+          route: '/v0/bookings/actions/:token/reschedule',
+          statusCode: 500,
+          durationMs: Date.now() - startedAt,
+          actionType: 'reschedule',
+          error: error instanceof Error ? error.message : 'unknown',
         });
         return context.json(responseBody, 500);
       }
