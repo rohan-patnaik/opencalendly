@@ -62,7 +62,12 @@ describe('next config security headers', () => {
     const nextConfigModule = await import('./next.config.mjs');
     const routes = await nextConfigModule.default.headers();
     const embedRoute = routes.find((route) => route.source === '/embed/:path*');
+    const globalRoute = routes.find((route) => route.source === '/:path*');
+    const globalHeaderKeys = new Set(globalRoute?.headers.map((header) => header.key) ?? []);
+    const globalCsp = globalRoute?.headers.find((header) => header.key === 'Content-Security-Policy')?.value ?? '';
 
     expect(embedRoute).toBeUndefined();
+    expect(globalHeaderKeys.has('X-Frame-Options')).toBe(false);
+    expect(globalCsp).not.toContain('frame-ancestors');
   });
 });

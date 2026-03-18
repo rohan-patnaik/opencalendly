@@ -40,7 +40,7 @@ Alert thresholds:
   - `writeback_backlog_high` when pending queue count exceeds `25`
   - immediate action when failed queue count is non-zero and growing
 - Calendar provider freshness:
-  - `calendar_sync_stale` when a connected provider is more than 30 minutes past the freshness grace window
+  - `calendar_sync_stale` when a connected provider misses its scheduled `nextSyncAt`, or when it has never completed an initial sync and remains unsynced for more than the 30-minute initial-sync grace window
 - Uptime:
   - page on two consecutive failed Better Stack checks for Web or API
 

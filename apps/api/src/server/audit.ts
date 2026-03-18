@@ -8,6 +8,7 @@ export type AuditEventName =
   | 'availability_read_completed'
   | 'booking_commit_completed'
   | 'booking_action_misuse_detected'
+  | 'calendar_connect_failed'
   | 'calendar_connect_completed'
   | 'calendar_disconnect_completed'
   | 'calendar_sync_completed'
@@ -40,6 +41,43 @@ const resolveConsoleMethod = (level: AuditLevel): typeof console.info => {
     return console.error;
   }
   return console.info;
+};
+
+export const sanitizeErrorForAudit = (error: unknown, fallback = 'internal_error'): string => {
+  if (typeof error !== 'string' && !(error instanceof Error)) {
+    return fallback;
+  }
+
+  const rawMessage = typeof error === 'string' ? error : error.message;
+  if (!rawMessage) {
+    return fallback;
+  }
+
+  const normalized = rawMessage
+    .replace(/\s+/g, ' ')
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[redacted-email]')
+    .replace(/https?:\/\/\S+/g, '[redacted-url]')
+    .replace(/\b[A-Fa-f0-9]{16,}\b/g, '[redacted-token]')
+    .trim();
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (/refresh token/i.test(normalized)) {
+    return 'refresh_token_error';
+  }
+  if (/access token/i.test(normalized)) {
+    return 'access_token_error';
+  }
+  if (/offline access/i.test(normalized)) {
+    return 'offline_access_missing';
+  }
+  if (/oauth/i.test(normalized)) {
+    return 'oauth_exchange_failed';
+  }
+
+  return normalized.slice(0, 200);
 };
 
 export const emitAuditEvent = (payload: AuditPayload): void => {

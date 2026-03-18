@@ -18,8 +18,8 @@ CLOUDFLARE_API_TOKEN=cf-token
 HYPERDRIVE_ID=hyperdrive
 RESEND_API_KEY=resend-key
 RESEND_FROM_EMAIL=OpenCalendly <no-reply@example.org>
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk
-CLERK_SECRET_KEY=sk_test_secret
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_placeholder
+CLERK_SECRET_KEY=sk_placeholder
 GOOGLE_CLIENT_ID=google-client-id
 GOOGLE_CLIENT_SECRET=google-client-secret
 MICROSOFT_CLIENT_ID=microsoft-client-id
@@ -36,10 +36,12 @@ const writeEnv = (contents: string): string => {
 };
 
 const runEnvCheck = (cwd: string, args: string[] = []): string => {
+  const env = { ...process.env };
+  delete env.OPENCALENDLY_ENV_CHECK_MODE;
   return execFileSync(process.execPath, [scriptPath, ...args], {
     cwd,
     encoding: 'utf8',
-    env: process.env,
+    env,
   });
 };
 
@@ -82,5 +84,33 @@ TELEMETRY_HMAC_KEY=${'c'.repeat(32)}
 
     const output = runEnvCheck(cwd, ['--production']);
     expect(output).toContain('Production-only validation checks passed.');
+  });
+
+  it('fails production validation when dedicated keys are too short', () => {
+    const cwd = writeEnv(`
+${createBaseEnv()}
+APP_BASE_URL=https://app.opencalendly.com
+API_BASE_URL=https://api.opencalendly.com
+NEXT_PUBLIC_API_BASE_URL=https://api.opencalendly.com
+WEBHOOK_SECRET_ENCRYPTION_KEY=short-key
+TELEMETRY_HMAC_KEY=another-short-key
+`);
+
+    expect(() => runEnvCheck(cwd, ['--production'])).toThrowError(
+      /WEBHOOK_SECRET_ENCRYPTION_KEY is too short/,
+    );
+  });
+
+  it('fails production validation when configured origins are not https', () => {
+    const cwd = writeEnv(`
+${createBaseEnv()}
+APP_BASE_URL=http://app.opencalendly.com
+API_BASE_URL=https://api.opencalendly.com
+NEXT_PUBLIC_API_BASE_URL=https://api.opencalendly.com
+WEBHOOK_SECRET_ENCRYPTION_KEY=${'b'.repeat(32)}
+TELEMETRY_HMAC_KEY=${'c'.repeat(32)}
+`);
+
+    expect(() => runEnvCheck(cwd, ['--production'])).toThrowError(/APP_BASE_URL must use HTTPS/);
   });
 });

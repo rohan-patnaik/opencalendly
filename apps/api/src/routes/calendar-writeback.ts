@@ -4,7 +4,7 @@ import { bookingExternalEvents } from '@opencalendly/db';
 import { calendarWritebackRunSchema } from '@opencalendly/shared';
 
 import { resolveAuthenticatedUser } from '../server/auth-session';
-import { emitAuditEvent } from '../server/audit';
+import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { jsonError } from '../server/core';
 import { withDatabase } from '../server/database';
 import { assertDemoFeatureAvailable, consumeDemoFeatureCredits, jsonDemoQuotaError } from '../server/demo-quota';
@@ -63,26 +63,13 @@ export const registerCalendarWritebackRoutes = (app: ApiApp): void => {
         }
       }
 
-      const outcome = await runCalendarWritebackBatch(db, context.env, {
-        organizerId: authedUser.id,
-        limit,
-      });
+      try {
+        const outcome = await runCalendarWritebackBatch(db, context.env, {
+          organizerId: authedUser.id,
+          limit,
+        });
 
-      emitAuditEvent({
-        event: 'calendar_writeback_batch_completed',
-        level: outcome.failed > 0 ? 'warn' : 'info',
-        actorUserId: authedUser.id,
-        route: '/v0/calendar/writeback/run',
-        statusCode: 200,
-        limit,
-        processed: outcome.processed,
-        succeeded: outcome.succeeded,
-        retried: outcome.retried,
-        failed: outcome.failed,
-      });
-
-      if (outcome.processed > 0) {
-        try {
+        if (outcome.processed > 0) {
           await db.transaction(async (transaction) => {
             await consumeDemoFeatureCredits(transaction as DemoQuotaDb, context.env, authedUser, {
               featureKey: 'writeback_run',
@@ -94,15 +81,55 @@ export const registerCalendarWritebackRoutes = (app: ApiApp): void => {
               now,
             });
           });
-        } catch (error) {
-          if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
-            return jsonDemoQuotaError(context, db, context.env, authedUser, error);
-          }
-          throw error;
         }
-      }
 
-      return context.json({ ok: true, limit, ...outcome });
+        emitAuditEvent({
+          event: 'calendar_writeback_batch_completed',
+          level: outcome.failed > 0 ? 'warn' : 'info',
+          actorUserId: authedUser.id,
+          route: '/v0/calendar/writeback/run',
+          statusCode: 200,
+          limit,
+          processed: outcome.processed,
+          succeeded: outcome.succeeded,
+          retried: outcome.retried,
+          failed: outcome.failed,
+        });
+
+        return context.json({ ok: true, limit, ...outcome });
+      } catch (error) {
+        if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+          emitAuditEvent({
+            event: 'calendar_writeback_batch_completed',
+            level: 'warn',
+            actorUserId: authedUser.id,
+            route: '/v0/calendar/writeback/run',
+            statusCode: error instanceof DemoQuotaAdmissionError ? 403 : 429,
+            limit,
+            processed: 0,
+            succeeded: 0,
+            retried: 0,
+            failed: 0,
+            error: sanitizeErrorForAudit(error, 'demo_quota_blocked'),
+          });
+          return jsonDemoQuotaError(context, db, context.env, authedUser, error);
+        }
+
+        emitAuditEvent({
+          event: 'calendar_writeback_batch_completed',
+          level: 'error',
+          actorUserId: authedUser.id,
+          route: '/v0/calendar/writeback/run',
+          statusCode: 500,
+          limit,
+          processed: 0,
+          succeeded: 0,
+          retried: 0,
+          failed: 0,
+          error: sanitizeErrorForAudit(error, 'calendar_writeback_route_failed'),
+        });
+        throw error;
+      }
     });
   });
 };

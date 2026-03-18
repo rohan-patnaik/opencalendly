@@ -2,7 +2,7 @@ import { bookingCreateSchema } from '@opencalendly/shared';
 
 import { createOneOnOneBooking } from '../server/one-on-one-booking';
 import { resolveAuthenticatedUser } from '../server/auth-session';
-import { emitAuditEvent } from '../server/audit';
+import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { actionTokenMap, buildActionUrls } from '../server/booking-action-links';
 import { jsonError, normalizeTimezone } from '../server/core';
 import { withDatabase } from '../server/database';
@@ -239,6 +239,18 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
         }
 
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {
+          emitAuditEvent({
+            event: 'booking_commit_completed',
+            level: 'warn',
+            route: '/v0/bookings',
+            statusCode: error instanceof DemoQuotaAdmissionError ? 403 : 429,
+            durationMs: Date.now() - startedAt,
+            organizerUsername: payload.username,
+            eventSlug: payload.eventSlug,
+            idempotencyKeyHash: idempotencyState.keyHash,
+            ...(authedUser?.id ? { actorUserId: authedUser.id } : {}),
+            error: sanitizeErrorForAudit(error, 'demo_quota_blocked'),
+          });
           await releaseIdempotencyRequest(db, {
             scope: 'booking_create',
             keyHash: idempotencyState.keyHash,

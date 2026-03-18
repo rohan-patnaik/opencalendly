@@ -46,6 +46,14 @@ const isLocalHostname = (hostname: string): boolean => {
 };
 
 export const shouldUseSecureSessionCookie = (request: Request, env: Bindings): boolean => {
+  const resolveFromRequest = (): boolean => {
+    const requestUrl = new URL(request.url);
+    if (isLocalHostname(requestUrl.hostname)) {
+      return false;
+    }
+    return requestUrl.protocol === 'https:';
+  };
+
   const configuredAppUrl = env.APP_BASE_URL?.trim();
   if (configuredAppUrl) {
     try {
@@ -55,15 +63,11 @@ export const shouldUseSecureSessionCookie = (request: Request, env: Bindings): b
       }
       return appUrl.protocol === 'https:';
     } catch {
-      return false;
+      return resolveFromRequest();
     }
   }
 
-  const requestUrl = new URL(request.url);
-  if (isLocalHostname(requestUrl.hostname)) {
-    return false;
-  }
-  return requestUrl.protocol === 'https:';
+  return resolveFromRequest();
 };
 
 export const buildSessionCookieHeader = (input: {

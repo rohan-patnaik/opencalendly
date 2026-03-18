@@ -1,6 +1,6 @@
 # Ordered Backlog (One Feature per PR)
 
-## Feature 70 (PR#TBD): GA security hardening and reliability verification
+## Feature 70 (PR#79): GA security hardening and reliability verification
 
 Scope:
 

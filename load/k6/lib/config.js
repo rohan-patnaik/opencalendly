@@ -26,6 +26,11 @@ export const buildIdempotentHeaders = (scope) => ({
   'Idempotency-Key': `${scope}-${__VU}-${__ITER}-${Date.now()}`,
 });
 
+export const shiftIsoByMinutes = (isoString, minutes) => {
+  const base = new Date(isoString);
+  return new Date(base.getTime() + minutes * 60_000).toISOString();
+};
+
 export const availabilityUrl = (input) => {
   const timezone = encodeURIComponent(__ENV.TIMEZONE || 'Asia/Kolkata');
   const start = encodeURIComponent(input.start);
@@ -61,7 +66,7 @@ export const expectStatus = (response, expected, label) =>
     [label]: (value) => expected.includes(value.status),
   });
 
-export const oneOnOneBookingPayload = () => ({
+export const oneOnOneBookingPayload = (overrides = {}) => ({
   username: __ENV.ONE_ON_ONE_USERNAME,
   eventSlug: __ENV.ONE_ON_ONE_EVENT_SLUG,
   startsAt: __ENV.ONE_ON_ONE_STARTS_AT,
@@ -69,9 +74,10 @@ export const oneOnOneBookingPayload = () => ({
   inviteeName: __ENV.INVITEE_NAME || 'Load Test Invitee',
   inviteeEmail: __ENV.INVITEE_EMAIL || `load-test+${Date.now()}@example.com`,
   answers: {},
+  ...overrides,
 });
 
-export const teamBookingPayload = () => ({
+export const teamBookingPayload = (overrides = {}) => ({
   teamSlug: __ENV.TEAM_SLUG,
   eventSlug: __ENV.TEAM_EVENT_SLUG,
   startsAt: __ENV.TEAM_STARTS_AT,
@@ -79,6 +85,7 @@ export const teamBookingPayload = () => ({
   inviteeName: __ENV.INVITEE_NAME || 'Load Test Invitee',
   inviteeEmail: __ENV.INVITEE_EMAIL || `load-test+${Date.now()}@example.com`,
   answers: {},
+  ...overrides,
 });
 
 export const reschedulePayload = () => ({

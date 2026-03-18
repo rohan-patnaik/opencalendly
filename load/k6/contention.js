@@ -49,7 +49,7 @@ requireEnv([
 
 const recordBookingOutcome = (response) => {
   bookingConflictRate.add(response.status === 409);
-  bookingUnexpectedFailureRate.add(![200, 409].includes(response.status));
+  bookingUnexpectedFailureRate.add(![200, 409, 429].includes(response.status));
 };
 
 export function sameSlotOneOnOne() {

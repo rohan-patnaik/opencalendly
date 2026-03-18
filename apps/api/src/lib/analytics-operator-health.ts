@@ -60,18 +60,7 @@ export const summarizeOperatorHealth = (input: {
   now?: Date;
 }) => {
   const now = input.now ?? new Date();
-  const webhookSummary = { total: 0, pending: 0, succeeded: 0, failed: 0 };
-  for (const row of input.webhookRows) {
-    const count = row.count ?? 1;
-    webhookSummary.total += count;
-    if (row.status === 'pending') {
-      webhookSummary.pending += count;
-    } else if (row.status === 'succeeded') {
-      webhookSummary.succeeded += count;
-    } else {
-      webhookSummary.failed += count;
-    }
-  }
+  const webhookSummary = summarizeQueueRows(input.webhookRows);
 
   const emailSummary = { total: 0, succeeded: 0, failed: 0 };
   const byEmailType = new Map<string, { emailType: string; total: number; succeeded: number; failed: number }>();

@@ -210,20 +210,8 @@ export const registerWebhookRoutes = (app: ApiApp): void => {
           return jsonError(context, 404, 'Webhook subscription not found.');
         }
 
-        if (parsed.data.isActive !== undefined) {
-          emitAuditEvent({
-            event: 'webhook_subscription_toggled',
-            level: 'info',
-            actorUserId: authedUser.id,
-            route: '/v0/webhooks/:id',
-            statusCode: 200,
-            webhookId: updated.id,
-            isActive: updated.isActive,
-          });
-        }
-
         emitAuditEvent({
-          event: 'webhook_subscription_updated',
+          event: parsed.data.isActive !== undefined ? 'webhook_subscription_toggled' : 'webhook_subscription_updated',
           level: 'info',
           actorUserId: authedUser.id,
           route: '/v0/webhooks/:id',
@@ -232,6 +220,7 @@ export const registerWebhookRoutes = (app: ApiApp): void => {
           url: updated.url,
           eventCount: parseWebhookEventTypes(updated.events).length,
           isActive: updated.isActive,
+          toggled: parsed.data.isActive !== undefined,
         });
 
         return context.json({

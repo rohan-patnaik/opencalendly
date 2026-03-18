@@ -2,7 +2,7 @@ import { bookingActionTokenSchema, bookingRescheduleSchema } from '@opencalendly
 
 import { BookingConflictError, BookingValidationError } from '../lib/booking';
 import { resolveAuthenticatedUser } from '../server/auth-session';
-import { emitAuditEvent } from '../server/audit';
+import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { actionTokenMap, buildActionUrls, hashActionToken } from '../server/booking-action-links';
 import { runBookingRescheduleSideEffects } from '../server/booking-side-effects';
 import { jsonError, normalizeTimezone } from '../server/core';
@@ -228,6 +228,16 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
             keyHash: idempotencyState.keyHash,
             statusCode: 400,
             responseBody,
+          });
+          emitAuditEvent({
+            event: 'booking_action_misuse_detected',
+            level: 'warn',
+            route: '/v0/bookings/actions/:token/reschedule',
+            statusCode: 400,
+            actionType: 'reschedule',
+            ...(authedUser?.id ? { actorUserId: authedUser.id } : {}),
+            reason: 'validation_error',
+            error: sanitizeErrorForAudit(error, 'booking_validation_failed'),
           });
           return context.json(responseBody, 400);
         }

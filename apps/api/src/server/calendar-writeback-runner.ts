@@ -40,7 +40,7 @@ import {
   claimDueCalendarWritebackRowIds,
   parseCalendarWritebackPayload,
 } from './calendar-writeback-queue';
-import { emitAuditEvent } from './audit';
+import { emitAuditEvent, sanitizeErrorForAudit } from './audit';
 import type { Bindings, CalendarWritebackOperation, Database } from './types';
 
 export type CalendarWritebackRunResult = {
@@ -199,7 +199,7 @@ export const runCalendarWritebackBatch = async (
           writebackId: row.id,
           operation,
           attempts: writebackResult.attemptCount,
-          error: writebackResult.lastError,
+          error: sanitizeErrorForAudit(writebackResult.lastError, 'calendar_writeback_failed'),
         });
       }
     };

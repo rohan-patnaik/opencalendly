@@ -34,4 +34,19 @@ describe('session cookie security', () => {
     expect(cookie).toContain('Secure');
     expect(cookie).toContain('SameSite=Lax');
   });
+
+  it('falls back to the request origin when APP_BASE_URL is malformed', () => {
+    const request = new Request('https://api.opencalendly.com/v0/auth/me');
+    expect(shouldUseSecureSessionCookie(request, { APP_BASE_URL: 'malformed' })).toBe(true);
+
+    const cookie = buildSessionCookieHeader({
+      request,
+      env: { APP_BASE_URL: 'malformed' },
+      value: 'session-token',
+      expiresAt: new Date('2026-03-19T00:00:00.000Z'),
+    });
+
+    expect(cookie).toContain('Secure');
+    expect(cookie).toContain('SameSite=Lax');
+  });
 });

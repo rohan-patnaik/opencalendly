@@ -74,10 +74,10 @@ Current degraded thresholds:
 
 Location:
 
-- [load/k6/README.md](/Users/rpatnaik/Desktop/Work/Code/open-calendly/load/k6/README.md)
-- [load/k6/smoke.js](/Users/rpatnaik/Desktop/Work/Code/open-calendly/load/k6/smoke.js)
-- [load/k6/baseline.js](/Users/rpatnaik/Desktop/Work/Code/open-calendly/load/k6/baseline.js)
-- [load/k6/contention.js](/Users/rpatnaik/Desktop/Work/Code/open-calendly/load/k6/contention.js)
+- [load/k6/README.md](load/k6/README.md)
+- [load/k6/smoke.js](load/k6/smoke.js)
+- [load/k6/baseline.js](load/k6/baseline.js)
+- [load/k6/contention.js](load/k6/contention.js)
 
 Profiles:
 

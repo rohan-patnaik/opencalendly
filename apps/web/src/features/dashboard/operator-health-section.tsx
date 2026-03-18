@@ -103,16 +103,22 @@ export const DashboardOperatorHealthSection = ({
             </tr>
           </thead>
           <tbody>
-            {operatorHealth.calendarProviders.byProvider.map((row) => (
-              <tr key={row.provider}>
-                <td>{row.provider}</td>
-                <td>{renderHealthStatus(row.status, styles)}</td>
-                <td>{row.externalEmail ?? 'Not connected'}</td>
-                <td>{row.lastSyncedAt ?? 'Not synced yet'}</td>
-                <td>{row.nextSyncAt ?? 'Not scheduled'}</td>
-                <td>{row.lastError ?? 'None'}</td>
+            {operatorHealth.calendarProviders.byProvider.length === 0 ? (
+              <tr>
+                <td colSpan={6}>No calendar providers connected</td>
               </tr>
-            ))}
+            ) : (
+              operatorHealth.calendarProviders.byProvider.map((row) => (
+                <tr key={row.provider}>
+                  <td>{row.provider}</td>
+                  <td>{renderHealthStatus(row.status, styles)}</td>
+                  <td>{row.externalEmail ?? 'Not connected'}</td>
+                  <td>{row.lastSyncedAt ?? 'Not synced yet'}</td>
+                  <td>{row.nextSyncAt ?? 'Not scheduled'}</td>
+                  <td>{row.lastError ?? 'None'}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
