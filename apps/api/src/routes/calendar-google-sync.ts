@@ -14,6 +14,7 @@ import {
   syncGoogleBusyWindows,
 } from '../lib/calendar-sync';
 import { resolveAuthenticatedUser } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { jsonError, logInternalError } from '../server/core';
 import { withDatabase } from '../server/database';
 import { assertDemoFeatureAvailable, consumeDemoFeatureCredits, jsonDemoQuotaError } from '../server/demo-quota';
@@ -57,6 +58,16 @@ export const registerGoogleCalendarSyncRoutes = (app: ApiApp): void => {
           .where(inArray(bookingExternalEvents.connectionId, connectionIds));
         await transaction.delete(calendarConnections).where(inArray(calendarConnections.id, connectionIds));
         return true;
+      });
+
+      emitAuditEvent({
+        event: 'calendar_disconnect_completed',
+        level: 'info',
+        actorUserId: authedUser.id,
+        provider: GOOGLE_CALENDAR_PROVIDER,
+        route: '/v0/calendar/google/disconnect',
+        statusCode: 200,
+        disconnected,
       });
 
       return context.json({ ok: true, provider: GOOGLE_CALENDAR_PROVIDER, disconnected });
@@ -202,6 +213,17 @@ export const registerGoogleCalendarSyncRoutes = (app: ApiApp): void => {
           });
         });
 
+        emitAuditEvent({
+          event: 'calendar_sync_completed',
+          level: 'info',
+          actorUserId: authedUser.id,
+          provider: GOOGLE_CALENDAR_PROVIDER,
+          route: '/v0/calendar/google/sync',
+          statusCode: 200,
+          busyWindowCount: dedupedBusyWindows.length,
+          refreshedAccessToken: token.refreshed,
+        });
+
         return context.json({
           ok: true,
           provider: GOOGLE_CALENDAR_PROVIDER,
@@ -222,6 +244,15 @@ export const registerGoogleCalendarSyncRoutes = (app: ApiApp): void => {
           .update(calendarConnections)
           .set({ lastError: message, nextSyncAt, updatedAt: now })
           .where(eq(calendarConnections.id, connection.id));
+        emitAuditEvent({
+          event: 'calendar_sync_completed',
+          level: 'error',
+          actorUserId: authedUser.id,
+          provider: GOOGLE_CALENDAR_PROVIDER,
+          route: '/v0/calendar/google/sync',
+          statusCode: 502,
+          error: error instanceof Error ? error.message : 'unknown',
+        });
         return jsonError(context, 502, message);
       }
     });

@@ -40,6 +40,7 @@ import {
   claimDueCalendarWritebackRowIds,
   parseCalendarWritebackPayload,
 } from './calendar-writeback-queue';
+import { emitAuditEvent, sanitizeErrorForAudit } from './audit';
 import type { Bindings, CalendarWritebackOperation, Database } from './types';
 
 export type CalendarWritebackRunResult = {
@@ -187,6 +188,19 @@ export const runCalendarWritebackBatch = async (
         result.retried += 1;
       } else {
         result.failed += 1;
+        emitAuditEvent({
+          event: 'calendar_writeback_failed_permanently',
+          level: 'warn',
+          actorUserId: row.organizerId,
+          ...(provider ? { provider } : {}),
+          route: 'calendar_writeback_runner',
+          statusCode: 500,
+          bookingId: row.bookingId,
+          writebackId: row.id,
+          operation,
+          attempts: writebackResult.attemptCount,
+          error: sanitizeErrorForAudit(writebackResult.lastError, 'calendar_writeback_failed'),
+        });
       }
     };
 

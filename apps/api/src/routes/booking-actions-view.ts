@@ -10,6 +10,7 @@ import { bookingActionTokenSchema } from '@opencalendly/shared';
 
 import { hashActionToken } from '../server/booking-action-links';
 import { resolveAuthenticatedUser } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { isLaunchDemoBookingContext } from '../server/demo-quota';
 import { jsonError, normalizeTimezone } from '../server/core';
 import { withDatabase } from '../server/database';
@@ -21,6 +22,14 @@ export const registerBookingActionViewRoutes = (app: ApiApp): void => {
     return withDatabase(context, async (db) => {
       const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
       if (!tokenParam.success) {
+        emitAuditEvent({
+          event: 'booking_action_misuse_detected',
+          level: 'warn',
+          route: '/v0/bookings/actions/:token',
+          statusCode: 404,
+          actionType: 'unknown',
+          reason: 'invalid_token',
+        });
         return jsonError(context, 404, 'Action link is invalid or expired.');
       }
 
@@ -52,6 +61,14 @@ export const registerBookingActionViewRoutes = (app: ApiApp): void => {
         .limit(1);
 
       if (!row) {
+        emitAuditEvent({
+          event: 'booking_action_misuse_detected',
+          level: 'warn',
+          route: '/v0/bookings/actions/:token',
+          statusCode: 404,
+          actionType: 'unknown',
+          reason: 'not_found',
+        });
         return jsonError(context, 404, 'Action link is invalid or expired.');
       }
 
@@ -64,6 +81,15 @@ export const registerBookingActionViewRoutes = (app: ApiApp): void => {
         now: new Date(),
       });
       if (tokenState === 'gone') {
+        emitAuditEvent({
+          event: 'booking_action_misuse_detected',
+          level: 'warn',
+          route: '/v0/bookings/actions/:token',
+          statusCode: 410,
+          actionType,
+          reason: 'gone',
+          bookingId: row.bookingId,
+        });
         return jsonError(context, 410, 'Action link is invalid or expired.');
       }
 

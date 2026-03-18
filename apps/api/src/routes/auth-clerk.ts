@@ -11,6 +11,7 @@ import {
   resolveUniqueUsername,
 } from '../lib/clerk-auth';
 import { issueSessionForUser, withIssuedSessionCookie } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { normalizeTimezone, jsonError } from '../server/core';
 import { withDatabase, isUniqueViolation } from '../server/database';
 import {
@@ -41,7 +42,13 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
     return withDatabase(context, async (db) => {
       const clientKey = resolveRateLimitClientKey(context.req.raw);
       if (await isClerkExchangeRateLimited(db, { clientKey })) {
-        console.warn('clerk_exchange_rate_limited', { ipHash: hashToken(clientKey) });
+        emitAuditEvent({
+          event: 'auth_exchange_rate_limited',
+          level: 'warn',
+          route: '/v0/auth/clerk/exchange',
+          ipHash: hashToken(clientKey),
+          statusCode: 429,
+        });
         return jsonError(context, 429, 'Too many requests. Please retry shortly.');
       }
 
@@ -108,7 +115,11 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
         ]);
 
         if (reason && upstreamFailureReasons.has(reason)) {
-          console.error('clerk_token_verification_failed', {
+          emitAuditEvent({
+            event: 'auth_exchange_upstream_failed',
+            level: 'error',
+            route: '/v0/auth/clerk/exchange',
+            statusCode: 502,
             reason,
             error: error instanceof Error ? error.message : 'unknown',
           });
@@ -156,10 +167,14 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
 
       if (!clerkUser && clerkLookupError) {
         const status = resolveLookupErrorStatus(clerkLookupError);
-        console.error('clerk_user_lookup_failed', {
+        emitAuditEvent({
+          event: 'auth_exchange_user_lookup_failed',
+          level: 'error',
+          route: '/v0/auth/clerk/exchange',
+          statusCode: 502,
           clerkUserIdHash: hashToken(clerkUserId),
           attempts: CLERK_USER_LOOKUP_MAX_ATTEMPTS,
-          status,
+          upstreamStatus: status,
           error: clerkLookupError instanceof Error ? clerkLookupError.message : 'unknown',
         });
         return jsonError(context, 502, 'Upstream dependency error contacting Clerk.');
@@ -241,10 +256,14 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
               },
             });
           } catch (error) {
-            console.error('clerk_username_resolution_failed', {
+            emitAuditEvent({
+              event: 'auth_exchange_username_resolution_failed',
+              level: 'error',
+              route: '/v0/auth/clerk/exchange',
+              statusCode: 503,
               preferredUsername,
               emailDomain: email.split('@')[1] ?? 'unknown',
-              attempt,
+              attempts: attempt + 1,
               error: error instanceof Error ? error.message : 'unknown',
             });
             return jsonError(context, 503, 'Unable to provision account username. Please retry.');

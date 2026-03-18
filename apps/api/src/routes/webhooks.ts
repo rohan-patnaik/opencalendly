@@ -11,6 +11,7 @@ import {
   parseWebhookEventTypes,
 } from '../lib/webhooks';
 import { resolveAuthenticatedUser } from '../server/auth-session';
+import { emitAuditEvent } from '../server/audit';
 import { jsonError } from '../server/core';
 import { withDatabase, isUniqueViolation } from '../server/database';
 import { consumeDemoFeatureCredits, jsonDemoQuotaError } from '../server/demo-quota';
@@ -109,6 +110,18 @@ export const registerWebhookRoutes = (app: ApiApp): void => {
           return jsonError(context, 500, 'Failed to create webhook subscription.');
         }
 
+        emitAuditEvent({
+          event: 'webhook_subscription_created',
+          level: 'info',
+          actorUserId: authedUser.id,
+          route: '/v0/webhooks',
+          statusCode: 200,
+          webhookId: inserted.id,
+          url: inserted.url,
+          eventCount: parseWebhookEventTypes(inserted.events).length,
+          isActive: inserted.isActive,
+        });
+
         return context.json({
           ok: true,
           webhook: {
@@ -196,6 +209,19 @@ export const registerWebhookRoutes = (app: ApiApp): void => {
         if (!updated) {
           return jsonError(context, 404, 'Webhook subscription not found.');
         }
+
+        emitAuditEvent({
+          event: parsed.data.isActive !== undefined ? 'webhook_subscription_toggled' : 'webhook_subscription_updated',
+          level: 'info',
+          actorUserId: authedUser.id,
+          route: '/v0/webhooks/:id',
+          statusCode: 200,
+          webhookId: updated.id,
+          url: updated.url,
+          eventCount: parseWebhookEventTypes(updated.events).length,
+          isActive: updated.isActive,
+          toggled: parsed.data.isActive !== undefined,
+        });
 
         return context.json({
           ok: true,

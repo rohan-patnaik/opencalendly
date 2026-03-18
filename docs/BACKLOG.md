@@ -1,5 +1,59 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 70 (PR#79): GA security hardening and reliability verification
+
+Scope:
+
+- Tighten production-only environment policy for security-sensitive secrets and deploy settings while keeping local development permissive.
+- Add privacy-safe structured audit/telemetry events around auth exchange failures, booking action misuse, webhook lifecycle changes, calendar provider lifecycle changes, and permanent queue failures.
+- Extend the existing operator health contract to include explicit `ok/degraded` status, queue backlog/failure summaries, and provider sync freshness signals.
+- Add regression tests for API/web security headers, sensitive-route framing behavior, public embed compatibility, and production env validation.
+- Add a repeatable `k6` load-test harness, profile documentation, and a GA readiness artifact for contention-sensitive booking, webhook, and calendar writeback flows.
+- Update GA-facing security, deploy, operator, and tracking docs to reflect the hardened contract and alert thresholds.
+
+Acceptance criteria:
+
+- Production env validation fails when `WEBHOOK_SECRET_ENCRYPTION_KEY` or `TELEMETRY_HMAC_KEY` are missing, while local/dev validation remains permissive.
+- Production docs explicitly validate `APP_BASE_URL`, `API_BASE_URL`, secure cookie behavior, and Google/Microsoft redirect URIs.
+- Structured audit-style events are emitted for:
+  - Clerk auth exchange upstream failures
+  - calendar connect and disconnect attempts/results
+  - webhook subscription create/update/toggle
+  - webhook delivery batch execution
+  - calendar writeback batch execution and permanent failure
+  - booking-action misuse responses (`404/409/410`)
+- `/v0/analytics/operator/health` returns explicit overall status plus:
+  - webhook backlog/failure totals
+  - calendar writeback backlog/failure totals
+  - provider sync freshness/error summaries
+  - existing email delivery summary
+- Dashboard operator health UI renders the expanded health contract without regressing existing analytics views.
+- Security regression coverage exists for:
+  - production CSP/security headers
+  - authenticated route frame denial
+  - public embed compatibility
+  - production env validation for dedicated webhook/telemetry secrets
+- A dedicated `k6` harness exists for:
+  - public availability read
+  - one-on-one same-slot booking contention
+  - team booking contention
+  - reschedule/cancel bursts
+  - webhook delivery batch execution
+  - calendar writeback runner execution
+- Load-testing docs define smoke, baseline, and contention profiles with pass/fail criteria and setup requirements.
+- A versioned GA-readiness artifact exists under `docs/releases/` with the required verification/checklist sections.
+- Docs updated:
+  - `docs/SECURITY_CHECKLIST.md`
+  - `docs/PROD_DEPLOY_CHECKLIST.md`
+  - `docs/OPERATOR_RUNBOOK.md`
+  - `docs/SECURITY_TRACKER.md`
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 69 (PR#TBD): FAQ resource and homepage footer attribution
 
 Scope:

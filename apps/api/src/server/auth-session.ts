@@ -45,7 +45,15 @@ const isLocalHostname = (hostname: string): boolean => {
   return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
 };
 
-const shouldUseSecureSessionCookie = (request: Request, env: Bindings): boolean => {
+export const shouldUseSecureSessionCookie = (request: Request, env: Bindings): boolean => {
+  const resolveFromRequest = (): boolean => {
+    const requestUrl = new URL(request.url);
+    if (isLocalHostname(requestUrl.hostname)) {
+      return false;
+    }
+    return requestUrl.protocol === 'https:';
+  };
+
   const configuredAppUrl = env.APP_BASE_URL?.trim();
   if (configuredAppUrl) {
     try {
@@ -55,18 +63,14 @@ const shouldUseSecureSessionCookie = (request: Request, env: Bindings): boolean 
       }
       return appUrl.protocol === 'https:';
     } catch {
-      return false;
+      return resolveFromRequest();
     }
   }
 
-  const requestUrl = new URL(request.url);
-  if (isLocalHostname(requestUrl.hostname)) {
-    return false;
-  }
-  return requestUrl.protocol === 'https:';
+  return resolveFromRequest();
 };
 
-const buildSessionCookieHeader = (input: {
+export const buildSessionCookieHeader = (input: {
   request: Request;
   env: Bindings;
   value: string;

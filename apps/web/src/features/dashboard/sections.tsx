@@ -4,11 +4,12 @@ import { Button, Card, LinkButton, Toast } from '../../components/ui';
 import type {
   DashboardUser,
   FunnelResponse,
-  OperatorHealthResponse,
   TeamResponse,
 } from './types';
 
 type DashboardStyles = Record<string, string>;
+
+export { DashboardOperatorHealthSection } from './operator-health-section';
 
 type SignedInHeaderProps = {
   authedUser: DashboardUser;
@@ -267,62 +268,6 @@ export const DashboardTeamSection = ({
                 <td>{row.teamName}</td>
                 <td>{row.eventTypeName}</td>
                 <td>{row.bookings}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-};
-
-export const DashboardOperatorHealthSection = ({
-  operatorHealth,
-  styles,
-}: {
-  operatorHealth: OperatorHealthResponse;
-  styles: DashboardStyles;
-}) => {
-  return (
-    <section className={styles.card}>
-      <h2>Operator Health</h2>
-      <div className={styles.statGrid}>
-        <div>
-          <strong>{operatorHealth.webhookDeliveries.total}</strong>
-          <span>Webhook deliveries</span>
-        </div>
-        <div>
-          <strong>{operatorHealth.webhookDeliveries.failed}</strong>
-          <span>Webhook failed</span>
-        </div>
-        <div>
-          <strong>{operatorHealth.emailDeliveries.total}</strong>
-          <span>Email deliveries</span>
-        </div>
-        <div>
-          <strong>{operatorHealth.emailDeliveries.failed}</strong>
-          <span>Email failed</span>
-        </div>
-      </div>
-
-      <h3>Email by type</h3>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Email type</th>
-              <th>Total</th>
-              <th>Succeeded</th>
-              <th>Failed</th>
-            </tr>
-          </thead>
-          <tbody>
-            {operatorHealth.emailDeliveries.byType.map((row) => (
-              <tr key={row.emailType}>
-                <td>{row.emailType}</td>
-                <td>{row.total}</td>
-                <td>{row.succeeded}</td>
-                <td>{row.failed}</td>
               </tr>
             ))}
           </tbody>

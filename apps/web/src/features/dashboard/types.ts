@@ -58,11 +58,45 @@ export type TeamResponse = {
 
 export type OperatorHealthResponse = {
   ok: boolean;
+  status: 'ok' | 'degraded';
+  alerts: string[];
+  range: {
+    startDate: string;
+    endDate: string;
+  };
   webhookDeliveries: {
     total: number;
     pending: number;
     succeeded: number;
     failed: number;
+  };
+  webhookQueue: {
+    total: number;
+    pending: number;
+    succeeded: number;
+    failed: number;
+  };
+  calendarWriteback: {
+    total: number;
+    pending: number;
+    succeeded: number;
+    failed: number;
+  };
+  calendarProviders: {
+    totalConnected: number;
+    disconnected: number;
+    stale: number;
+    errored: number;
+    byProvider: Array<{
+      provider: string;
+      connected: boolean;
+      externalEmail: string | null;
+      lastSyncedAt: string | null;
+      nextSyncAt: string | null;
+      lastError: string | null;
+      stale: boolean;
+      status: 'ok' | 'degraded' | 'disconnected';
+    }>;
   };
   emailDeliveries: {
     total: number;

@@ -16,6 +16,7 @@ import {
 } from '../server/types';
 import { DemoQuotaAdmissionError, DemoQuotaCreditsError } from '../server/types';
 import { hashActionToken, lockActionToken, lockBooking } from '../server/booking-action-links';
+import { emitAuditEvent } from '../server/audit';
 import { runBookingCancellationSideEffects } from '../server/booking-side-effects';
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { cancelPendingScheduledNotificationsForBooking } from '../server/notifications';
@@ -31,6 +32,14 @@ export const registerBookingActionCancelRoutes = (app: ApiApp): void => {
       const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
       const tokenParam = bookingActionTokenSchema.safeParse(context.req.param('token'));
       if (!tokenParam.success) {
+        emitAuditEvent({
+          event: 'booking_action_misuse_detected',
+          level: 'warn',
+          route: '/v0/bookings/actions/:token/cancel',
+          statusCode: 404,
+          actionType: 'cancel',
+          reason: 'invalid_token',
+        });
         return jsonError(context, 404, 'Action link is invalid or expired.');
       }
 
@@ -188,9 +197,25 @@ export const registerBookingActionCancelRoutes = (app: ApiApp): void => {
           return jsonError(context, 401, error.message);
         }
         if (error instanceof BookingActionNotFoundError) {
+          emitAuditEvent({
+            event: 'booking_action_misuse_detected',
+            level: 'warn',
+            route: '/v0/bookings/actions/:token/cancel',
+            statusCode: 404,
+            actionType: 'cancel',
+            reason: 'not_found',
+          });
           return jsonError(context, 404, 'Action link is invalid or expired.');
         }
         if (error instanceof BookingActionGoneError) {
+          emitAuditEvent({
+            event: 'booking_action_misuse_detected',
+            level: 'warn',
+            route: '/v0/bookings/actions/:token/cancel',
+            statusCode: 410,
+            actionType: 'cancel',
+            reason: 'gone',
+          });
           return jsonError(context, 410, 'Action link is invalid or expired.');
         }
         if (error instanceof DemoQuotaAdmissionError || error instanceof DemoQuotaCreditsError) {

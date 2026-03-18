@@ -2138,6 +2138,11 @@ Success response:
 ```json
 {
   "ok": true,
+  "status": "degraded",
+  "alerts": [
+    "webhook_backlog_high",
+    "writeback_failures_present"
+  ],
   "range": {
     "startDate": "2026-02-01",
     "endDate": "2026-03-01"
@@ -2147,6 +2152,46 @@ Success response:
     "pending": 2,
     "succeeded": 16,
     "failed": 2
+  },
+  "webhookQueue": {
+    "total": 28,
+    "pending": 26,
+    "succeeded": 0,
+    "failed": 2
+  },
+  "calendarWriteback": {
+    "total": 5,
+    "pending": 1,
+    "succeeded": 3,
+    "failed": 1
+  },
+  "calendarProviders": {
+    "totalConnected": 2,
+    "disconnected": 0,
+    "stale": 1,
+    "errored": 1,
+    "byProvider": [
+      {
+        "provider": "google",
+        "connected": true,
+        "externalEmail": "ops@example.com",
+        "lastSyncedAt": "2026-03-01T09:00:00.000Z",
+        "nextSyncAt": "2026-03-01T09:15:00.000Z",
+        "lastError": null,
+        "stale": false,
+        "status": "ok"
+      },
+      {
+        "provider": "microsoft",
+        "connected": true,
+        "externalEmail": "ops@example.com",
+        "lastSyncedAt": "2026-03-01T07:30:00.000Z",
+        "nextSyncAt": "2026-03-01T08:00:00.000Z",
+        "lastError": "ErrorItemNotFound",
+        "stale": true,
+        "status": "degraded"
+      }
+    ]
   },
   "emailDeliveries": {
     "total": 30,
@@ -2175,3 +2220,21 @@ Success response:
   }
 }
 ```
+
+Notes:
+
+- `status` is the operator-facing overall health state used for alerting. It is currently `ok` or `degraded`.
+- `alerts` is a stable list of machine-readable alert keys. Current keys:
+  - `webhook_backlog_high`
+  - `webhook_failures_present`
+  - `writeback_backlog_high`
+  - `writeback_failures_present`
+  - `calendar_sync_stale`
+  - `calendar_provider_errors`
+- `webhookDeliveries` is the selected range summary.
+- `webhookQueue` and `calendarWriteback` are current queue-state summaries, independent of the selected analytics date range.
+- `calendarProviders.byProvider[].status` is one of:
+  - `ok`
+  - `degraded`
+  - `disconnected`
+- A connected provider is marked stale when its sync freshness has exceeded the operator grace window.
