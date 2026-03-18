@@ -592,6 +592,12 @@
   color: var(--brand-primary);
 }
 
+.footerCredit {
+  margin: 0.2rem 0 0;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+}
+
 .footerColumns {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
