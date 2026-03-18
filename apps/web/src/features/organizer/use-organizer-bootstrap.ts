@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { AuthSession } from '../../lib/auth-session';
 import { organizerApi } from '../../lib/organizer-api';
@@ -31,38 +31,52 @@ export const useOrganizerBootstrap = ({
   refreshDemoQuota,
 }: UseOrganizerBootstrapInput) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasResolvedInitialLoad, setHasResolvedInitialLoad] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [state, setState] = useState<OrganizerSectionsState>(emptyState);
   const [selectedTeamId, setSelectedTeamId] = useState('');
+  const refreshRequestIdRef = useRef(0);
 
   const refreshOrganizerState = useCallback(async () => {
     if (!session) {
       return;
     }
 
+    const requestId = refreshRequestIdRef.current + 1;
+    refreshRequestIdRef.current = requestId;
+    const isLatestRequest = () => refreshRequestIdRef.current === requestId;
+
     setIsRefreshing(true);
     setGlobalError(null);
 
     try {
-      const refreshDemoQuotaPromise = refreshDemoQuota();
+      const refreshDemoQuotaPromise = Promise.resolve(refreshDemoQuota());
       const [
-        eventTypePayload,
-        availabilityPayload,
-        timeOffPayload,
-        teamPayload,
-        webhookPayload,
-        calendarPayload,
-        writebackPayload,
+        [
+          eventTypePayload,
+          availabilityPayload,
+          timeOffPayload,
+          teamPayload,
+          webhookPayload,
+          calendarPayload,
+          writebackPayload,
+        ],
       ] = await Promise.all([
-        organizerApi.listEventTypes(apiBaseUrl, session),
-        organizerApi.getAvailability(apiBaseUrl, session),
-        organizerApi.listTimeOffBlocks(apiBaseUrl, session),
-        organizerApi.listTeams(apiBaseUrl, session),
-        organizerApi.listWebhooks(apiBaseUrl, session),
-        organizerApi.getCalendarSyncStatus(apiBaseUrl, session),
-        organizerApi.getWritebackStatus(apiBaseUrl, session),
+        Promise.all([
+          organizerApi.listEventTypes(apiBaseUrl, session),
+          organizerApi.getAvailability(apiBaseUrl, session),
+          organizerApi.listTimeOffBlocks(apiBaseUrl, session),
+          organizerApi.listTeams(apiBaseUrl, session),
+          organizerApi.listWebhooks(apiBaseUrl, session),
+          organizerApi.getCalendarSyncStatus(apiBaseUrl, session),
+          organizerApi.getWritebackStatus(apiBaseUrl, session),
+        ]),
+        refreshDemoQuotaPromise,
       ]);
-      await refreshDemoQuotaPromise;
+
+      if (!isLatestRequest()) {
+        return;
+      }
 
       setState({
         eventTypes: eventTypePayload.eventTypes,
@@ -88,17 +102,24 @@ export const useOrganizerBootstrap = ({
         return teamPayload.teams[0]?.id ?? '';
       });
     } catch (caught) {
-      setGlobalError(caught instanceof Error ? caught.message : 'Unable to load organizer console.');
+      if (isLatestRequest()) {
+        setGlobalError(caught instanceof Error ? caught.message : 'Unable to load organizer console.');
+      }
     } finally {
-      setIsRefreshing(false);
+      if (isLatestRequest()) {
+        setHasResolvedInitialLoad(true);
+        setIsRefreshing(false);
+      }
     }
   }, [apiBaseUrl, refreshDemoQuota, session]);
 
   useEffect(() => {
     if (!session) {
+      refreshRequestIdRef.current += 1;
       setState(emptyState);
       setSelectedTeamId('');
       setGlobalError(null);
+      setHasResolvedInitialLoad(false);
       return;
     }
 
@@ -128,6 +149,7 @@ export const useOrganizerBootstrap = ({
   }, [state.calendarStatuses, state.eventTypes.length, state.teams, state.webhooks.length, state.writebackStatus?.summary.failed]);
 
   return {
+    hasResolvedInitialLoad,
     isRefreshing,
     globalError,
     state,

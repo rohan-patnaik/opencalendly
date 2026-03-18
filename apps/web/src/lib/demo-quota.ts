@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { API_REQUEST_CREDENTIALS, type AuthSession } from './auth-session';
+import { normalizeLocalBrowserUrl } from './api-base-url';
 
 export type DemoFeatureCostKey =
   | 'event_type_create'
@@ -71,7 +72,7 @@ export const fetchDemoQuotaStatus = async (input: {
   session: AuthSession | null;
   signal?: AbortSignal;
 }): Promise<DemoQuotaStatusResponse> => {
-  const response = await fetch(`${input.apiBaseUrl}/v0/demo-credits/status`, {
+  const response = await fetch(normalizeLocalBrowserUrl(`${input.apiBaseUrl}/v0/demo-credits/status`), {
     cache: 'no-store',
     credentials: API_REQUEST_CREDENTIALS,
     ...(input.signal ? { signal: input.signal } : {}),
@@ -89,7 +90,7 @@ export const joinDemoWaitlist = async (input: {
   source: string;
   metadata?: Record<string, unknown>;
 }): Promise<{ ok: boolean; joined: boolean }> => {
-  const response = await fetch(`${input.apiBaseUrl}/v0/waitlist`, {
+  const response = await fetch(normalizeLocalBrowserUrl(`${input.apiBaseUrl}/v0/waitlist`), {
     method: 'POST',
     cache: 'no-store',
     credentials: API_REQUEST_CREDENTIALS,

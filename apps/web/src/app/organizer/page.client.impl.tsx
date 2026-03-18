@@ -20,6 +20,7 @@ import { useOrganizerSession } from '../../features/organizer/use-organizer-sess
 import { useTeamDetails } from '../../features/organizer/use-team-details';
 import { WebhooksPanel } from '../../features/organizer/webhooks-panel';
 import { WritebackPanel } from '../../features/organizer/writeback-panel';
+import { getOrganizerConsolePageState } from './page-state';
 import styles from './page.module.css';
 
 type OrganizerConsolePageClientProps = {
@@ -66,8 +67,15 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     session,
     eventTypes: organizer.state.eventTypes,
   });
+  const pageState = getOrganizerConsolePageState({
+    ready,
+    authChecking,
+    session,
+    authedUser,
+    hasResolvedInitialLoad: organizer.hasResolvedInitialLoad,
+  });
 
-  if (!ready || authChecking) {
+  if (pageState === 'auth-loading') {
     return (
       <PageShell
         eyebrow="Feature 12"
@@ -81,7 +89,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     );
   }
 
-  if (!session || !authedUser) {
+  if (pageState === 'signed-out') {
     return (
       <PageShell
         eyebrow="Authentication required"
@@ -98,6 +106,23 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     );
   }
 
+  if (pageState === 'data-loading') {
+    return (
+      <PageShell
+        eyebrow="Feature 12"
+        title="Organizer Console"
+        description="Run the core scheduling controls from one place."
+        className={styles.loadingShell}
+        stackClassName={styles.loadingStack}
+        introClassName={styles.loadingIntro}
+      >
+        <Card className={styles.loadingCard}>
+          <p>Loading organizer controls…</p>
+        </Card>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell
       eyebrow="Feature 12"
@@ -107,7 +132,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       <OrganizerHero
         apiBaseUrl={apiBaseUrl}
         session={session}
-        authedUser={authedUser}
+        authedUser={authedUser as NonNullable<typeof authedUser>}
         isRefreshing={organizer.isRefreshing}
         busyCount={busy.busyActions.size}
         globalError={organizer.globalError}

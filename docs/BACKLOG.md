@@ -1,5 +1,64 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 67 (PR#76): Organizer bootstrap false-empty-state fix
+
+Scope:
+
+- Prevent the organizer console from rendering empty-state panels before the first authenticated bootstrap completes.
+- Keep the fix scoped to organizer bootstrap/render timing without changing organizer API contracts.
+- Add a small regression test for the organizer page-state decision.
+
+Acceptance criteria:
+
+- Signed-in organizer users see a loading state while the first organizer bootstrap is still resolving.
+- The organizer console no longer shows `No provider statuses available.` or other fake empty panels during initial bootstrap.
+- Once bootstrap resolves, the existing organizer sections render normally, including connected calendar provider rows.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
+## Feature 66 (PR#76): Beta-blocking authenticated demo and organizer fixes
+
+Scope:
+
+- Fix the organizer mutation crash caused by demo quota timestamp serialization.
+- Normalize the remaining browser-side local API requests so authenticated demo, booking, booking-action, and embed flows use the active local hostname consistently.
+- Track the current beta-blocking findings in a dedicated doc that can be updated as issues are resolved.
+
+Acceptance criteria:
+
+- Organizer event-type creation no longer crashes with `input.admittedAt.toISOString is not a function`.
+- Signed-in one-on-one and team demo pages can load launch-demo event details on local development without host mismatch failures.
+- Embed playground preview and booking-action flows use the active local hostname consistently in local development.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
+## Feature 65 (PR#76): Clerk Google sign-in session exchange fix
+
+Scope:
+
+- Fix Clerk session exchange failures after Google sign-in in local development and production-like flows.
+- Ensure the client only forwards usernames that satisfy the app username contract before calling the Clerk exchange endpoint.
+- Add regression coverage for the username filtering logic used by the auth session bridge.
+
+Acceptance criteria:
+
+- Google/Clerk sign-in is not blocked by provider-generated usernames that fall outside the app username pattern.
+- The auth session bridge still sends valid app-compatible usernames when available and drops invalid ones safely.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 64 (PR#TBD): Marketing cards and mobile alignment polish
 
 Scope:

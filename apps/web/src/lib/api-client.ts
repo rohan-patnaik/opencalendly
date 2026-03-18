@@ -1,4 +1,5 @@
 import { API_REQUEST_CREDENTIALS, type AuthSession } from './auth-session';
+import { normalizeLocalBrowserUrl } from './api-base-url';
 
 type ApiErrorPayload = {
   ok?: boolean;
@@ -33,7 +34,8 @@ const authedJson = async <T>(input: {
     headers['Content-Type'] = 'application/json';
   }
 
-  const response = await fetch(input.url, {
+  const normalizedUrl = normalizeLocalBrowserUrl(input.url);
+  const response = await fetch(normalizedUrl, {
     method: input.method,
     cache: 'no-store',
     credentials: API_REQUEST_CREDENTIALS,
@@ -108,7 +110,7 @@ export const authedDeleteJson = async <T>(input: {
 };
 
 export const revokeApiSession = async (apiBaseUrl: string): Promise<void> => {
-  const response = await fetch(`${apiBaseUrl}/v0/auth/logout`, {
+  const response = await fetch(normalizeLocalBrowserUrl(`${apiBaseUrl}/v0/auth/logout`), {
     method: 'POST',
     cache: 'no-store',
     credentials: API_REQUEST_CREDENTIALS,

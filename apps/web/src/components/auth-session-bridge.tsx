@@ -3,7 +3,7 @@
 import { useAuth, useUser } from '@clerk/nextjs';
 import { useEffect, useRef, useState } from 'react';
 
-import { resolveApiBaseUrl } from '../lib/api-base-url';
+import { normalizeLocalBrowserUrl, resolveApiBaseUrl } from '../lib/api-base-url';
 import {
   API_REQUEST_CREDENTIALS,
   clearAuthSession,
@@ -12,6 +12,7 @@ import {
 } from '../lib/auth-session';
 import {
   resolveBrowserTimezone,
+  resolveClerkExchangeUsername,
   shouldExchangeClerkSession,
   shouldPreserveSignedOutSession,
 } from '../lib/clerk-session-bridge';
@@ -102,7 +103,7 @@ export default function AuthSessionBridge() {
         requestTimeout = setTimeout(() => {
           abortController.abort();
         }, EXCHANGE_REQUEST_TIMEOUT_MS);
-        response = await fetch(`${apiBaseUrl}/v0/auth/clerk/exchange`, {
+        response = await fetch(normalizeLocalBrowserUrl(`${apiBaseUrl}/v0/auth/clerk/exchange`), {
           method: 'POST',
           credentials: API_REQUEST_CREDENTIALS,
           headers: {
@@ -112,7 +113,7 @@ export default function AuthSessionBridge() {
           signal: abortController.signal,
           body: JSON.stringify({
             clerkToken,
-            username: user?.username ?? undefined,
+            username: resolveClerkExchangeUsername(user?.username),
             displayName: user?.fullName ?? undefined,
             timezone: resolveBrowserTimezone(),
           }),

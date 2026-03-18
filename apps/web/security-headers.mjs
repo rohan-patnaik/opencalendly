@@ -7,6 +7,8 @@ const CLERK_IMAGE_ORIGINS = [
   'https://img.clerk.com',
 ];
 
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '::1'];
+
 const normalizeOrigin = (value) => {
   if (!value) {
     return null;
@@ -47,6 +49,27 @@ export const resolveClerkFrontendApiOrigin = (publishableKey) => {
 const toDirective = (name, values) =>
   `${name} ${Array.from(new Set(values.filter(Boolean))).join(' ')}`;
 
+const expandLocalDevelopmentOrigins = (origin) => {
+  if (!origin) {
+    return [];
+  }
+
+  try {
+    const url = new URL(origin);
+    const normalizedHostname = url.hostname.trim().toLowerCase().replace(/^\[(.*)\]$/, '$1');
+    if (!LOCAL_HOSTNAMES.includes(normalizedHostname)) {
+      return [url.origin];
+    }
+
+    return LOCAL_HOSTNAMES.map((hostname) => {
+      const formattedHostname = hostname.includes(':') ? `[${hostname}]` : hostname;
+      return `${url.protocol}//${formattedHostname}${url.port ? `:${url.port}` : ''}`;
+    });
+  } catch {
+    return [origin];
+  }
+};
+
 export const buildWebCsp = (input = {}) => {
   const isDevelopment = input.isDevelopment === true;
   const appOrigin = normalizeOrigin(input.appBaseUrl)
@@ -56,23 +79,25 @@ export const buildWebCsp = (input = {}) => {
   const clerkOrigin = resolveClerkFrontendApiOrigin(input.clerkPublishableKey);
 
   const clerkSources = clerkOrigin ? [clerkOrigin] : CLERK_FALLBACK_ORIGINS;
+  const appSources = isDevelopment ? expandLocalDevelopmentOrigins(appOrigin) : [appOrigin];
+  const apiSources = isDevelopment ? expandLocalDevelopmentOrigins(apiOrigin) : [apiOrigin];
   const connectSrc = [
     "'self'",
-    appOrigin,
-    apiOrigin,
+    ...appSources,
+    ...apiSources,
     ...clerkSources,
   ];
   const scriptSrc = [
     "'self'",
     "'unsafe-inline'",
     ...(isDevelopment ? ["'unsafe-eval'"] : []),
-    apiOrigin,
+    ...apiSources,
     'https://challenges.cloudflare.com',
     ...clerkSources,
   ];
   const frameSrc = [
     "'self'",
-    appOrigin,
+    ...appSources,
     'https://challenges.cloudflare.com',
     ...clerkSources,
   ];
@@ -85,7 +110,7 @@ export const buildWebCsp = (input = {}) => {
   const styleSrc = ["'self'", "'unsafe-inline'"];
   const fontSrc = ["'self'", 'data:', 'https:'];
   const workerSrc = ["'self'", 'blob:'];
-  const formAction = ["'self'", appOrigin, ...clerkSources];
+  const formAction = ["'self'", ...appSources, ...clerkSources];
 
   return [
     toDirective('default-src', ["'self'"]),
