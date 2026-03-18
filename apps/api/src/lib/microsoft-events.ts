@@ -1,7 +1,15 @@
 import type { FetchLike } from './microsoft-shared';
 import { MICROSOFT_EVENTS_URL, readErrorPayload, toGraphDateTime } from './microsoft-shared';
 
-const MICROSOFT_IDEMPOTENCY_LOOKUP_LIMIT = 25;
+const DEFAULT_MICROSOFT_IDEMPOTENCY_LOOKUP_LIMIT = 100;
+
+export const getMicrosoftIdempotencyLookupLimit = (): number => {
+  const parsed = Number.parseInt(process.env.MICROSOFT_IDEMPOTENCY_LOOKUP_LIMIT ?? '', 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_MICROSOFT_IDEMPOTENCY_LOOKUP_LIMIT;
+};
 
 export const createMicrosoftCalendarEvent = async (
   input: {
@@ -62,10 +70,13 @@ export const findMicrosoftCalendarEventByIdempotencyKey = async (
   input: { accessToken: string; idempotencyKey: string },
   fetchImpl: FetchLike = fetch,
 ): Promise<{ externalEventId: string } | null> => {
+  // This is a best-effort retry window used after Graph accepts an event but the
+  // corresponding database write fails. Operators can widen it via env when they
+  // expect higher event volume between retries.
   const url = new URL(MICROSOFT_EVENTS_URL);
   url.searchParams.set('$select', 'id,transactionId,createdDateTime');
   url.searchParams.set('$orderby', 'createdDateTime desc');
-  url.searchParams.set('$top', String(MICROSOFT_IDEMPOTENCY_LOOKUP_LIMIT));
+  url.searchParams.set('$top', String(getMicrosoftIdempotencyLookupLimit()));
 
   const response = await fetchImpl(url.toString(), {
     method: 'GET',
