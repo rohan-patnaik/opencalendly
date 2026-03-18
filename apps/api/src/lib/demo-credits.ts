@@ -65,6 +65,19 @@ export type DemoQuotaStatus = {
   featureCosts: DemoFeatureCost[];
 };
 
+const toIsoTimestamp = (value: Date | string | null | undefined): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
+
+  return value.toISOString();
+};
+
 const clampPositiveInteger = (input: {
   rawValue: string | undefined;
   fallback: number;
@@ -139,8 +152,8 @@ export const buildDemoAccountStatus = (input: {
   isBypass: boolean;
   creditsLimit: number | null;
   creditsUsed: number;
-  admittedAt?: Date | null;
-  lastActivityAt?: Date | null;
+  admittedAt?: Date | string | null;
+  lastActivityAt?: Date | string | null;
 }): DemoAccountStatus => {
   const creditsUsed = Math.max(0, input.creditsUsed);
   const creditsLimit =
@@ -156,8 +169,8 @@ export const buildDemoAccountStatus = (input: {
     creditsUsed,
     remaining,
     isExhausted: remaining === 0 && creditsLimit !== null,
-    admittedAt: input.admittedAt ? input.admittedAt.toISOString() : null,
-    lastActivityAt: input.lastActivityAt ? input.lastActivityAt.toISOString() : null,
+    admittedAt: toIsoTimestamp(input.admittedAt),
+    lastActivityAt: toIsoTimestamp(input.lastActivityAt),
   };
 };
 

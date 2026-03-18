@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AuthSession } from './auth-session';
 import {
   buildClerkSyncKey,
+  resolveClerkExchangeUsername,
   shouldExchangeClerkSession,
   shouldPreserveSignedOutSession,
 } from './clerk-session-bridge';
@@ -19,6 +20,16 @@ const buildSession = (email: string): AuthSession => ({
 });
 
 describe('clerk session bridge helpers', () => {
+  it('keeps app-compatible clerk usernames for exchange', () => {
+    expect(resolveClerkExchangeUsername('Demo-User')).toBe('demo-user');
+  });
+
+  it('drops clerk usernames that do not match the app username contract', () => {
+    expect(resolveClerkExchangeUsername('john.doe')).toBeUndefined();
+    expect(resolveClerkExchangeUsername('john_doe')).toBeUndefined();
+    expect(resolveClerkExchangeUsername('')).toBeUndefined();
+  });
+
   it('builds sync key using session id and normalized email', () => {
     expect(
       buildClerkSyncKey({

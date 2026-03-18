@@ -9,6 +9,7 @@ import type {
 
 import { buildEmailDeliveryMessage } from '../../lib/booking-outcome';
 import { API_REQUEST_CREDENTIALS } from '../../lib/auth-session';
+import { normalizeLocalBrowserUrl } from '../../lib/api-base-url';
 import { useDemoQuota } from '../../lib/demo-quota';
 import {
   COMMON_TIMEZONES,
@@ -100,7 +101,9 @@ export function useTeamBooking(input: TeamBookingArgs) {
 
     try {
       const response = await fetch(
-        `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}`,
+        normalizeLocalBrowserUrl(
+          `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}`,
+        ),
         {
           cache: 'no-store',
           credentials: API_REQUEST_CREDENTIALS,
@@ -140,7 +143,9 @@ export function useTeamBooking(input: TeamBookingArgs) {
         days: '7',
       });
       const response = await fetch(
-        `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
+        normalizeLocalBrowserUrl(
+          `${apiBaseUrl}/v0/teams/${encodeURIComponent(teamSlug)}/event-types/${encodeURIComponent(eventSlug)}/availability?${params.toString()}`,
+        ),
         {
           cache: 'no-store',
           credentials: API_REQUEST_CREDENTIALS,
@@ -219,7 +224,7 @@ export function useTeamBooking(input: TeamBookingArgs) {
       if (!bookingRequestKey) {
         setBookingRequestKey(requestIdempotencyKey);
       }
-      const response = await fetch(`${apiBaseUrl}/v0/team-bookings`, {
+      const response = await fetch(normalizeLocalBrowserUrl(`${apiBaseUrl}/v0/team-bookings`), {
         method: 'POST',
         credentials: API_REQUEST_CREDENTIALS,
         headers: {

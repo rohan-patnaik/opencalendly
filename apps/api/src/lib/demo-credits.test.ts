@@ -74,6 +74,25 @@ describe('demo quota helpers', () => {
     });
   });
 
+  it('serializes both Date and string timestamps safely', () => {
+    const admittedAt = '2026-03-17T13:00:00.000Z';
+    const lastActivityAt = new Date('2026-03-17T14:00:00.000Z');
+
+    expect(
+      buildDemoAccountStatus({
+        admitted: true,
+        isBypass: false,
+        creditsLimit: 20,
+        creditsUsed: 7,
+        admittedAt,
+        lastActivityAt,
+      }),
+    ).toMatchObject({
+      admittedAt,
+      lastActivityAt: '2026-03-17T14:00:00.000Z',
+    });
+  });
+
   it('builds a full quota status payload with feature costs', () => {
     const status = buildDemoQuotaStatus({
       date: '2026-02-26',

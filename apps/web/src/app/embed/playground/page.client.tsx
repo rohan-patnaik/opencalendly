@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { normalizeLocalBrowserUrl } from '../../../lib/api-base-url';
 import { getBrowserTimezone } from '../../../lib/public-booking';
 import styles from './page.module.css';
 
@@ -27,6 +28,7 @@ const toScriptSnippet = (input: {
 export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroundPageClientProps) {
   const previewHostRef = useRef<HTMLDivElement | null>(null);
 
+  const [resolvedApiBaseUrl, setResolvedApiBaseUrl] = useState(apiBaseUrl.replace(/\/$/, ''));
   const [username, setUsername] = useState('demo');
   const [eventSlug, setEventSlug] = useState('intro-call');
   const [timezone, setTimezone] = useState(DEFAULT_EMBED_TIMEZONE);
@@ -37,6 +39,13 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
   const [title, setTitle] = useState(DEFAULT_TITLE);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
+  useEffect(() => {
+    const normalizedApiBaseUrl = normalizeLocalBrowserUrl(apiBaseUrl).replace(/\/$/, '');
+    if (normalizedApiBaseUrl !== resolvedApiBaseUrl) {
+      setResolvedApiBaseUrl(normalizedApiBaseUrl);
+    }
+  }, [apiBaseUrl, resolvedApiBaseUrl]);
+
   const scriptSrc = useMemo(() => {
     const params = new URLSearchParams({
       username: username.trim() || 'demo',
@@ -44,8 +53,8 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
       timezone: timezone.trim() || 'UTC',
       theme: 'dark',
     });
-    return `${apiBaseUrl}/v0/embed/widget.js?${params.toString()}`;
-  }, [apiBaseUrl, eventSlug, timezone, username]);
+    return `${resolvedApiBaseUrl}/v0/embed/widget.js?${params.toString()}`;
+  }, [eventSlug, resolvedApiBaseUrl, timezone, username]);
 
   const scriptSnippet = useMemo(() => {
     return toScriptSnippet({
@@ -57,6 +66,14 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
       title: title.trim() || DEFAULT_TITLE,
     });
   }, [height, radius, scriptSrc, shadow, title, width]);
+
+  const resolvedApiOrigin = useMemo(() => {
+    try {
+      return new URL(resolvedApiBaseUrl).origin;
+    } catch {
+      return resolvedApiBaseUrl;
+    }
+  }, [resolvedApiBaseUrl]);
 
   useEffect(() => {
     setTimezone((currentTimezone) => {
@@ -220,7 +237,7 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
         <div className={styles.card}>
           <h2>Live preview</h2>
           <p className={styles.muted}>
-            Ensure API worker is running locally at <code>{apiBaseUrl}</code>.
+            Ensure API worker is running locally at <code>{resolvedApiOrigin}</code>.
           </p>
           <div ref={previewHostRef} className={styles.previewHost} />
         </div>

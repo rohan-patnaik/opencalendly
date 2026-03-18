@@ -1,4 +1,5 @@
 import { API_REQUEST_CREDENTIALS, type AuthSession } from '../../lib/auth-session';
+import { normalizeLocalBrowserUrl } from '../../lib/api-base-url';
 import type {
   AvailabilityResponse,
   BookingActionApiError,
@@ -27,7 +28,9 @@ export const fetchBookingAction = async (input: {
   session: AuthSession | null;
 }) => {
   const response = await fetch(
-    `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}`,
+    normalizeLocalBrowserUrl(
+      `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}`,
+    ),
     {
       cache: 'no-store',
       credentials: API_REQUEST_CREDENTIALS,
@@ -53,7 +56,7 @@ export const fetchBookingActionAvailability = async (input: {
     ? `/v0/teams/${encodeURIComponent(input.actionData.booking.team.teamSlug)}/event-types/${encodeURIComponent(input.actionData.eventType.slug)}/availability?${params.toString()}`
     : `/v0/users/${encodeURIComponent(input.actionData.organizer.username)}/event-types/${encodeURIComponent(input.actionData.eventType.slug)}/availability?${params.toString()}`;
 
-  const response = await fetch(`${input.apiBaseUrl}${path}`, {
+  const response = await fetch(normalizeLocalBrowserUrl(`${input.apiBaseUrl}${path}`), {
     cache: 'no-store',
     credentials: API_REQUEST_CREDENTIALS,
   });
@@ -68,7 +71,9 @@ export const postBookingCancel = async (input: {
   cancelReason: string;
 }) => {
   const response = await fetch(
-    `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}/cancel`,
+    normalizeLocalBrowserUrl(
+      `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}/cancel`,
+    ),
     {
       method: 'POST',
       credentials: API_REQUEST_CREDENTIALS,
@@ -93,7 +98,9 @@ export const postBookingReschedule = async (input: {
   idempotencyKey: string;
 }) => {
   const response = await fetch(
-    `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}/reschedule`,
+    normalizeLocalBrowserUrl(
+      `${input.apiBaseUrl}/v0/bookings/actions/${encodeURIComponent(input.token)}/reschedule`,
+    ),
     {
       method: 'POST',
       credentials: API_REQUEST_CREDENTIALS,

@@ -11,7 +11,17 @@
   align-content: center;
 }
 
+.loadingShell {
+  min-height: calc(100vh - var(--app-header-height) - 2rem);
+  display: grid;
+  align-content: center;
+}
+
 .signedOutStack {
+  justify-items: center;
+}
+
+.loadingStack {
   justify-items: center;
 }
 
@@ -20,9 +30,20 @@
   text-align: center;
 }
 
+.loadingIntro {
+  justify-items: center;
+  text-align: center;
+}
+
 .signedOutCard {
   width: min(100%, 860px);
   justify-items: center;
+}
+
+.loadingCard {
+  width: min(100%, 860px);
+  justify-items: center;
+  text-align: center;
 }
 
 .signedOutCard .rowActions {

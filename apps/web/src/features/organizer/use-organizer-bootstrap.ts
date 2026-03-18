@@ -31,6 +31,7 @@ export const useOrganizerBootstrap = ({
   refreshDemoQuota,
 }: UseOrganizerBootstrapInput) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasResolvedInitialLoad, setHasResolvedInitialLoad] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [state, setState] = useState<OrganizerSectionsState>(emptyState);
   const [selectedTeamId, setSelectedTeamId] = useState('');
@@ -90,6 +91,7 @@ export const useOrganizerBootstrap = ({
     } catch (caught) {
       setGlobalError(caught instanceof Error ? caught.message : 'Unable to load organizer console.');
     } finally {
+      setHasResolvedInitialLoad(true);
       setIsRefreshing(false);
     }
   }, [apiBaseUrl, refreshDemoQuota, session]);
@@ -99,6 +101,7 @@ export const useOrganizerBootstrap = ({
       setState(emptyState);
       setSelectedTeamId('');
       setGlobalError(null);
+      setHasResolvedInitialLoad(false);
       return;
     }
 
@@ -128,6 +131,7 @@ export const useOrganizerBootstrap = ({
   }, [state.calendarStatuses, state.eventTypes.length, state.teams, state.webhooks.length, state.writebackStatus?.summary.failed]);
 
   return {
+    hasResolvedInitialLoad,
     isRefreshing,
     globalError,
     state,

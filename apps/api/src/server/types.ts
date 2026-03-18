@@ -112,8 +112,8 @@ export type DemoAccountDailyUsageRow = {
   creditsLimit: number;
   creditsUsed: number;
   isBypass: boolean;
-  admittedAt: Date;
-  lastActivityAt: Date;
+  admittedAt: Date | string;
+  lastActivityAt: Date | string;
 };
 export type WebhookSubscriptionRecord = {
   id: string;

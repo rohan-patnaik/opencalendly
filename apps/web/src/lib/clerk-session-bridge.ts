@@ -1,11 +1,23 @@
 import type { AuthSession } from './auth-session';
 
+const APP_USERNAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export const resolveBrowserTimezone = (): string => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   } catch {
     return 'UTC';
   }
+};
+
+export const resolveClerkExchangeUsername = (
+  username: string | null | undefined,
+): string | undefined => {
+  const normalized = username?.trim().toLowerCase();
+  if (!normalized || !APP_USERNAME_PATTERN.test(normalized)) {
+    return undefined;
+  }
+  return normalized;
 };
 
 export const buildClerkSyncKey = (input: {
