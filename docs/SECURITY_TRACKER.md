@@ -1,6 +1,6 @@
 # Security / Beta Blocker Tracker
 
-Last updated: 2026-03-18T19:41:59+05:30
+Last updated: 2026-03-19T01:18:00+05:30
 
 This document tracks the highest-priority blockers discovered during authenticated QA before beta access is opened wider. Some items are reliability defects rather than traditional security issues, but they are tracked here per release-review request.
 
@@ -24,7 +24,47 @@ Observed behavior:
   - App-managed booking create triggered immediate calendar writeback with `succeeded: 1`
   - The Google Calendar event was present in the connected primary calendar
   - App-managed booking cancel triggered immediate calendar writeback with `succeeded: 1`
-  - The same Google Calendar event transitioned to `status: cancelled`
+- The same Google Calendar event transitioned to `status: cancelled`
+
+### Microsoft calendar integration verification
+
+Status: Resolved after Azure local OAuth app setup and Microsoft writeback lookup fix
+
+Observed behavior:
+
+- Local Azure App Registration was configured with:
+  - redirect URI `http://localhost:3000/settings/calendar/microsoft/callback`
+  - supported accounts `Any Entra ID tenant + Personal Microsoft accounts`
+  - Microsoft Graph delegated permissions:
+    - `openid`
+    - `email`
+    - `offline_access`
+    - `User.Read`
+    - `Calendars.Read`
+    - `Calendars.ReadWrite`
+- Verified with the provided Outlook account:
+  - first-time Microsoft sign-up created the OpenCalendly account
+  - returning-user Microsoft sign-in succeeded afterward
+  - Microsoft calendar connect completed successfully
+  - Microsoft calendar sync completed successfully from organizer
+- Writeback initially retried forever because the Microsoft idempotency lookup attempted:
+  - `GET /me/events?$filter=transactionId eq '...'`
+  - Microsoft Graph rejected that with `ErrorInvalidProperty` because `transactionId` does not support filtering
+
+Resolution summary:
+
+- Replaced the unsupported Microsoft Graph `$filter=transactionId ...` lookup with a recent-events query ordered by `createdDateTime desc`, then filtered client-side by `transactionId`.
+- Added regression tests for the Microsoft recent-events lookup and event create payload.
+- Re-verified end-to-end:
+  - Microsoft calendar connect
+  - Microsoft calendar sync
+  - Microsoft writeback create through the queue runner
+  - Microsoft writeback cancel through the queue runner
+  - Microsoft writeback reschedule through the real booking-action API
+- Confirmed in Outlook/Graph:
+  - created event present with matching `transactionId`
+  - canceled/deleted event returns `404` after queue cancellation
+  - rescheduled booking keeps the same Outlook event ID and the writeback row completes with `status: succeeded`
 
 ## Resolved
 
@@ -111,8 +151,9 @@ Verified end-to-end on the authenticated demo account:
 - Google calendar provider sync
 - Google calendar provider writeback create
 - Google calendar provider writeback cancel
-
-Still external-provider dependent and not fully verified in this pass:
-
-- Microsoft social sign-in flow
-- Microsoft calendar provider connect / sync / writeback
+- Microsoft social sign-in
+- Microsoft calendar provider connect
+- Microsoft calendar provider sync
+- Microsoft calendar provider writeback create
+- Microsoft calendar provider writeback cancel
+- Microsoft calendar provider writeback reschedule

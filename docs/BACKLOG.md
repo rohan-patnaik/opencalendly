@@ -1,5 +1,29 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 68 (PR#TBD): Microsoft calendar writeback lookup fix
+
+Scope:
+
+- Finish local Microsoft provider verification for sign-in, calendar connect, sync, and writeback.
+- Fix the Microsoft writeback idempotency lookup so queue retries can safely reuse already-created Outlook events.
+- Keep the change scoped to the Microsoft calendar integration and its regression coverage.
+
+Acceptance criteria:
+
+- Microsoft social sign-in works for the configured Outlook demo account.
+- Microsoft calendar connect completes successfully through the organizer flow.
+- Microsoft calendar sync succeeds with the configured Microsoft provider.
+- Microsoft calendar writeback create succeeds and stores the external event ID.
+- Microsoft calendar writeback cancel succeeds and removes the Outlook event.
+- Microsoft calendar writeback reschedule succeeds and preserves the linked Outlook event.
+- Validation passes:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run env:check`
+  - `npx vitest run apps/api/src/lib/microsoft-events.test.ts apps/api/src/lib/calendar-writeback.test.ts`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 67 (PR#76): Organizer bootstrap false-empty-state fix
 
 Scope:

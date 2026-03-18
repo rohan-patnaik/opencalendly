@@ -1,6 +1,16 @@
 import type { FetchLike } from './microsoft-shared';
 import { MICROSOFT_EVENTS_URL, readErrorPayload, toGraphDateTime } from './microsoft-shared';
 
+const DEFAULT_MICROSOFT_IDEMPOTENCY_LOOKUP_LIMIT = 100;
+
+export const getMicrosoftIdempotencyLookupLimit = (): number => {
+  const parsed = Number.parseInt(process.env.MICROSOFT_IDEMPOTENCY_LOOKUP_LIMIT ?? '', 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_MICROSOFT_IDEMPOTENCY_LOOKUP_LIMIT;
+};
+
 export const createMicrosoftCalendarEvent = async (
   input: {
     accessToken: string;
@@ -60,11 +70,13 @@ export const findMicrosoftCalendarEventByIdempotencyKey = async (
   input: { accessToken: string; idempotencyKey: string },
   fetchImpl: FetchLike = fetch,
 ): Promise<{ externalEventId: string } | null> => {
+  // This is a best-effort retry window used after Graph accepts an event but the
+  // corresponding database write fails. Operators can widen it via env when they
+  // expect higher event volume between retries.
   const url = new URL(MICROSOFT_EVENTS_URL);
-  const escapedIdempotencyKey = input.idempotencyKey.replace(/'/g, "''");
-  url.searchParams.set('$filter', `transactionId eq '${escapedIdempotencyKey}'`);
-  url.searchParams.set('$select', 'id');
-  url.searchParams.set('$top', '1');
+  url.searchParams.set('$select', 'id,transactionId,createdDateTime');
+  url.searchParams.set('$orderby', 'createdDateTime desc');
+  url.searchParams.set('$top', String(getMicrosoftIdempotencyLookupLimit()));
 
   const response = await fetchImpl(url.toString(), {
     method: 'GET',
@@ -75,8 +87,12 @@ export const findMicrosoftCalendarEventByIdempotencyKey = async (
     throw new Error(`Microsoft calendar event lookup failed: ${await readErrorPayload(response)}`);
   }
 
-  const parsed = (await response.json()) as { value?: Array<{ id?: string }> };
-  const externalEventId = parsed.value?.[0]?.id;
+  const parsed = (await response.json()) as {
+    value?: Array<{ id?: string; transactionId?: string | null }>;
+  };
+  const externalEventId = parsed.value?.find(
+    (event) => event.transactionId === input.idempotencyKey,
+  )?.id;
   if (typeof externalEventId !== 'string' || externalEventId.length === 0) {
     return null;
   }
