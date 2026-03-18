@@ -31,6 +31,12 @@ routes = [{ pattern = "api.opencalendly.com/*", zone_name = "opencalendly.com" }
 [env.production.vars]
 APP_BASE_URL = "https://opencalendly.com"
 RESEND_FROM_EMAIL = "OpenCalendly <no-reply@opencalendly.com>"
+ENABLE_DEV_AUTH_BOOTSTRAP = ""
+DEMO_DAILY_ACCOUNT_LIMIT = ""
+DEMO_DAILY_CREDIT_LIMIT = ""
+DEMO_CREDIT_BYPASS_EMAILS = ""
+GOOGLE_CLIENT_ID = ""
+MICROSOFT_CLIENT_ID = ""
 
 # Explicit production Hyperdrive binding.
 # Replace with a dedicated production Hyperdrive ID when provisioned.

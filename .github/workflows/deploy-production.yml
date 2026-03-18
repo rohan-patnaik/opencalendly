@@ -65,7 +65,21 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: npm run deploy:api:production
+        run: |
+          max_attempts=3
+          for attempt in $(seq 1 "$max_attempts"); do
+            echo "API deploy attempt ${attempt}/${max_attempts}"
+            if npm run deploy:api:production; then
+              exit 0
+            fi
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep_seconds=$((attempt * 20))
+              echo "API deploy failed; retrying in ${sleep_seconds}s..."
+              sleep "$sleep_seconds"
+            fi
+          done
+          echo "API deploy failed after ${max_attempts} attempts."
+          exit 1
 
       - name: Deploy web (Pages production)
         env:

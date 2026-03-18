@@ -1,5 +1,23 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 71 (PR#TBD): Production deploy resilience for Cloudflare API timeouts
+
+Scope:
+
+- Remove Wrangler production-environment var drift so the production Worker config is explicit and warning-free.
+- Add a bounded retry around the production API Worker deploy step to absorb transient Cloudflare API `503`/timeout failures.
+- Keep the change scoped to deployment reliability with no product behavior changes.
+
+Acceptance criteria:
+
+- `apps/api/wrangler.toml` no longer warns that top-level `vars` are missing from `env.production.vars` for production deploys.
+- The production GitHub Actions workflow retries the API Worker deploy step with explicit attempt logging and bounded backoff.
+- A transient Cloudflare Worker deploy failure does not immediately fail the whole production deployment until the retry budget is exhausted.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `git diff --check`
+
 ## Feature 70 (PR#79): GA security hardening and reliability verification
 
 Scope:
