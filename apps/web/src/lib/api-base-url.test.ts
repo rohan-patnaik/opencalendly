@@ -43,3 +43,33 @@ describe('resolveApiBaseUrl', () => {
     expect(resolveApiBaseUrl('test route')).toBe('http://localhost:8787');
   });
 });
+
+describe('normalizeLocalBrowserUrl', () => {
+  afterEach(() => {
+    restoreEnv();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it('normalizes local browser URLs to the active hostname', async () => {
+    vi.stubGlobal('window', {
+      location: {
+        hostname: 'localhost',
+      },
+    });
+
+    const { normalizeLocalBrowserUrl } = await import('./api-base-url');
+
+    expect(normalizeLocalBrowserUrl('http://127.0.0.1:8787/v0/test')).toBe(
+      'http://localhost:8787/v0/test',
+    );
+  });
+
+  it('preserves non-local browser URLs', async () => {
+    const { normalizeLocalBrowserUrl } = await import('./api-base-url');
+
+    expect(normalizeLocalBrowserUrl('https://api.example.com/v0/test')).toBe(
+      'https://api.example.com/v0/test',
+    );
+  });
+});

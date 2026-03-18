@@ -123,11 +123,6 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
     );
   }
 
-  const organizerUser = authedUser;
-  if (!session || !organizerUser) {
-    return null;
-  }
-
   return (
     <PageShell
       eyebrow="Feature 12"
@@ -137,7 +132,7 @@ export default function OrganizerConsolePageClient({ apiBaseUrl }: OrganizerCons
       <OrganizerHero
         apiBaseUrl={apiBaseUrl}
         session={session}
-        authedUser={organizerUser}
+        authedUser={authedUser as NonNullable<typeof authedUser>}
         isRefreshing={organizer.isRefreshing}
         busyCount={busy.busyActions.size}
         globalError={organizer.globalError}

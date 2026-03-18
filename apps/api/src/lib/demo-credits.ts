@@ -75,6 +75,10 @@ const toIsoTimestamp = (value: Date | string | null | undefined): string | null 
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
   }
 
+  if (Number.isNaN(value.getTime())) {
+    return null;
+  }
+
   return value.toISOString();
 };
 

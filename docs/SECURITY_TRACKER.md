@@ -1,6 +1,6 @@
 # Security / Beta Blocker Tracker
 
-Last updated: 2026-03-18 IST
+Last updated: 2026-03-18T19:41:59+05:30
 
 This document tracks the highest-priority blockers discovered during authenticated QA before beta access is opened wider. Some items are reliability defects rather than traditional security issues, but they are tracked here per release-review request.
 

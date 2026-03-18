@@ -28,7 +28,7 @@ const toScriptSnippet = (input: {
 export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroundPageClientProps) {
   const previewHostRef = useRef<HTMLDivElement | null>(null);
 
-  const [resolvedApiBaseUrl, setResolvedApiBaseUrl] = useState(apiBaseUrl.replace(/\/$/, ''));
+  const [resolvedApiBaseUrl, setResolvedApiBaseUrl] = useState(() => normalizeLocalBrowserUrl(apiBaseUrl));
   const [username, setUsername] = useState('demo');
   const [eventSlug, setEventSlug] = useState('intro-call');
   const [timezone, setTimezone] = useState(DEFAULT_EMBED_TIMEZONE);
@@ -40,11 +40,8 @@ export default function EmbedPlaygroundPageClient({ apiBaseUrl }: EmbedPlaygroun
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const normalizedApiBaseUrl = normalizeLocalBrowserUrl(apiBaseUrl).replace(/\/$/, '');
-    if (normalizedApiBaseUrl !== resolvedApiBaseUrl) {
-      setResolvedApiBaseUrl(normalizedApiBaseUrl);
-    }
-  }, [apiBaseUrl, resolvedApiBaseUrl]);
+    setResolvedApiBaseUrl(normalizeLocalBrowserUrl(apiBaseUrl));
+  }, [apiBaseUrl]);
 
   const scriptSrc = useMemo(() => {
     const params = new URLSearchParams({

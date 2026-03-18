@@ -22,42 +22,31 @@ const resolvePreferredLocalHostname = (): string | null => {
   }
 };
 
-const normalizeLocalApiBaseUrl = (configured: string): string => {
-  try {
-    const url = new URL(configured);
-    if (!isLocalHostname(url.hostname)) {
-      return configured;
-    }
-
-    const preferredHostname = resolvePreferredLocalHostname();
-    if (!preferredHostname || preferredHostname === url.hostname) {
-      return configured;
-    }
-
-    url.hostname = preferredHostname;
-    return url.toString();
-  } catch {
-    return configured;
-  }
-};
-
-export const normalizeLocalBrowserUrl = (value: string): string => {
+const rewriteLocalHostnameInUrl = (value: string): string => {
   try {
     const url = new URL(value);
     if (!isLocalHostname(url.hostname)) {
-      return value;
+      return value.replace(/\/$/, '');
     }
 
     const preferredHostname = resolvePreferredLocalHostname();
     if (!preferredHostname || preferredHostname === url.hostname) {
-      return value;
+      return value.replace(/\/$/, '');
     }
 
     url.hostname = preferredHostname;
-    return url.toString();
+    return url.toString().replace(/\/$/, '');
   } catch {
-    return value;
+    return value.replace(/\/$/, '');
   }
+};
+
+const normalizeLocalApiBaseUrl = (configured: string): string => {
+  return rewriteLocalHostnameInUrl(configured);
+};
+
+export const normalizeLocalBrowserUrl = (value: string): string => {
+  return rewriteLocalHostnameInUrl(value);
 };
 
 export const resolveApiBaseUrl = (routeName: string): string => {
@@ -71,5 +60,5 @@ export const resolveApiBaseUrl = (routeName: string): string => {
     return 'http://localhost:8787';
   }
 
-  return normalizeLocalApiBaseUrl(configured).replace(/\/$/, '');
+  return normalizeLocalApiBaseUrl(configured);
 };

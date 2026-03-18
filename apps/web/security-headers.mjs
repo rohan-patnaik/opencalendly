@@ -62,9 +62,8 @@ const expandLocalDevelopmentOrigins = (origin) => {
     }
 
     return LOCAL_HOSTNAMES.map((hostname) => {
-      const nextUrl = new URL(url.origin);
-      nextUrl.hostname = hostname;
-      return nextUrl.origin;
+      const formattedHostname = hostname.includes(':') ? `[${hostname}]` : hostname;
+      return `${url.protocol}//${formattedHostname}${url.port ? `:${url.port}` : ''}`;
     });
   } catch {
     return [origin];

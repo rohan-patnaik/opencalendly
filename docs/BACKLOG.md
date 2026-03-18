@@ -1,6 +1,6 @@
 # Ordered Backlog (One Feature per PR)
 
-## Feature 67 (PR#TBD): Organizer bootstrap false-empty-state fix
+## Feature 67 (PR#76): Organizer bootstrap false-empty-state fix
 
 Scope:
 
@@ -14,12 +14,13 @@ Acceptance criteria:
 - The organizer console no longer shows `No provider statuses available.` or other fake empty panels during initial bootstrap.
 - Once bootstrap resolves, the existing organizer sections render normally, including connected calendar provider rows.
 - Validation passes:
-  - `npm run test -- apps/web/src/app/organizer/page-state.test.ts`
+  - `npm run env:check`
   - `npm run lint`
+  - `npm run test`
   - `npm run typecheck`
   - `git diff --check`
 
-## Feature 66 (PR#TBD): Beta-blocking authenticated demo and organizer fixes
+## Feature 66 (PR#76): Beta-blocking authenticated demo and organizer fixes
 
 Scope:
 
@@ -39,7 +40,7 @@ Acceptance criteria:
   - `npm run typecheck`
   - `git diff --check`
 
-## Feature 65 (PR#TBD): Clerk Google sign-in session exchange fix
+## Feature 65 (PR#76): Clerk Google sign-in session exchange fix
 
 Scope:
 

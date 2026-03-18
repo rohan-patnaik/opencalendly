@@ -93,6 +93,20 @@ describe('demo quota helpers', () => {
     });
   });
 
+  it('drops invalid Date timestamps instead of throwing', () => {
+    expect(
+      buildDemoAccountStatus({
+        admitted: true,
+        isBypass: false,
+        creditsLimit: 20,
+        creditsUsed: 7,
+        admittedAt: new Date('invalid'),
+      }),
+    ).toMatchObject({
+      admittedAt: null,
+    });
+  });
+
   it('builds a full quota status payload with feature costs', () => {
     const status = buildDemoQuotaStatus({
       date: '2026-02-26',

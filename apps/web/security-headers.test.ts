@@ -47,8 +47,10 @@ describe('web security headers', () => {
 
     expect(csp).toContain('http://localhost:3000');
     expect(csp).toContain('http://127.0.0.1:3000');
+    expect(csp).toContain('http://[::1]:3000');
     expect(csp).toContain('http://localhost:8787');
     expect(csp).toContain('http://127.0.0.1:8787');
+    expect(csp).toContain('http://[::1]:8787');
   });
 
   it('fails closed instead of whitelisting localhost in production', () => {
