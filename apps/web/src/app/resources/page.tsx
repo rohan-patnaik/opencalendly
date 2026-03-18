@@ -4,6 +4,12 @@ import styles from '../marketing-pages.module.css';
 
 const resources = [
   {
+    title: 'User FAQ',
+    description: 'Answers to common sign-in, calendar connection, and booking questions.',
+    href: 'https://github.com/rohan-patnaik/opencalendly/blob/main/docs/FAQ.md',
+    external: true,
+  },
+  {
     title: 'Backlog and acceptance criteria',
     description: 'The running plan for feature slices and merge gates.',
     href: 'https://github.com/rohan-patnaik/opencalendly/blob/main/docs/BACKLOG.md',
@@ -49,7 +55,12 @@ export default function ResourcesPage() {
               <h3>{resource.title}</h3>
               <p>{resource.description}</p>
               {resource.external ? (
-                <a href={resource.href} className={styles.secondaryButton} target="_blank" rel="noreferrer">
+                <a
+                  href={resource.href}
+                  className={styles.secondaryButton}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Open resource
                 </a>
               ) : (

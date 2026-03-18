@@ -1,5 +1,23 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 69 (PR#TBD): FAQ resource and homepage footer attribution
+
+Scope:
+
+- Add the new user FAQ document to the repository and surface it from the resources page.
+- Add a small footer credit line on the homepage without changing the current license label.
+- Keep the change scoped to marketing/docs presentation with no product behavior changes.
+
+Acceptance criteria:
+
+- `docs/FAQ.md` exists and covers the intended end-user auth/calendar/booking questions.
+- `/resources` includes a link to the FAQ document.
+- The homepage footer includes the requested attribution line while still showing the current project license string.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `git diff --check`
+
 ## Feature 68 (PR#TBD): Microsoft calendar writeback lookup fix
 
 Scope:

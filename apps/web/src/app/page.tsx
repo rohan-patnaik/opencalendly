@@ -354,6 +354,7 @@ export default function HomePage() {
             >
               GitHub repository
             </Link>
+            <p className={styles.footerCredit}>Made with ❤️ by Rohan Patnaik</p>
           </div>
           <div className={styles.footerColumns}>
             <div className={styles.footerColumn}>
