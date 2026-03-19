@@ -29,6 +29,8 @@ describe('resolveAllowedCorsOrigins', () => {
     const origins = resolveAllowedCorsOrigins(undefined);
     expect(origins.has('http://localhost:3000')).toBe(true);
     expect(origins.has('http://127.0.0.1:3000')).toBe(true);
+    expect(origins.has('http://localhost:3001')).toBe(true);
+    expect(origins.has('http://127.0.0.1:3001')).toBe(true);
   });
 
   it('adds APP_BASE_URL origin only when valid and http(s)', () => {
@@ -36,12 +38,19 @@ describe('resolveAllowedCorsOrigins', () => {
       new Set([
         'http://localhost:3000',
         'http://127.0.0.1:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3001',
         'https://product.example.com',
       ]),
     );
 
     expect(resolveAllowedCorsOrigins('file:///etc/passwd')).toEqual(
-      new Set(['http://localhost:3000', 'http://127.0.0.1:3000']),
+      new Set([
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:3001',
+        'http://127.0.0.1:3001',
+      ]),
     );
   });
 });

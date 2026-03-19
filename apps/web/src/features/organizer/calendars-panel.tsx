@@ -2,6 +2,7 @@
 
 import { organizerApi, type CalendarConnectionStatus } from '../../lib/organizer-api';
 import type { AuthSession } from '../../lib/auth-session';
+import { CalendarConnectActions } from './calendar-connect-actions';
 
 type OrganizerStyles = Record<string, string>;
 
@@ -28,29 +29,6 @@ export const CalendarsPanel = ({
   setPanelMessage: (message: string | null) => void;
   styles: OrganizerStyles;
 }) => {
-  const handleStartCalendarConnect = async (provider: 'google' | 'microsoft') => {
-    if (!session) {
-      return;
-    }
-
-    const action = `calendarConnect:${provider}`;
-    beginBusy(action);
-    setPanelError(null);
-    setPanelMessage(null);
-
-    try {
-      const redirectUri = `${window.location.origin}/settings/calendar/${provider}/callback`;
-      const payload =
-        provider === 'google'
-          ? await organizerApi.startGoogleConnect(apiBaseUrl, session, { redirectUri })
-          : await organizerApi.startMicrosoftConnect(apiBaseUrl, session, { redirectUri });
-      window.location.assign(payload.authUrl);
-    } catch (caught) {
-      setPanelError(caught instanceof Error ? caught.message : `Unable to start ${provider} connect flow.`);
-      endBusy(action);
-    }
-  };
-
   const handleCalendarSync = async (connection: CalendarConnectionStatus) => {
     if (!session) {
       return;
@@ -141,24 +119,15 @@ export const CalendarsPanel = ({
         <p className={styles.helperText}>
           Connect as many Google and Microsoft calendars as you need.
         </p>
-        <div className={styles.inlineActions}>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={() => void handleStartCalendarConnect('google')}
-            disabled={isBusy('calendarConnect:google')}
-          >
-            {isBusy('calendarConnect:google') ? 'Starting…' : 'Add Google calendar'}
-          </button>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={() => void handleStartCalendarConnect('microsoft')}
-            disabled={isBusy('calendarConnect:microsoft')}
-          >
-            {isBusy('calendarConnect:microsoft') ? 'Starting…' : 'Add Microsoft calendar'}
-          </button>
-        </div>
+        <CalendarConnectActions
+          apiBaseUrl={apiBaseUrl}
+          session={session}
+          isBusy={isBusy}
+          beginBusy={beginBusy}
+          endBusy={endBusy}
+          setPanelError={setPanelError}
+          styles={styles}
+        />
       </div>
 
       <div className={styles.form}>

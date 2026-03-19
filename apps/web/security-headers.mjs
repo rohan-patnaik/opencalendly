@@ -3,6 +3,10 @@ const CLERK_FALLBACK_ORIGINS = [
   'https://*.clerk.accounts.dev',
 ];
 
+const CLERK_CONNECT_ORIGINS = [
+  'https://clerk-telemetry.com',
+];
+
 const CLERK_IMAGE_ORIGINS = [
   'https://img.clerk.com',
 ];
@@ -79,13 +83,14 @@ export const buildWebCsp = (input = {}) => {
   const clerkOrigin = resolveClerkFrontendApiOrigin(input.clerkPublishableKey);
 
   const clerkSources = clerkOrigin ? [clerkOrigin] : CLERK_FALLBACK_ORIGINS;
+  const clerkConnectSources = [...clerkSources, ...CLERK_CONNECT_ORIGINS];
   const appSources = isDevelopment ? expandLocalDevelopmentOrigins(appOrigin) : [appOrigin];
   const apiSources = isDevelopment ? expandLocalDevelopmentOrigins(apiOrigin) : [apiOrigin];
   const connectSrc = [
     "'self'",
     ...appSources,
     ...apiSources,
-    ...clerkSources,
+    ...clerkConnectSources,
   ];
   const scriptSrc = [
     "'self'",

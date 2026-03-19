@@ -584,7 +584,7 @@ Behavior:
 - Uses DB unique slot constraint to avoid duplicate commits.
 - Enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) at commit time.
 - Creates secure cancel/reschedule action tokens (stored hashed server-side).
-- Sends booking confirmation email after successful write.
+- Attempts the booking confirmation email inline after the booking is written and returns the initial send result in the response.
 - Schedules enabled reminder/follow-up notification rows for this booking.
 - Enqueues and runs immediate calendar writeback for connected providers.
 - Route is rate-limited per IP + booking link key.
@@ -1575,6 +1575,14 @@ Behavior:
 ### `POST /v0/team-bookings`
 
 Public booking commit endpoint for team event types.
+
+Behavior:
+
+- Re-validates slot availability and team assignment at commit time.
+- Applies the same server-side booking-question validation rules as one-on-one booking.
+- Attempts the booking confirmation email inline after the booking is written and returns the initial send result in the response.
+- Schedules enabled reminder/follow-up notification rows for this booking.
+- Enqueues and runs immediate calendar writeback for connected providers.
 
 Request:
 

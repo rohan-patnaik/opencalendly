@@ -7,15 +7,14 @@ import {
   normalizeBookingAnswersForIdempotency,
 } from '../lib/booking';
 import { resolveAuthenticatedUser } from '../server/auth-session';
-import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
+import { emitAuditEvent } from '../server/audit';
 import { actionTokenMap, buildActionUrls } from '../server/booking-action-links';
 import {
   queueBookingCreatedSideEffects,
-  queuedEmailDelivery,
   sendBookingCreatedEmailSideEffects,
 } from '../server/booking-side-effects';
-import { jsonError, normalizeTimezone, queueBackgroundTask } from '../server/core';
-import { withConnectedDatabase, withDatabase } from '../server/database';
+import { jsonError, normalizeTimezone } from '../server/core';
+import { withDatabase } from '../server/database';
 import {
   jsonDemoQuotaError,
   requiresLaunchDemoAuthForTeamRoute,
@@ -135,27 +134,14 @@ export const registerTeamBookingCreateRoutes = (app: ApiApp): void => {
             assignmentUserIds: result.assignmentUserIds,
           },
         });
-        queueBackgroundTask(
-          context,
-          withConnectedDatabase(context, async (backgroundDb) => {
-            await sendBookingCreatedEmailSideEffects(context.env, backgroundDb, {
-              booking: result.booking,
-              eventType: result.eventType,
-              organizerDisplayName:
-                result.team.mode === 'collective' ? `${result.team.name} Team` : result.organizer.displayName,
-              timezone,
-              actionUrls,
-            });
-          }).catch((error) => {
-            emitAuditEvent({
-              event: 'booking_side_effect_failed',
-              level: 'error',
-              route: '/v0/team-bookings',
-              bookingId: result.booking.id,
-              error: sanitizeErrorForAudit(error, 'booking_confirmation_email_failed'),
-            });
-          }),
-        );
+        const email = await sendBookingCreatedEmailSideEffects(context.env, db, {
+          booking: result.booking,
+          eventType: result.eventType,
+          organizerDisplayName:
+            result.team.mode === 'collective' ? `${result.team.name} Team` : result.organizer.displayName,
+          timezone,
+          actionUrls,
+        });
 
         const responseBody: Record<string, unknown> = {
           ok: true,
@@ -186,7 +172,7 @@ export const registerTeamBookingCreateRoutes = (app: ApiApp): void => {
               url: actionUrls.rescheduleUrl,
             },
           },
-          email: queuedEmailDelivery,
+          email,
           notifications: { queued: result.queuedNotifications },
           webhooks: { queued: sideEffects.queuedWebhookDeliveries },
           calendarWriteback: sideEffects.calendarWriteback,

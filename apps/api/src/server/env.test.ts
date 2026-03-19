@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveAppBaseUrl, resolveWebhookEncryptionSecret } from './env';
+import {
+  resolveAppBaseUrl,
+  resolveClerkAuthorizedParties,
+  resolveWebhookEncryptionSecret,
+} from './env';
 import type { Bindings } from './types';
 
 const createBindings = (overrides: Partial<Bindings> = {}): Bindings =>
@@ -43,5 +47,16 @@ describe('resolveWebhookEncryptionSecret', () => {
     const value = resolveWebhookEncryptionSecret(createBindings());
 
     expect(value).toBe('0123456789abcdef0123456789abcdef');
+  });
+});
+
+describe('resolveClerkAuthorizedParties', () => {
+  it('allows both supported local web ports when APP_BASE_URL is local', () => {
+    const value = resolveClerkAuthorizedParties(createBindings({ APP_BASE_URL: 'http://localhost:3000' }));
+
+    expect(value).toContain('http://localhost:3000');
+    expect(value).toContain('http://127.0.0.1:3000');
+    expect(value).toContain('http://localhost:3001');
+    expect(value).toContain('http://127.0.0.1:3001');
   });
 });

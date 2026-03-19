@@ -119,6 +119,8 @@ export const resolveClerkAuthorizedParties = (env: Bindings): string[] => {
   if (shouldAllowLocalOrigins) {
     values.add('http://localhost:3000');
     values.add('http://127.0.0.1:3000');
+    values.add('http://localhost:3001');
+    values.add('http://127.0.0.1:3001');
   }
 
   if (values.size === 0) {
