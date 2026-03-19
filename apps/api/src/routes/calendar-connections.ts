@@ -188,11 +188,16 @@ export const registerCalendarConnectionRoutes = (app: ApiApp): void => {
         return jsonError(context, 404, 'Calendar connection not found.');
       }
 
+      const provider = toCalendarProvider(updatedConnection.provider);
+      if (!provider) {
+        return jsonError(context, 500, 'Unsupported calendar provider.');
+      }
+
       return context.json({
         ok: true,
         connection: toCalendarConnectionStatus({
           id: updatedConnection.id,
-          provider: toCalendarProvider(updatedConnection.provider) ?? GOOGLE_CALENDAR_PROVIDER,
+          provider,
           externalEmail: updatedConnection.externalEmail,
           useForConflictChecks: updatedConnection.useForConflictChecks,
           useForWriteback: updatedConnection.useForWriteback,

@@ -22,8 +22,11 @@ export function HomepageHeroActions() {
     try {
       await signOut({ redirectUrl: '/auth/sign-in' });
       clear();
-      void revokeApiSession(apiBaseUrl).catch(() => {
-        // The Clerk sign-out is authoritative; revoking the API session is best effort.
+      void revokeApiSession(apiBaseUrl).catch((error) => {
+        console.error('revokeApiSession failed after Clerk sign-out', {
+          apiBaseUrl,
+          error,
+        });
       });
     } catch (error) {
       if (isClerkAPIResponseError(error)) {

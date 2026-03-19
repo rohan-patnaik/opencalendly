@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 
@@ -31,7 +31,7 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
 
-  const refreshOnboardingData = async () => {
+  const refreshOnboardingData = useCallback(async () => {
     if (!session) {
       return;
     }
@@ -58,7 +58,7 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiBaseUrl, router, save, session]);
 
   useEffect(() => {
     if (!ready) {
@@ -76,7 +76,7 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
     }
 
     void refreshOnboardingData();
-  }, [ready, router, session]);
+  }, [ready, refreshOnboardingData, router, session]);
 
   const handleProfileUpdated = (nextUser: OrganizerConsoleUser) => {
     setProfile(nextUser);
@@ -119,8 +119,11 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
   const handleSignOut = async () => {
     await signOut({ redirectUrl: '/auth/sign-in' });
     clear();
-    void revokeApiSession(apiBaseUrl).catch(() => {
-      // The Clerk sign-out is authoritative; revoking the API session is best effort.
+    void revokeApiSession(apiBaseUrl).catch((error) => {
+      console.error('revokeApiSession failed after Clerk sign-out', {
+        apiBaseUrl,
+        error,
+      });
     });
   };
 

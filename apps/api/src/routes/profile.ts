@@ -1,4 +1,4 @@
-import { and, eq, ne } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import { users } from '@opencalendly/db';
 import { onboardingCompleteSchema, profileUpdateSchema } from '@opencalendly/shared';
@@ -6,7 +6,7 @@ import { onboardingCompleteSchema, profileUpdateSchema } from '@opencalendly/sha
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { emitAuditEvent } from '../server/audit';
 import { normalizeTimezone, jsonError } from '../server/core';
-import { withDatabase } from '../server/database';
+import { isUniqueViolation, withDatabase } from '../server/database';
 import type { ApiApp } from '../server/types';
 
 const toProfilePayload = (row: {
@@ -54,31 +54,42 @@ export const registerProfileRoutes = (app: ApiApp): void => {
       const nextDisplayName = parsed.data.displayName?.trim() ?? authedUser.displayName;
       const nextTimezone = parsed.data.timezone ? normalizeTimezone(parsed.data.timezone) : authedUser.timezone;
 
-      const [conflictingUser] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(and(eq(users.username, nextUsername), ne(users.id, authedUser.id)))
-        .limit(1);
-      if (conflictingUser) {
-        return jsonError(context, 409, 'Username is already taken.');
-      }
+      let updated:
+        | {
+            id: string;
+            email: string;
+            username: string;
+            displayName: string;
+            timezone: string;
+            onboardingCompleted: boolean;
+          }
+        | undefined;
 
-      const [updated] = await db
-        .update(users)
-        .set({
-          username: nextUsername,
-          displayName: nextDisplayName,
-          timezone: nextTimezone,
-        })
-        .where(eq(users.id, authedUser.id))
-        .returning({
-          id: users.id,
-          email: users.email,
-          username: users.username,
-          displayName: users.displayName,
-          timezone: users.timezone,
-          onboardingCompleted: users.onboardingCompleted,
+      try {
+        [updated] = await db.transaction(async (transaction) => {
+          return transaction
+            .update(users)
+            .set({
+              username: nextUsername,
+              displayName: nextDisplayName,
+              timezone: nextTimezone,
+            })
+            .where(eq(users.id, authedUser.id))
+            .returning({
+              id: users.id,
+              email: users.email,
+              username: users.username,
+              displayName: users.displayName,
+              timezone: users.timezone,
+              onboardingCompleted: users.onboardingCompleted,
+            });
         });
+      } catch (error) {
+        if (isUniqueViolation(error, 'users_username_unique')) {
+          return jsonError(context, 409, 'Username is already taken.');
+        }
+        throw error;
+      }
 
       if (!updated) {
         return jsonError(context, 404, 'Profile not found.');
