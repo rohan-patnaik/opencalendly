@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node -e \"require('node:fs').rmSync('.next', { recursive: true, force: true })\" && next dev",
+    "dev": "node ../../scripts/ensure-dev-port.mjs 3000 web-dev-port && node -e \"require('node:fs').rmSync('.next', { recursive: true, force: true })\" && next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --project tsconfig.json --noEmit",

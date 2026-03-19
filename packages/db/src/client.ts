@@ -33,6 +33,14 @@ type RuntimeDbEntry = {
   db: ReturnType<typeof drizzle<typeof schema>>;
 };
 
+export const runtimeSupportsTimerUnref = (): boolean => {
+  const timer = setTimeout(() => undefined, 0) as ReturnType<typeof setTimeout> & {
+    unref?: () => unknown;
+  };
+  clearTimeout(timer);
+  return typeof timer === 'object' && timer !== null && typeof timer.unref === 'function';
+};
+
 const getRuntimeDbCache = (): Map<string, RuntimeDbEntry> => {
   const globalCache = globalThis as typeof globalThis & {
     __opencalendlyRuntimeDbCache__?: Map<string, RuntimeDbEntry>;
@@ -69,14 +77,19 @@ export const createPgPool = (
     assertNeonDatabaseUrl(databaseUrl);
   }
 
-  return new Pool({
+  const poolOptions: ConstructorParameters<typeof Pool>[0] = {
     connectionString: databaseUrl,
     ssl: { rejectUnauthorized: false },
     max: 20,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
-    allowExitOnIdle: true,
-  });
+  };
+
+  if (runtimeSupportsTimerUnref()) {
+    poolOptions.allowExitOnIdle = true;
+  }
+
+  return new Pool(poolOptions);
 };
 
 export const createDb = (databaseUrl = getDatabaseUrl(), options: CreatePgClientOptions = {}) => {

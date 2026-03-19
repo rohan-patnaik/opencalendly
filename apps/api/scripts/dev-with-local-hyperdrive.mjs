@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import net from 'node:net';
 
 const parseEnvFile = (contents) => {
   const values = {};
@@ -34,6 +35,36 @@ const parseEnvFile = (contents) => {
 
 const ROOT_ENV_PATH = resolve(process.cwd(), '..', '..', '.env');
 const API_DEV_VARS_PATH = resolve(process.cwd(), '.dev.vars');
+const API_DEV_PORT = 8787;
+
+const assertPortAvailable = async (port, label) => {
+  await new Promise((resolvePromise, rejectPromise) => {
+    const server = net.createServer();
+
+    server.once('error', (error) => {
+      server.close();
+      rejectPromise(error);
+    });
+
+    server.listen(port, () => {
+      server.close((closeError) => {
+        if (closeError) {
+          rejectPromise(closeError);
+          return;
+        }
+        resolvePromise();
+      });
+    });
+  }).catch((error) => {
+    if ((error && typeof error === 'object' && 'code' in error && error.code) === 'EADDRINUSE') {
+      console.error(`${label} is already in use. Stop the existing process before starting local dev.`);
+      process.exit(1);
+    }
+
+    console.error(`Unable to verify ${label}: ${error instanceof Error ? error.message : 'unknown error'}`);
+    process.exit(1);
+  });
+};
 
 const loadRootEnv = () => {
   if (!existsSync(ROOT_ENV_PATH)) {
@@ -49,6 +80,7 @@ const loadRootEnv = () => {
 };
 
 loadRootEnv();
+await assertPortAvailable(API_DEV_PORT, 'api-dev-port');
 
 if (!process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE) {
   const databaseUrl = process.env.DATABASE_URL?.trim();
@@ -65,7 +97,7 @@ if (!process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE) {
 }
 
 const wranglerCommand = process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler';
-const wranglerArgs = ['dev', '--config', 'wrangler.toml'];
+const wranglerArgs = ['dev', '--config', 'wrangler.toml', '--port', String(API_DEV_PORT)];
 
 if (existsSync(API_DEV_VARS_PATH)) {
   wranglerArgs.push('--env-file', API_DEV_VARS_PATH);
