@@ -16,6 +16,7 @@ import {
   shouldExchangeClerkSession,
   shouldPreserveSignedOutSession,
 } from '../lib/clerk-session-bridge';
+import { AUTH_SESSION_BRIDGE_RETRY_EVENT } from '../lib/auth-session-bridge-retry';
 
 type ClerkExchangeResponse = {
   ok: boolean;
@@ -44,6 +45,24 @@ export default function AuthSessionBridge() {
   const inFlightSyncKeyRef = useRef<string | null>(null);
   const retryStateRef = useRef<{ syncKey: string; attempts: number }>({ syncKey: '', attempts: 0 });
   const [retryNonce, setRetryNonce] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleRetry = () => {
+      lastSyncKeyRef.current = '';
+      inFlightSyncKeyRef.current = null;
+      retryStateRef.current = { syncKey: '', attempts: 0 };
+      setRetryNonce((current) => current + 1);
+    };
+
+    window.addEventListener(AUTH_SESSION_BRIDGE_RETRY_EVENT, handleRetry);
+    return () => {
+      window.removeEventListener(AUTH_SESSION_BRIDGE_RETRY_EVENT, handleRetry);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isLoaded) {

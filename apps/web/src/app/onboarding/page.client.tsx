@@ -11,6 +11,7 @@ import type { OrganizerConsoleUser } from '../../features/organizer/types';
 import { useBusyActions } from '../../features/organizer/use-busy-actions';
 import { organizerApi, type CalendarConnectionStatus } from '../../lib/organizer-api';
 import { revokeApiSession } from '../../lib/api-client';
+import { requestAuthSessionBridgeRetry } from '../../lib/auth-session-bridge-retry';
 import { resolvePostAuthRoute } from '../../lib/post-auth-route';
 import { useAuthSession } from '../../lib/use-auth-session';
 import organizerStyles from '../organizer/page.module.css';
@@ -165,7 +166,7 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
                 onClick={() => {
                   setSessionBridgeTimedOut(false);
                   setSessionBridgeRetryKey((value) => value + 1);
-                  router.refresh();
+                  requestAuthSessionBridgeRetry();
                 }}
               >
                 Retry
