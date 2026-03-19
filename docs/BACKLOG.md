@@ -1,5 +1,23 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 79 (PR#TBD): Fix final booking review gaps
+
+Scope:
+
+- Fix the last two review-reported gaps in booking idempotency consistency and organizer-changing reschedule notifications.
+- Keep the change scoped to route hashing, reschedule side effects, tests, and minimal docs.
+- Preserve existing request/response shapes and same-organizer reschedule behavior.
+
+Acceptance criteria:
+
+- `POST /v0/bookings` and `POST /v0/team-bookings` hash a canonicalized booking-answer payload for idempotency so whitespace-only optional answers and trimmed-equivalent values do not cause false mismatch responses.
+- Booking answer canonicalization for idempotency does not loosen server-side booking-question validation or persistence rules.
+- Same-organizer reschedules still emit one `booking.rescheduled` webhook and the existing organizer/invitee reschedule emails.
+- Organizer-changing reschedules notify both organizers:
+  - the old organizer receives a removal signal
+  - the new organizer receives the reschedule signal
+- Regression tests cover idempotency answer canonicalization and organizer-changing reschedule side effects.
+
 ## Feature 78 (PR#TBD): Fix booking correctness review gaps
 
 Scope:

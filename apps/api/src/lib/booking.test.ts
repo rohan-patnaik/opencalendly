@@ -5,6 +5,7 @@ import {
   BookingUniqueConstraintError,
   commitBooking,
   type BookingDataAccess,
+  normalizeBookingAnswersForIdempotency,
   type PublicEventType,
 } from './booking';
 
@@ -102,6 +103,19 @@ const buildDataAccess = (options?: {
 };
 
 describe('commitBooking', () => {
+  it('canonicalizes booking answers for idempotency hashing without changing validation behavior', () => {
+    expect(
+      normalizeBookingAnswersForIdempotency({
+        company: '  Acme  ',
+        notes: '   ',
+        agenda: '\n Roadmap review\t',
+      }),
+    ).toEqual({
+      agenda: 'Roadmap review',
+      company: 'Acme',
+    });
+  });
+
   it('commits booking when slot stays available inside transaction', async () => {
     const harness = buildDataAccess();
 

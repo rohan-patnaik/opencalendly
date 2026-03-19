@@ -5,10 +5,12 @@ import { resolveAuthenticatedUser } from '../server/auth-session';
 import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { actionTokenMap, buildActionUrls, hashActionToken } from '../server/booking-action-links';
 import {
-  queueBookingRescheduleSideEffects,
   queuedEmailDelivery,
-  sendBookingRescheduleEmailSideEffects,
 } from '../server/booking-side-effects';
+import {
+  queueBookingRescheduleSideEffects,
+  sendBookingRescheduleEmailSideEffects,
+} from '../server/booking-reschedule-side-effects';
 import { jsonError, normalizeTimezone, queueBackgroundTask } from '../server/core';
 import { withConnectedDatabase, withDatabase } from '../server/database';
 import { jsonDemoQuotaError } from '../server/demo-quota';
@@ -121,7 +123,14 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
                 oldBooking: result.oldBooking,
                 newBooking: result.newBooking,
                 eventType: { name: result.eventType.name },
-                organizer: { email: result.organizer.email, displayName: result.organizer.displayName },
+                oldOrganizer: {
+                  email: result.oldOrganizer.email,
+                  displayName: result.oldOrganizer.displayName,
+                },
+                newOrganizer: {
+                  email: result.newOrganizer.email,
+                  displayName: result.newOrganizer.displayName,
+                },
                 timezone,
                 alreadyProcessed: false,
               });
