@@ -48,7 +48,7 @@ jobs:
           SENTRY_ENVIRONMENT: ${{ vars.SENTRY_ENVIRONMENT || 'production' }}
         run: |
           missing=0
-          for key in APP_BASE_URL NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY NEXT_PUBLIC_API_BASE_URL SENTRY_DSN_WEB SENTRY_DSN_API SENTRY_ENVIRONMENT; do
+          for key in APP_BASE_URL NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY NEXT_PUBLIC_API_BASE_URL SENTRY_ENVIRONMENT; do
             if [ -z "${!key//[[:space:]]/}" ]; then
               echo "Missing required repository variable: ${key}"
               missing=1
@@ -61,6 +61,11 @@ jobs:
             if ! VALUE="${!key}" node -e "const value = process.env.VALUE; try { const url = new URL(value); if (!['http:', 'https:'].includes(url.protocol)) { process.exit(1); } } catch { process.exit(1); }"; then
               echo "Repository variable must be a valid absolute http(s) URL: ${key}"
               exit 1
+            fi
+          done
+          for key in SENTRY_DSN_WEB SENTRY_DSN_API; do
+            if [ -z "${!key//[[:space:]]/}" ]; then
+              echo "::warning::Optional repository secret is missing; deployment will continue without Sentry reporting: ${key}"
             fi
           done
 

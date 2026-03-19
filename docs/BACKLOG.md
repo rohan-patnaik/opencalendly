@@ -1516,3 +1516,19 @@ Acceptance criteria:
 - CI no longer fails on the stale homepage copy expectation introduced by the copy refresh merge.
 - Validation passes:
   - `npx vitest run apps/web/src/app/marketing-routes.test.ts`
+
+### Feature 58: Production deploy tolerance for missing Sentry DSNs
+
+Scope:
+- Unblock production deploys when Sentry DSNs have not yet been configured in repository secrets.
+- Keep the deploy workflow explicit by warning on missing DSNs instead of failing before deployment starts.
+- Do not change application runtime behavior; only adjust the GitHub Actions production gate.
+
+Acceptance criteria:
+
+- Production deploy workflow no longer exits in the variable verification step solely because `SENTRY_DSN_WEB` or `SENTRY_DSN_API` are unset.
+- Workflow emits a visible warning when either Sentry DSN is missing so operators know observability is degraded.
+- Existing required deploy variables (`APP_BASE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_API_BASE_URL`) remain enforced.
+- Validation passes:
+  - `git diff --check`
+  - workflow YAML remains syntactically valid
