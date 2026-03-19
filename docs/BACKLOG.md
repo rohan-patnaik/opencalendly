@@ -1,5 +1,35 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 76 (PR#TBD): Audit and fix Google/Microsoft provider flows end to end
+
+Scope:
+
+- Run a full authenticated product regression pass using the existing demo Google and Microsoft accounts.
+- Verify the shared post-auth flow, organizer/dashboard surfaces, booking flows, calendar integrations, and common provider-backed actions in the live app.
+- Fix only the issues discovered during that regression pass, keeping the PR scoped to provider-flow correctness and reliability.
+- Remove local dev runtime regressions that break the Clerk-to-app session exchange before the signed-in product flows can be verified.
+- Remove browser-console noise caused by invalid local CSP sources so auth verification is easier to debug in dev.
+
+Acceptance criteria:
+
+- Google sign-in works end to end in local dev.
+- Microsoft sign-in works end to end in local dev.
+- Signed-in users can reach the organizer and dashboard without auth/session loop regressions.
+- Local auth/session exchange does not fail due to API runtime crashes on the supported `dev:web` + `dev:api` stack.
+- Local auth verification no longer emits invalid `http://[::1]` CSP source errors in the browser console.
+- Common booking flows pass for the provider-backed demo accounts:
+  - one-on-one booking create
+  - cancel
+  - reschedule
+- Calendar-backed organizer flows remain usable for the demo accounts.
+- Any regression discovered during the audit is fixed in the same PR, with tests updated where practical.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 75 (PR#TBD): Fix onboarding auth loop after OAuth
 
 Scope:

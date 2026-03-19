@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 
-import type { createRuntimeDb } from '@opencalendly/db';
+import { createDb } from '@opencalendly/db';
 import type {
   EventQuestion,
   TeamSchedulingMode,
@@ -40,9 +40,12 @@ export type ContextLike = {
   json: (body: unknown, status?: number) => Response;
 };
 
+const createDbTypeAnchor = createDb;
+void createDbTypeAnchor;
+
 export type ApiApp = Hono<{ Bindings: Bindings }>;
 export type IdempotencyScope = 'booking_create' | 'team_booking_create' | 'booking_reschedule';
-export type Database = ReturnType<typeof createRuntimeDb>['db'];
+export type Database = ReturnType<typeof createDbTypeAnchor>['db'];
 export type DatabaseTransaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 export type DemoQuotaDb = Database | DatabaseTransaction;
 export type QueryableDb = Pick<Database, 'select'>;

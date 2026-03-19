@@ -7,7 +7,7 @@ const CLERK_IMAGE_ORIGINS = [
   'https://img.clerk.com',
 ];
 
-const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '::1'];
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1'];
 
 const normalizeOrigin = (value) => {
   if (!value) {
