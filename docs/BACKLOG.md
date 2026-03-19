@@ -1532,3 +1532,20 @@ Acceptance criteria:
 - Validation passes:
   - `git diff --check`
   - workflow YAML remains syntactically valid
+
+### Feature 59: Local auth safety on fixed dev ports
+
+Scope:
+- Prevent local auth and OAuth flows from silently breaking when the web or API dev server starts on an unexpected fallback port.
+- Keep local development pinned to `localhost:3000` for web and `localhost:8787` for API.
+- Fail fast with a clear error when either expected port is already occupied.
+
+Acceptance criteria:
+
+- `npm run dev:web` checks port `3000` first and exits with a clear message instead of silently switching to another port.
+- `npm run dev:api` checks port `8787` first and exits with a clear message instead of silently switching to another port.
+- Local auth/OAuth assumptions remain aligned with `.env` defaults for `APP_BASE_URL` and `NEXT_PUBLIC_API_BASE_URL`.
+- Validation passes:
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
