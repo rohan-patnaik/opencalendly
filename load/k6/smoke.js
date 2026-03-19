@@ -6,7 +6,8 @@ import {
   apiBaseUrl,
   availabilityUrl,
   buildAuthedHeaders,
-  buildIdempotentHeaders,
+  buildPublicHeaders,
+  buildPublicIdempotentHeaders,
   cancelPayload,
   expectStatus,
   getJson,
@@ -45,7 +46,11 @@ export default function smoke() {
         eventSlug: __ENV.ONE_ON_ONE_EVENT_SLUG,
         start: __ENV.ONE_ON_ONE_STARTS_AT,
       }),
-      { tags: { flow: 'availability', kind: 'one_on_one' } },
+      {
+        headers: buildPublicHeaders(),
+        tags: { flow: 'availability', kind: 'one_on_one' },
+        expectedStatuses: [200],
+      },
     );
     expectStatus(oneOnOneAvailability, [200], 'one-on-one availability loads');
 
@@ -56,21 +61,27 @@ export default function smoke() {
         eventSlug: __ENV.TEAM_EVENT_SLUG,
         start: __ENV.TEAM_STARTS_AT,
       }),
-      { tags: { flow: 'availability', kind: 'team' } },
+      {
+        headers: buildPublicHeaders(),
+        tags: { flow: 'availability', kind: 'team' },
+        expectedStatuses: [200],
+      },
     );
     expectStatus(teamAvailability, [200], 'team availability loads');
   });
 
   group('booking create endpoints', () => {
     const bookingResponse = postJson(`${apiBaseUrl}/v0/bookings`, oneOnOneBookingPayload(), {
-      headers: buildIdempotentHeaders('smoke-booking'),
+      headers: buildPublicIdempotentHeaders('smoke-booking'),
       tags: { flow: 'booking', kind: 'one_on_one' },
+      expectedStatuses: [200, 409, 429],
     });
     expectStatus(bookingResponse, [200, 409], 'one-on-one booking returns success or conflict');
 
     const teamResponse = postJson(`${apiBaseUrl}/v0/team-bookings`, teamBookingPayload(), {
-      headers: buildIdempotentHeaders('smoke-team-booking'),
+      headers: buildPublicIdempotentHeaders('smoke-team-booking'),
       tags: { flow: 'booking', kind: 'team' },
+      expectedStatuses: [200, 409, 429],
     });
     expectStatus(teamResponse, [200, 409], 'team booking returns success or conflict');
   });
@@ -81,8 +92,9 @@ export default function smoke() {
         `${apiBaseUrl}/v0/bookings/actions/${__ENV.RESCHEDULE_TOKEN}/reschedule`,
         reschedulePayload(),
         {
-          headers: buildIdempotentHeaders('smoke-reschedule'),
+          headers: buildPublicIdempotentHeaders('smoke-reschedule'),
           tags: { flow: 'booking_action', kind: 'reschedule' },
+          expectedStatuses: [200, 404, 409, 410],
         },
       );
       expectStatus(response, [200, 404, 409, 410], 'reschedule action responds explicitly');
@@ -95,8 +107,9 @@ export default function smoke() {
         `${apiBaseUrl}/v0/bookings/actions/${__ENV.CANCEL_TOKEN}/cancel`,
         cancelPayload(),
         {
-          headers: buildAuthedHeaders(),
+          headers: buildPublicHeaders(__ENV.AUTH_TOKEN ? { Authorization: buildAuthedHeaders().Authorization } : {}),
           tags: { flow: 'booking_action', kind: 'cancel' },
+          expectedStatuses: [200, 404, 410],
         },
       );
       expectStatus(response, [200, 404, 410], 'cancel action responds explicitly');
@@ -107,11 +120,13 @@ export default function smoke() {
     group('worker endpoints', () => {
       const webhookRun = runWorker(`${apiBaseUrl}/v0/webhooks/deliveries/run`, 10, {
         tags: { flow: 'worker', kind: 'webhooks' },
+        expectedStatuses: [200],
       });
       expectStatus(webhookRun, [200], 'webhook worker runs');
 
       const writebackRun = runWorker(`${apiBaseUrl}/v0/calendar/writeback/run`, 10, {
         tags: { flow: 'worker', kind: 'writeback' },
+        expectedStatuses: [200],
       });
       expectStatus(writebackRun, [200], 'writeback worker runs');
     });

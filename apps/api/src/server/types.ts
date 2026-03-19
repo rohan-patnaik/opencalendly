@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 
-import type { createDb } from '@opencalendly/db';
+import type { createRuntimeDb } from '@opencalendly/db';
 import type {
   EventQuestion,
   TeamSchedulingMode,
@@ -19,6 +19,8 @@ export type Bindings = {
   SESSION_SECRET?: string;
   WEBHOOK_SECRET_ENCRYPTION_KEY?: string;
   TELEMETRY_HMAC_KEY?: string;
+  SENTRY_DSN_API?: string;
+  SENTRY_ENVIRONMENT?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   DEMO_DAILY_ACCOUNT_LIMIT?: string;
@@ -40,7 +42,7 @@ export type ContextLike = {
 
 export type ApiApp = Hono<{ Bindings: Bindings }>;
 export type IdempotencyScope = 'booking_create' | 'team_booking_create' | 'booking_reschedule';
-export type Database = ReturnType<typeof createDb>['db'];
+export type Database = ReturnType<typeof createRuntimeDb>['db'];
 export type DatabaseTransaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 export type DemoQuotaDb = Database | DatabaseTransaction;
 export type QueryableDb = Pick<Database, 'select'>;

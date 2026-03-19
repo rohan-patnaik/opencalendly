@@ -112,6 +112,13 @@ export type CommitBookingResult = {
   eventType: PublicEventType;
   booking: InsertedBooking;
   actionTokens: BookingActionTokenPublic[];
+  performance: {
+    lockMs: number;
+    scheduleLoadMs: number;
+    availabilityComputeMs: number;
+    capCheckMs: number;
+    insertMs: number;
+  };
 };
 
 const slotKey = (startsAt: string, endsAt: string): string => `${startsAt}|${endsAt}`;
@@ -174,14 +181,18 @@ export const commitBooking = async (
   }
 
   const result = await dataAccess.withEventTypeTransaction(eventType.id, async (transaction) => {
+    const lockStartedAt = Date.now();
     await transaction.lockEventType(eventType.id);
+    const lockMs = Date.now() - lockStartedAt;
 
+    const scheduleLoadStartedAt = Date.now();
     const [rules, overrides, externalBusyWindows, confirmedBookings] = await Promise.all([
       transaction.listRules(eventType.userId),
       transaction.listOverrides(eventType.userId, rangeStart, rangeEnd),
       transaction.listExternalBusyWindows(eventType.userId, rangeStart, rangeEnd),
       transaction.listConfirmedBookings(eventType.userId, rangeStart, rangeEnd),
     ]);
+    const scheduleLoadMs = Date.now() - scheduleLoadStartedAt;
 
     const blockingBusyOverrides: AvailabilityOverrideWindow[] = externalBusyWindows.map((window) => ({
       startAt: window.startsAt,
@@ -189,6 +200,7 @@ export const commitBooking = async (
       isAvailable: false,
     }));
 
+    const availabilityComputeStartedAt = Date.now();
     const slots = computeAvailabilitySlots({
       organizerTimezone: eventType.organizerTimezone,
       rangeStartIso,
@@ -198,6 +210,7 @@ export const commitBooking = async (
       overrides: [...overrides, ...blockingBusyOverrides],
       bookings: confirmedBookings,
     });
+    const availabilityComputeMs = Date.now() - availabilityComputeStartedAt;
 
     const requestedSlot = slotKey(startsAtIso, endsAtIso);
     const matchingSlot = slots.find((slot) => slotKey(slot.startsAt, slot.endsAt) === requestedSlot);
@@ -216,6 +229,7 @@ export const commitBooking = async (
       },
     });
 
+    const capCheckStartedAt = Date.now();
     for (const window of capWindows) {
       const existingCount = await transaction.countConfirmedEventTypeBookingsInWindow({
         eventTypeId: eventType.id,
@@ -227,6 +241,7 @@ export const commitBooking = async (
         throw new BookingConflictError('Booking limit reached for this event window.');
       }
     }
+    const capCheckMs = Date.now() - capCheckStartedAt;
 
     const metadata = JSON.stringify({
       answers: input.answers ?? {},
@@ -238,6 +253,7 @@ export const commitBooking = async (
     const actionTokenSet = createBookingActionTokenSet();
 
     try {
+      const insertStartedAt = Date.now();
       const booking = await transaction.insertBooking({
         eventTypeId: eventType.id,
         organizerId: eventType.userId,
@@ -250,10 +266,18 @@ export const commitBooking = async (
 
       await transaction.insertActionTokens(booking.id, actionTokenSet.tokenWrites);
       await transaction.afterInsertBooking?.(booking);
+      const insertMs = Date.now() - insertStartedAt;
 
       return {
         booking,
         actionTokens: actionTokenSet.publicTokens,
+        performance: {
+          lockMs,
+          scheduleLoadMs,
+          availabilityComputeMs,
+          capCheckMs,
+          insertMs,
+        },
       };
     } catch (error) {
       if (error instanceof BookingUniqueConstraintError) {
@@ -263,5 +287,10 @@ export const commitBooking = async (
     }
   });
 
-  return { eventType, booking: result.booking, actionTokens: result.actionTokens };
+  return {
+    eventType,
+    booking: result.booking,
+    actionTokens: result.actionTokens,
+    performance: result.performance,
+  };
 };

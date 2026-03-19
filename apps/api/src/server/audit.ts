@@ -6,6 +6,7 @@ export type AuditEventName =
   | 'auth_exchange_user_lookup_failed'
   | 'auth_exchange_username_resolution_failed'
   | 'availability_read_completed'
+  | 'booking_side_effect_failed'
   | 'booking_commit_completed'
   | 'booking_action_misuse_detected'
   | 'calendar_connect_failed'

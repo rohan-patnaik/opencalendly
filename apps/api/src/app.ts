@@ -5,6 +5,7 @@ import { resolveAllowedCorsOrigins, toCorsOrigin } from './lib/cors';
 import { hasSessionCookie } from './server/auth-session';
 import { jsonError, logInternalError } from './server/core';
 import { API_SECURITY_HEADERS } from './server/security-headers';
+import { captureApiException } from './server/sentry';
 import type { Bindings } from './server/types';
 import { registerAnalyticsFunnelRoutes } from './routes/analytics-funnel';
 import { registerAnalyticsOperatorRoutes } from './routes/analytics-operator';
@@ -123,6 +124,12 @@ registerBookingActionRescheduleRoutes(app);
 
 app.onError((error, context) => {
   logInternalError('api_unhandled_error', error);
+  void captureApiException(context.env, error, {
+    route: new URL(context.req.url).pathname,
+    method: context.req.method.toUpperCase(),
+    requestId: context.req.header('cf-ray') ?? context.req.header('x-request-id') ?? null,
+    statusCode: 500,
+  });
   const response = jsonError(context, 500, 'Unexpected server error.');
   for (const [key, value] of Object.entries(API_SECURITY_HEADERS)) {
     response.headers.set(key, value);

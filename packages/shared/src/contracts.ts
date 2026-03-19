@@ -17,6 +17,7 @@ export type PublicBookingActionLinks = {
 export type PublicBookingEmailDelivery = {
   sent: boolean;
   provider: string;
+  queued?: boolean;
   error?: string;
 };
 

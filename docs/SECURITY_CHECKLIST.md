@@ -11,8 +11,13 @@ Last reviewed: 19 Mar 2026 (IST)
 - [x] Logs and API responses do not expose raw OAuth tokens, API keys, webhook secrets, or session tokens.
 - [x] Local/dev env validation remains permissive for optional production-only keys.
 - [x] Production env validation fails when either of these is missing:
+- [x] Production env validation fails when either of these is missing:
   - `WEBHOOK_SECRET_ENCRYPTION_KEY`
   - `TELEMETRY_HMAC_KEY`
+- [x] Production env validation also fails when observability is not explicitly configured:
+  - `SENTRY_DSN_API`
+  - `SENTRY_DSN_WEB`
+  - `SENTRY_ENVIRONMENT`
 - [x] Production env validation requires `APP_BASE_URL`, `API_BASE_URL`, and `NEXT_PUBLIC_API_BASE_URL` to be non-local `https:` origins.
 
 ## 2. Auth, sessions, and browser boundary
@@ -58,11 +63,13 @@ Last reviewed: 19 Mar 2026 (IST)
 - [x] Organizer-managed webhook targets are restricted to public HTTPS hostnames and rejected when they resolve to private or unsafe IP space.
 - [x] Runtime expectations for provider APIs and webhook egress are documented in architecture, API, deploy, and operator docs.
 - [x] Production response headers match the documented CSP/security-header baseline in tests.
+- [x] Staging is expected to be protected behind Cloudflare Access with an explicit internal allowlist before pre-GA testing begins.
 
 ## 7. GA follow-ups after this hardening slice
 
 - [ ] Add optional IP allow-listing for admin-only operational endpoints.
 - [ ] Add scheduled secret-rotation rehearsal and calendar reconnect drill.
-- [ ] Add external vendor alert wiring in the production environment:
+- [ ] Confirm external vendor alert wiring is live in staging and production:
   - Sentry for exception capture
   - Better Stack uptime checks for Web/API health
+- [ ] Record a successful staging smoke exception in Sentry for both web and API surfaces before public launch.

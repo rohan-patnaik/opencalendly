@@ -3,7 +3,7 @@ import { Rate } from 'k6/metrics';
 
 import {
   apiBaseUrl,
-  buildIdempotentHeaders,
+  buildPublicIdempotentHeaders,
   expectStatus,
   oneOnOneBookingPayload,
   postJson,
@@ -31,7 +31,7 @@ export const options = {
     },
   },
   thresholds: {
-    http_req_failed: ['rate<0.15'],
+    http_req_failed: ['rate==0'],
     http_req_duration: ['p(95)<2000', 'p(99)<4000'],
     checks: ['rate>0.9'],
     booking_unexpected_failure_rate: ['rate==0'],
@@ -54,8 +54,9 @@ const recordBookingOutcome = (response) => {
 
 export function sameSlotOneOnOne() {
   const response = postJson(`${apiBaseUrl}/v0/bookings`, oneOnOneBookingPayload(), {
-    headers: buildIdempotentHeaders('contention-booking'),
+    headers: buildPublicIdempotentHeaders('contention-booking'),
     tags: { flow: 'booking', profile: 'contention', kind: 'one_on_one' },
+    expectedStatuses: [200, 409, 429],
   });
   expectStatus(response, [200, 409], 'contention one-on-one returns success or conflict');
   recordBookingOutcome(response);
@@ -64,8 +65,9 @@ export function sameSlotOneOnOne() {
 
 export function sameSlotTeam() {
   const response = postJson(`${apiBaseUrl}/v0/team-bookings`, teamBookingPayload(), {
-    headers: buildIdempotentHeaders('contention-team-booking'),
+    headers: buildPublicIdempotentHeaders('contention-team-booking'),
     tags: { flow: 'booking', profile: 'contention', kind: 'team' },
+    expectedStatuses: [200, 409, 429],
   });
   expectStatus(response, [200, 409], 'contention team booking returns success or conflict');
   recordBookingOutcome(response);

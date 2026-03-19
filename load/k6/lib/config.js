@@ -10,6 +10,24 @@ const jsonHeaders = {
   'Content-Type': 'application/json',
 };
 
+const PUBLIC_CLIENT_POOL_SIZE = Math.max(
+  1,
+  Number.parseInt(__ENV.PUBLIC_CLIENT_POOL_SIZE || '256', 10) || 256,
+);
+
+const buildSyntheticClientIp = () => {
+  const bucket = ((__VU - 1) % PUBLIC_CLIENT_POOL_SIZE) + 1;
+  const thirdOctet = Math.floor((bucket - 1) / 254);
+  const fourthOctet = ((bucket - 1) % 254) + 1;
+  return `198.51.${thirdOctet}.${fourthOctet}`;
+};
+
+export const buildPublicHeaders = (extraHeaders = {}) => ({
+  ...jsonHeaders,
+  'X-Forwarded-For': buildSyntheticClientIp(),
+  ...extraHeaders,
+});
+
 export const buildAuthedHeaders = () => {
   if (!__ENV.AUTH_TOKEN) {
     return jsonHeaders;
@@ -24,6 +42,27 @@ export const buildAuthedHeaders = () => {
 export const buildIdempotentHeaders = (scope) => ({
   ...jsonHeaders,
   'Idempotency-Key': `${scope}-${__VU}-${__ITER}-${Date.now()}`,
+});
+
+export const buildPublicIdempotentHeaders = (scope) =>
+  buildPublicHeaders({
+    'Idempotency-Key': `${scope}-${__VU}-${__ITER}-${Date.now()}`,
+  });
+
+const buildResponseCallback = (expectedStatuses) => {
+  if (!Array.isArray(expectedStatuses) || expectedStatuses.length === 0) {
+    return undefined;
+  }
+
+  return http.expectedStatuses(...expectedStatuses);
+};
+
+const buildRequestOptions = (params = {}) => ({
+  headers: params.headers,
+  tags: params.tags,
+  ...(buildResponseCallback(params.expectedStatuses)
+    ? { responseCallback: buildResponseCallback(params.expectedStatuses) }
+    : {}),
 });
 
 export const shiftIsoByMinutes = (isoString, minutes) => {
@@ -45,20 +84,20 @@ export const availabilityUrl = (input) => {
 
 export const postJson = (url, payload, params = {}) =>
   http.post(url, JSON.stringify(payload), {
-    headers: params.headers || jsonHeaders,
-    tags: params.tags,
+    ...buildRequestOptions({
+      ...params,
+      headers: params.headers || jsonHeaders,
+    }),
   });
 
 export const getJson = (url, params = {}) =>
-  http.get(url, {
-    headers: params.headers,
-    tags: params.tags,
-  });
+  http.get(url, buildRequestOptions(params));
 
 export const runWorker = (url, limit, params = {}) =>
   postJson(url, typeof limit === 'number' ? { limit } : {}, {
     headers: params.headers || buildAuthedHeaders(),
     tags: params.tags,
+    expectedStatuses: params.expectedStatuses,
   });
 
 export const expectStatus = (response, expected, label) =>

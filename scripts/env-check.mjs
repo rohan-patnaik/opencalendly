@@ -35,6 +35,12 @@ const OPTIONAL = {
     'Optional dedicated encryption key for webhook signing secrets. Falls back to SESSION_SECRET when omitted.',
   TELEMETRY_HMAC_KEY:
     'Recommended dedicated secret for telemetry HMAC. If unset, email delivery telemetry writes are skipped.',
+  SENTRY_DSN_API:
+    'Recommended Sentry DSN for API exception capture. Required before GA on staging/production.',
+  SENTRY_DSN_WEB:
+    'Recommended Sentry DSN for web exception capture. Required before GA on staging/production.',
+  SENTRY_ENVIRONMENT:
+    'Recommended Sentry environment label such as staging or production.',
   MICROSOFT_CLIENT_ID: 'Microsoft Entra -> App registrations -> client ID (Feature 7).',
   MICROSOFT_CLIENT_SECRET: 'Microsoft Entra -> App registrations -> client secret (Feature 7).',
 };
@@ -47,6 +53,12 @@ const PRODUCTION_ONLY_REQUIRED = {
     'Production requires a dedicated encryption key for webhook signing secrets.',
   TELEMETRY_HMAC_KEY:
     'Production requires a dedicated telemetry HMAC key so operational writes and alerts remain enabled.',
+  SENTRY_DSN_API:
+    'Production requires an API Sentry DSN so smoke exceptions and production failures are observable.',
+  SENTRY_DSN_WEB:
+    'Production requires a web Sentry DSN so client-side exceptions are observable.',
+  SENTRY_ENVIRONMENT:
+    'Production requires an explicit Sentry environment label.',
 };
 const PRODUCTION_ONLY_HTTPS_URLS = ['APP_BASE_URL', 'API_BASE_URL', 'NEXT_PUBLIC_API_BASE_URL'];
 const isProductionValidation =
@@ -195,6 +207,13 @@ if (telemetryHmacKey && telemetryHmacKey.length < 32) {
 const webhookSecretEncryptionKey = parsed.WEBHOOK_SECRET_ENCRYPTION_KEY;
 if (webhookSecretEncryptionKey && webhookSecretEncryptionKey.length < 32) {
   errors.push('WEBHOOK_SECRET_ENCRYPTION_KEY must be at least 32 characters when provided.');
+}
+
+for (const key of ['SENTRY_DSN_API', 'SENTRY_DSN_WEB']) {
+  const value = parsed[key];
+  if (value && !/^https:\/\/.+/i.test(value)) {
+    errors.push(`${key} must be a valid https DSN URL when provided.`);
+  }
 }
 
 const enableDevAuthBootstrap = parsed.ENABLE_DEV_AUTH_BOOTSTRAP;

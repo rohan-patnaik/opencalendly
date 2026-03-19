@@ -28,9 +28,23 @@ id = "177ee8cb797040f58ba308bd85fa43cf"
 workers_dev = false
 routes = [{ pattern = "api.opencalendly.com/*", zone_name = "opencalendly.com" }]
 
+[env.staging]
+workers_dev = false
+routes = [{ pattern = "api-staging.opencalendly.com/*", zone_name = "opencalendly.com" }]
+
+[env.staging.vars]
+APP_BASE_URL = "https://staging.opencalendly.com"
+RESEND_FROM_EMAIL = "OpenCalendly Staging <no-reply@staging.opencalendly.com>"
+
 [env.production.vars]
 APP_BASE_URL = "https://opencalendly.com"
 RESEND_FROM_EMAIL = "OpenCalendly <no-reply@opencalendly.com>"
+
+# Explicit staging Hyperdrive binding.
+# Replace with a dedicated staging Hyperdrive ID before private pre-GA sign-off.
+[[env.staging.hyperdrive]]
+binding = "HYPERDRIVE"
+id = "177ee8cb797040f58ba308bd85fa43cf"
 
 # Explicit production Hyperdrive binding.
 # Replace with a dedicated production Hyperdrive ID when provisioned.

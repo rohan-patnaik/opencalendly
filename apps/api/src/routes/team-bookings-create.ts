@@ -2,11 +2,15 @@ import { teamBookingCreateSchema } from '@opencalendly/shared';
 
 import { BookingConflictError, BookingNotFoundError, BookingValidationError } from '../lib/booking';
 import { resolveAuthenticatedUser } from '../server/auth-session';
-import { emitAuditEvent } from '../server/audit';
+import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { actionTokenMap, buildActionUrls } from '../server/booking-action-links';
-import { runBookingCreatedSideEffects } from '../server/booking-side-effects';
-import { jsonError, normalizeTimezone } from '../server/core';
-import { withDatabase } from '../server/database';
+import {
+  queueBookingCreatedSideEffects,
+  queuedEmailDelivery,
+  sendBookingCreatedEmailSideEffects,
+} from '../server/booking-side-effects';
+import { jsonError, normalizeTimezone, queueBackgroundTask } from '../server/core';
+import { withConnectedDatabase, withDatabase } from '../server/database';
 import {
   jsonDemoQuotaError,
   requiresLaunchDemoAuthForTeamRoute,
@@ -109,7 +113,7 @@ export const registerTeamBookingCreateRoutes = (app: ApiApp): void => {
           cancelToken: tokens.cancelToken,
           rescheduleToken: tokens.rescheduleToken,
         });
-        const sideEffects = await runBookingCreatedSideEffects(context.env, db, {
+        const sideEffects = await queueBookingCreatedSideEffects(db, {
           booking: result.booking,
           eventType: result.eventType,
           organizerDisplayName:
@@ -125,6 +129,27 @@ export const registerTeamBookingCreateRoutes = (app: ApiApp): void => {
             assignmentUserIds: result.assignmentUserIds,
           },
         });
+        queueBackgroundTask(
+          context,
+          withConnectedDatabase(context, async (backgroundDb) => {
+            await sendBookingCreatedEmailSideEffects(context.env, backgroundDb, {
+              booking: result.booking,
+              eventType: result.eventType,
+              organizerDisplayName:
+                result.team.mode === 'collective' ? `${result.team.name} Team` : result.organizer.displayName,
+              timezone,
+              actionUrls,
+            });
+          }).catch((error) => {
+            emitAuditEvent({
+              event: 'booking_side_effect_failed',
+              level: 'error',
+              route: '/v0/team-bookings',
+              bookingId: result.booking.id,
+              error: sanitizeErrorForAudit(error, 'booking_confirmation_email_failed'),
+            });
+          }),
+        );
 
         const responseBody: Record<string, unknown> = {
           ok: true,
@@ -155,7 +180,7 @@ export const registerTeamBookingCreateRoutes = (app: ApiApp): void => {
               url: actionUrls.rescheduleUrl,
             },
           },
-          email: sideEffects.email,
+          email: queuedEmailDelivery,
           notifications: { queued: result.queuedNotifications },
           webhooks: { queued: sideEffects.queuedWebhookDeliveries },
           calendarWriteback: sideEffects.calendarWriteback,
@@ -177,6 +202,7 @@ export const registerTeamBookingCreateRoutes = (app: ApiApp): void => {
           teamSlug: payload.teamSlug,
           eventSlug: payload.eventSlug,
           bookingId: result.booking.id,
+          performance: result.performance,
         });
 
         return context.json(responseBody);

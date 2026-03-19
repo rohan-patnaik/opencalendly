@@ -39,11 +39,19 @@ export const isNeonDatabaseUrl = (connectionString: string): boolean => {
 };
 
 export const resolveConnectionString = (env: Bindings): ConnectionConfig => {
+  const preferDirectDatabaseUrl =
+    env.ENABLE_DEV_AUTH_BOOTSTRAP?.trim().toLowerCase() === 'true' ||
+    env.ENABLE_DEV_AUTH_BOOTSTRAP?.trim() === '1';
+  const databaseUrl = env.DATABASE_URL?.trim();
+
+  if (preferDirectDatabaseUrl && databaseUrl) {
+    return { source: 'database_url', connectionString: databaseUrl };
+  }
+
   if (env.HYPERDRIVE?.connectionString) {
     return { source: 'hyperdrive', connectionString: env.HYPERDRIVE.connectionString };
   }
 
-  const databaseUrl = env.DATABASE_URL?.trim();
   if (databaseUrl) {
     return { source: 'database_url', connectionString: databaseUrl };
   }

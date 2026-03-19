@@ -7,6 +7,12 @@ This runbook wires production traffic so:
 - `https://opencalendly.com` and `https://www.opencalendly.com` -> Cloudflare Pages app
 - `https://api.opencalendly.com` -> Cloudflare Worker API (`opencalendly-api`)
 
+For private pre-GA rehearsal, mirror the same model on staging:
+
+- `https://staging.opencalendly.com` -> staging Pages app
+- `https://api-staging.opencalendly.com` -> staging Worker API
+- protect both staging domains with Cloudflare Access and an internal email allowlist before enabling pre-GA verification
+
 ## 1) Disable URL forwarding in Porkbun
 
 If URL forwarding is enabled, traffic is redirected to `*.l.ink` and bypasses your app.
@@ -28,6 +34,7 @@ Cloudflare also auto-provisions SSL/TLS certificates for these custom domains; c
 Worker config in repo already includes production route:
 
 - `api.opencalendly.com/*`
+- `api-staging.opencalendly.com/*`
 
 File: `apps/api/wrangler.toml`
 
@@ -68,6 +75,33 @@ Optional GitHub repository variables:
 - `CLOUDFLARE_PAGES_PRODUCTION_BRANCH` (default `main`)
 
 Cloudflare Pages `Git Provider` can remain `No` when using this workflow-based direct upload model.
+
+## 5a) Private staging deploy flow
+
+Staging deploys are intentionally separate from public production and should be driven manually:
+
+- `.github/workflows/deploy-staging.yml`
+- Expected staging Pages project variable: `STAGING_CLOUDFLARE_PAGES_PROJECT`
+- Expected staging Pages branch variable: `STAGING_CLOUDFLARE_PAGES_BRANCH`
+- Expected staging domains:
+  - `staging.opencalendly.com`
+  - `api-staging.opencalendly.com`
+
+Required staging repository variables/secrets:
+
+- `STAGING_APP_BASE_URL`
+- `STAGING_API_BASE_URL`
+- `STAGING_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `STAGING_SENTRY_DSN_WEB`
+- `STAGING_SENTRY_DSN_API`
+- `STAGING_SENTRY_ENVIRONMENT`
+
+Before a staging deploy is considered valid:
+
+- Cloudflare Access must restrict the staging domains to the internal allowlist
+- staging OAuth callbacks must be configured in Clerk, Google, and Microsoft
+- staging Neon branch/database must exist in the same region as production
+- `npm run domain:check:staging` must pass
 
 ## 6) Manual deploy fallback
 

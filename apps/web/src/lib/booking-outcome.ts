@@ -1,5 +1,6 @@
 export type BookingEmailPayload = {
   sent: boolean;
+  queued?: boolean;
   error?: string;
 };
 
@@ -13,6 +14,10 @@ export const buildEmailDeliveryMessage = (
 
   if (email.sent) {
     return `Confirmation email sent to ${inviteeEmail}.`;
+  }
+
+  if (email.queued) {
+    return `Booking confirmed. Confirmation email to ${inviteeEmail} is queued.`;
   }
 
   if (email.error && email.error.trim().length > 0) {

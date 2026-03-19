@@ -4,6 +4,25 @@ Last updated: 19 Mar 2026 (IST)
 
 ## Pre-deploy
 
+- [ ] Private staging is fully deployed and protected before public production is opened:
+  - `staging.opencalendly.com`
+  - `api-staging.opencalendly.com`
+  - Cloudflare Access allowlist enforced
+- [ ] Staging functional verification is complete for:
+  - Google sign-in + calendar connect/sync/writeback
+  - Microsoft sign-in + calendar connect/sync/writeback
+  - one-on-one and team booking create/reschedule/cancel
+  - organizer reads/writes
+  - webhook subscription create + delivery batch
+- [ ] Staging load verification is complete:
+  - `npm run load:test:smoke`
+  - `npm run load:test:baseline`
+  - `npm run load:test:contention`
+- [ ] Staging GA artifact is updated with:
+  - final p95/p99 latency
+  - conflict behavior under contention
+  - queue backlog behavior
+  - Sentry and Better Stack status
 - [ ] `main` is green on required checks:
   - `lint-test-typecheck`
   - `GitGuardian Security Checks`
@@ -17,6 +36,9 @@ Last updated: 19 Mar 2026 (IST)
 - [ ] Dedicated production-only secrets are set:
   - `WEBHOOK_SECRET_ENCRYPTION_KEY`
   - `TELEMETRY_HMAC_KEY`
+  - `SENTRY_DSN_API`
+  - `SENTRY_DSN_WEB`
+  - `SENTRY_ENVIRONMENT`
 - [ ] `APP_BASE_URL`, `API_BASE_URL`, and `NEXT_PUBLIC_API_BASE_URL` all resolve to the production `https:` domains.
 - [ ] Provider redirect URIs are reviewed against production domains:
   - Clerk social login/callback settings
@@ -40,6 +62,9 @@ Last updated: 19 Mar 2026 (IST)
 - [ ] External observability vendors are configured:
   - Sentry project created for Web/API exception capture
   - Better Stack (or equivalent) uptime checks configured for Web and API health probes
+- [ ] A staging smoke exception has been observed in Sentry for:
+  - web
+  - API
 - [ ] Alert routing points to a real operator channel with an owner on call.
 
 ## Database and schema
@@ -60,6 +85,8 @@ Last updated: 19 Mar 2026 (IST)
 - [ ] Confirm the Worker environment contains:
   - `WEBHOOK_SECRET_ENCRYPTION_KEY`
   - `TELEMETRY_HMAC_KEY`
+  - `SENTRY_DSN_API`
+  - `SENTRY_ENVIRONMENT`
 - [ ] Smoke test:
   - `GET /health`
   - public availability route
@@ -75,6 +102,9 @@ Last updated: 19 Mar 2026 (IST)
   - `opencalendly.com`
   - `www.opencalendly.com`
 - [ ] Confirm runtime env vars on Pages include API base URL and public config.
+- [ ] Confirm runtime env vars on Pages include:
+  - `SENTRY_DSN_WEB`
+  - `SENTRY_ENVIRONMENT`
 - [ ] Verify homepage, public booking page, and booking submission path.
 - [ ] Confirm production security headers on sensitive routes:
   - `X-Frame-Options: DENY` on dashboard/organizer/auth/settings/booking-action pages
@@ -96,6 +126,7 @@ Last updated: 19 Mar 2026 (IST)
   - web homepage
   - API `/health`
 - [ ] Sentry receives and groups server-side exceptions from a smoke-test path.
+- [ ] Staging sign-off evidence is recorded in the release PR description or release handoff.
 
 ## Rollback readiness
 

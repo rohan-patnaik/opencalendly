@@ -1,0 +1,100 @@
+name: Deploy Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy to staging
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_PAGES_PROJECT: ${{ vars.STAGING_CLOUDFLARE_PAGES_PROJECT || 'opencalendly-web-staging' }}
+      CLOUDFLARE_PAGES_PRODUCTION_BRANCH: ${{ vars.STAGING_CLOUDFLARE_PAGES_BRANCH || 'staging' }}
+      STAGING_APP_BASE_URL: ${{ vars.STAGING_APP_BASE_URL || 'https://staging.opencalendly.com' }}
+      STAGING_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL || 'https://api-staging.opencalendly.com' }}
+      STAGING_CLERK_PUBLISHABLE_KEY: ${{ vars.STAGING_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      STAGING_SENTRY_ENVIRONMENT: ${{ vars.STAGING_SENTRY_ENVIRONMENT || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.ref || 'main' }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify required staging vars
+        run: |
+          missing=0
+          for key in STAGING_APP_BASE_URL STAGING_API_BASE_URL STAGING_CLERK_PUBLISHABLE_KEY STAGING_SENTRY_ENVIRONMENT; do
+            if [ -z "${!key//[[:space:]]/}" ]; then
+              echo "Missing required repository variable: ${key}"
+              missing=1
+            fi
+          done
+          for key in STAGING_SENTRY_DSN_WEB STAGING_SENTRY_DSN_API; do
+            if [ -z "${!key//[[:space:]]/}" ]; then
+              echo "Missing required repository secret: ${key}"
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+        env:
+          STAGING_SENTRY_DSN_WEB: ${{ secrets.STAGING_SENTRY_DSN_WEB }}
+          STAGING_SENTRY_DSN_API: ${{ secrets.STAGING_SENTRY_DSN_API }}
+
+      - name: Deploy API worker (staging)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SENTRY_DSN_API: ${{ secrets.STAGING_SENTRY_DSN_API }}
+          SENTRY_ENVIRONMENT: ${{ env.STAGING_SENTRY_ENVIRONMENT }}
+        run: npm run deploy:api:staging
+
+      - name: Deploy web (Pages staging)
+        env:
+          APP_BASE_URL: ${{ env.STAGING_APP_BASE_URL }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ env.STAGING_API_BASE_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ env.STAGING_CLERK_PUBLISHABLE_KEY }}
+          SENTRY_DSN_WEB: ${{ secrets.STAGING_SENTRY_DSN_WEB }}
+          SENTRY_ENVIRONMENT: ${{ env.STAGING_SENTRY_ENVIRONMENT }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npm run deploy:web:staging
+
+      - name: Verify staging domains
+        run: |
+          max_attempts=8
+          for attempt in $(seq 1 "$max_attempts"); do
+            echo "Staging domain check attempt ${attempt}/${max_attempts}"
+            if DOMAIN_CHECK_ALLOW_FORBIDDEN=true npm run domain:check:staging; then
+              exit 0
+            fi
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              sleep_seconds=$((attempt * 15))
+              echo "Staging domain check failed; retrying in ${sleep_seconds}s..."
+              sleep "$sleep_seconds"
+            fi
+          done
+          echo "Staging domain check failed after retries."
+          exit 1

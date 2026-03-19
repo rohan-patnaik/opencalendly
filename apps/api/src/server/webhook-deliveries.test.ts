@@ -38,6 +38,7 @@ describe('executeWebhookDelivery', () => {
 
     const result = await executeWebhookDelivery(
       { update } as unknown as Database,
+      {},
       buildDelivery('https://127.0.0.1/webhooks/opencalendly'),
     );
 
@@ -77,6 +78,7 @@ describe('executeWebhookDelivery', () => {
 
     const result = await executeWebhookDelivery(
       { update } as unknown as Database,
+      {},
       buildDelivery('https://hooks.example.com/webhooks/opencalendly'),
     );
 

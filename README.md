@@ -74,8 +74,5 @@ npm run dev:web
 
 ## Repo Guide
 
-- API contract: [docs/API.md](docs/API.md)
-- Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- Stack and operational choices: [docs/STACK.md](docs/STACK.md)
-- Production deploy checklist: [docs/PROD_DEPLOY_CHECKLIST.md](docs/PROD_DEPLOY_CHECKLIST.md)
+- Start here: [docs/README.md](docs/README.md)
 - Environment reference: [.env.example](.env.example)

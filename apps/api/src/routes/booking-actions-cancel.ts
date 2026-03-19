@@ -16,13 +16,17 @@ import {
 } from '../server/types';
 import { DemoQuotaAdmissionError, DemoQuotaCreditsError } from '../server/types';
 import { hashActionToken, lockActionToken, lockBooking } from '../server/booking-action-links';
-import { emitAuditEvent } from '../server/audit';
-import { runBookingCancellationSideEffects } from '../server/booking-side-effects';
+import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
+import {
+  queueBookingCancellationSideEffects,
+  queuedEmailDelivery,
+  sendBookingCancellationEmailSideEffects,
+} from '../server/booking-side-effects';
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { cancelPendingScheduledNotificationsForBooking } from '../server/notifications';
 import { jsonDemoQuotaError, consumeDemoFeatureCredits, isLaunchDemoBookingContext } from '../server/demo-quota';
-import { jsonError, normalizeTimezone } from '../server/core';
-import { withDatabase } from '../server/database';
+import { jsonError, normalizeTimezone, queueBackgroundTask } from '../server/core';
+import { withConnectedDatabase, withDatabase } from '../server/database';
 import type { ApiApp, DemoQuotaDb } from '../server/types';
 import { evaluateBookingActionToken, parseBookingMetadata } from '../lib/booking-actions';
 
@@ -175,19 +179,40 @@ export const registerBookingActionCancelRoutes = (app: ApiApp): void => {
         const timezone =
           parseBookingMetadata(result.booking.metadata, normalizeTimezone).timezone ??
           normalizeTimezone(result.organizer.timezone);
-        const sideEffects = await runBookingCancellationSideEffects(context.env, db, {
+        const sideEffects = await queueBookingCancellationSideEffects(db, {
           booking: result.booking,
-          eventType: { name: result.eventType.name },
-          organizer: { email: result.organizer.email, displayName: result.organizer.displayName },
-          timezone,
           cancellationReason: parsed.data.reason ?? null,
           alreadyProcessed: result.alreadyProcessed,
         });
+        if (!result.alreadyProcessed) {
+          queueBackgroundTask(
+            context,
+            withConnectedDatabase(context, async (backgroundDb) => {
+              await sendBookingCancellationEmailSideEffects(context.env, backgroundDb, {
+                booking: result.booking,
+                eventType: { name: result.eventType.name },
+                organizer: { email: result.organizer.email, displayName: result.organizer.displayName },
+                timezone,
+                cancellationReason: parsed.data.reason ?? null,
+                alreadyProcessed: false,
+              });
+            }).catch((error) => {
+              emitAuditEvent({
+                event: 'booking_side_effect_failed',
+                level: 'error',
+                route: '/v0/bookings/actions/:token/cancel',
+                bookingId: result.booking.id,
+                actionType: 'cancel',
+                error: sanitizeErrorForAudit(error, 'booking_cancellation_email_failed'),
+              });
+            }),
+          );
+        }
 
         return context.json({
           ok: true,
           booking: { id: result.booking.id, status: result.booking.status },
-          email: sideEffects.email,
+          ...(result.alreadyProcessed ? {} : { email: queuedEmailDelivery }),
           notifications: { canceled: result.canceledNotifications },
           webhooks: { queued: sideEffects.queuedWebhookDeliveries },
           calendarWriteback: sideEffects.calendarWriteback,

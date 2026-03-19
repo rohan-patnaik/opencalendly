@@ -13,6 +13,7 @@ import {
   resolveWebhookTargetSafety,
 } from '../lib/webhooks';
 import { emitAuditEvent } from './audit';
+import { captureApiException } from './sentry';
 import { migrateWebhookSecretIfNeeded } from './webhook-secret-storage';
 import type {
   Bindings,
@@ -119,6 +120,7 @@ export const enqueueWebhookDeliveries = async (
 
 export const executeWebhookDelivery = async (
   db: Database,
+  env: Bindings,
   delivery: PendingWebhookDelivery,
 ): Promise<'succeeded' | 'retried' | 'failed'> => {
   const now = new Date();
@@ -145,6 +147,16 @@ export const executeWebhookDelivery = async (
       subscriptionId: delivery.subscriptionId,
       reason: targetSafety.reason,
       attempts: delivery.maxAttempts,
+    });
+    void captureApiException(env, targetSafety.reason, {
+      route: 'webhook_delivery_runner',
+      statusCode: 422,
+      tags: { deliveryStatus: 'failed' },
+      extra: {
+        deliveryId: delivery.id,
+        subscriptionId: delivery.subscriptionId,
+        attempts: delivery.maxAttempts,
+      },
     });
 
     return 'failed';
@@ -240,6 +252,16 @@ export const executeWebhookDelivery = async (
       subscriptionId: delivery.subscriptionId,
       reason: errorMessage,
       attempts: attemptedCount,
+    });
+    void captureApiException(env, errorMessage ?? 'webhook_delivery_failed', {
+      route: 'webhook_delivery_runner',
+      statusCode: responseStatus ?? 500,
+      tags: { deliveryStatus: 'failed' },
+      extra: {
+        deliveryId: delivery.id,
+        subscriptionId: delivery.subscriptionId,
+        attempts: attemptedCount,
+      },
     });
     return 'failed';
   }
@@ -353,7 +375,7 @@ export const runWebhookDeliveryBatch = async (
   let succeeded = 0;
   let retried = 0;
   for (const delivery of deliveries) {
-    const outcome = await executeWebhookDelivery(db, delivery);
+    const outcome = await executeWebhookDelivery(db, input.env, delivery);
     if (outcome === 'succeeded') {
       succeeded += 1;
     } else if (outcome === 'retried') {

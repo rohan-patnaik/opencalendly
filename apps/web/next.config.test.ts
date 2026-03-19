@@ -5,6 +5,8 @@ const restoreEnv = () => {
   delete process.env.NEXT_PUBLIC_API_BASE_URL;
   delete process.env.API_BASE_URL;
   delete process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  delete process.env.SENTRY_DSN_WEB;
+  delete process.env.SENTRY_ENVIRONMENT;
   delete process.env.NODE_ENV;
 };
 
@@ -69,5 +71,19 @@ describe('next config security headers', () => {
     expect(embedRoute).toBeUndefined();
     expect(globalHeaderKeys.has('X-Frame-Options')).toBe(false);
     expect(globalCsp).not.toContain('frame-ancestors');
+  });
+
+  it('maps Sentry env vars to browser-safe public values', async () => {
+    process.env.SENTRY_DSN_WEB = 'https://public@example.ingest.sentry.io/123';
+    process.env.SENTRY_ENVIRONMENT = 'staging';
+
+    const nextConfigModule = await import('./next.config.mjs');
+
+    expect(nextConfigModule.default.env).toEqual(
+      expect.objectContaining({
+        NEXT_PUBLIC_SENTRY_DSN_WEB: 'https://public@example.ingest.sentry.io/123',
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: 'staging',
+      }),
+    );
   });
 });
