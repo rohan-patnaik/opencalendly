@@ -8,6 +8,15 @@ import type { OrganizerConsoleUser } from './types';
 
 type OrganizerStyles = Record<string, string>;
 
+const fallbackTimezones = ['UTC', 'Asia/Kolkata', 'Europe/London', 'America/New_York'];
+
+const resolveTimezones = (): string[] => {
+  if (typeof Intl.supportedValuesOf === 'function') {
+    return Intl.supportedValuesOf('timeZone');
+  }
+  return fallbackTimezones;
+};
+
 export const ProfilePanel = ({
   apiBaseUrl,
   session,
@@ -34,6 +43,7 @@ export const ProfilePanel = ({
   const [displayName, setDisplayName] = useState(user.displayName);
   const [username, setUsername] = useState(user.username);
   const [timezone, setTimezone] = useState(user.timezone);
+  const [timezones] = useState<string[]>(() => resolveTimezones());
 
   useEffect(() => {
     setDisplayName(user.displayName);
@@ -94,12 +104,18 @@ export const ProfilePanel = ({
       </label>
       <label className={styles.label}>
         Timezone
-        <input
+        <select
           className={styles.input}
           value={timezone}
           onChange={(event) => setTimezone(event.target.value)}
           required
-        />
+        >
+          {timezones.map((timezoneOption) => (
+            <option key={timezoneOption} value={timezoneOption}>
+              {timezoneOption}
+            </option>
+          ))}
+        </select>
       </label>
       <button type="submit" className={styles.primaryButton} disabled={isBusy('profileUpdate')}>
         {isBusy('profileUpdate') ? 'Saving…' : 'Save profile'}

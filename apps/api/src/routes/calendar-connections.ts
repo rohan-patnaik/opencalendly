@@ -99,6 +99,7 @@ export const registerCalendarConnectionRoutes = (app: ApiApp): void => {
         level: 'info',
         actorUserId: authedUser.id,
         ...(auditProvider ? { provider: auditProvider } : {}),
+        connectionId: connection.id,
         route: '/v0/calendar/connections/:connectionId/disconnect',
         statusCode: 200,
         disconnected: true,

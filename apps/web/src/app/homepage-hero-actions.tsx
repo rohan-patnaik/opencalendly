@@ -18,17 +18,14 @@ export function HomepageHeroActions() {
 
   const handleSignOut = async () => {
     setSignOutError(null);
-    let apiSessionRevoked = false;
 
     try {
-      await revokeApiSession(apiBaseUrl);
-      apiSessionRevoked = true;
-      clear();
       await signOut({ redirectUrl: '/auth/sign-in' });
+      clear();
+      void revokeApiSession(apiBaseUrl).catch(() => {
+        // The Clerk sign-out is authoritative; revoking the API session is best effort.
+      });
     } catch (error) {
-      if (apiSessionRevoked) {
-        clear();
-      }
       if (isClerkAPIResponseError(error)) {
         const detail = error.errors[0]?.longMessage ?? error.errors[0]?.message;
         setSignOutError(detail ?? 'Unable to sign out right now.');

@@ -82,6 +82,9 @@ export const CalendarsPanel = ({
     if (!session) {
       return;
     }
+    if (!window.confirm('Disconnect this calendar? Existing booking links will stay active.')) {
+      return;
+    }
 
     const action = `calendarDisconnect:${connection.id}`;
     beginBusy(action);
@@ -206,6 +209,9 @@ export const CalendarsPanel = ({
                   />
                   Default writeback calendar
                 </label>
+                <p className={styles.helperText}>
+                  Only one connected calendar can be the default writeback target at a time.
+                </p>
                 <div className={styles.inlineActions}>
                   <button
                     type="button"

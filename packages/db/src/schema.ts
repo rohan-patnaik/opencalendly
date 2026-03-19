@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -807,6 +808,9 @@ export const calendarConnections = pgTable(
     ),
     userProviderIndex: index('calendar_connections_user_provider_idx').on(table.userId, table.provider),
     userWritebackIndex: index('calendar_connections_user_writeback_idx').on(table.userId, table.useForWriteback),
+    singleWritebackPerUser: uniqueIndex('calendar_connections_user_single_writeback_uidx')
+      .on(table.userId)
+      .where(sql`${table.useForWriteback} = true`),
     userConflictChecksIndex: index('calendar_connections_user_conflict_checks_idx').on(
       table.userId,
       table.useForConflictChecks,

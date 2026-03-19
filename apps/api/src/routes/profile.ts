@@ -33,7 +33,7 @@ export const registerProfileRoutes = (app: ApiApp): void => {
         return jsonError(context, 401, 'Unauthorized.');
       }
 
-      return context.json({ ok: true, user: authedUser });
+      return context.json({ ok: true, user: toProfilePayload(authedUser) });
     });
   });
 

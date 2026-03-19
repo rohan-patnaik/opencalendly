@@ -30,7 +30,8 @@ Acceptance criteria:
   - Teams
   - Webhooks
   - Profile
-  - Analytics
+  - Writeback queue
+- Dashboard analytics remains available as a dedicated authenticated surface linked from organizer navigation.
 - `/organizer` remains the default signed-in organizer landing page and behaves as the `Event types` entrypoint.
 - Users can connect multiple Google and/or Microsoft calendar accounts without overwriting an existing connection for the same provider.
 - Calendar settings let a user:
@@ -48,6 +49,7 @@ Acceptance criteria:
   - `npm run lint`
   - `npm run test`
   - `npm run typecheck`
+  - `npm run complexity:check:enforce`
   - `git diff --check`
 
 ## Feature 72 (PR#TBD): Private pre-GA staging, observability, and performance hardening

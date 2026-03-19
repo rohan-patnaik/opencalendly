@@ -78,6 +78,10 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
     );
   }
 
+  if (!authedUser.onboardingCompleted) {
+    return null;
+  }
+
   return (
     <PageShell
       eyebrow="Feature 8"

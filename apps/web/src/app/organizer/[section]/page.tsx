@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation';
+
 import OrganizerConsolePageClient from '../page.client';
 import { resolveApiBaseUrl } from '../../../lib/api-base-url';
 import { organizerSections, type OrganizerSectionId } from '../../../features/organizer/utils';
@@ -10,7 +12,11 @@ export default async function OrganizerSectionPage({
   params: Promise<{ section: string }>;
 }) {
   const { section } = await params;
-  const activeSection: OrganizerSectionId = organizerSectionIds.has(section) ? (section as OrganizerSectionId) : 'event-types';
+  if (!organizerSectionIds.has(section)) {
+    redirect('/organizer');
+  }
+
+  const activeSection = section as OrganizerSectionId;
 
   return (
     <OrganizerConsolePageClient

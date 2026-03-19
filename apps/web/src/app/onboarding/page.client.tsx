@@ -45,6 +45,12 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
         organizerApi.getCalendarSyncStatus(apiBaseUrl, session),
       ]);
 
+      if (profilePayload.user.onboardingCompleted) {
+        handleProfileUpdated(profilePayload.user);
+        router.replace(resolvePostAuthRoute(true));
+        return;
+      }
+
       setProfile(profilePayload.user);
       setCalendarStatuses(calendarPayload.connections);
     } catch (caught) {
@@ -111,9 +117,11 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
   };
 
   const handleSignOut = async () => {
-    await revokeApiSession(apiBaseUrl);
-    clear();
     await signOut({ redirectUrl: '/auth/sign-in' });
+    clear();
+    void revokeApiSession(apiBaseUrl).catch(() => {
+      // The Clerk sign-out is authoritative; revoking the API session is best effort.
+    });
   };
 
   if (!ready || loading) {
