@@ -1,8 +1,8 @@
 ALTER TABLE "booking_external_events" DROP CONSTRAINT "booking_external_events_booking_provider_unique";--> statement-breakpoint
-ALTER TABLE "calendar_connections" DROP CONSTRAINT "calendar_connections_user_provider_unique";--> statement-breakpoint
-ALTER TABLE "calendar_connections" DROP CONSTRAINT "calendar_connections_id_provider_unique";--> statement-breakpoint
 ALTER TABLE "booking_external_events" DROP CONSTRAINT "booking_external_events_connection_provider_fk";
 --> statement-breakpoint
+ALTER TABLE "calendar_connections" DROP CONSTRAINT "calendar_connections_user_provider_unique";--> statement-breakpoint
+ALTER TABLE "calendar_connections" DROP CONSTRAINT "calendar_connections_id_provider_unique";--> statement-breakpoint
 ALTER TABLE "calendar_connections" ADD COLUMN "use_for_conflict_checks" boolean DEFAULT true NOT NULL;--> statement-breakpoint
 ALTER TABLE "calendar_connections" ADD COLUMN "use_for_writeback" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN "onboarding_completed" boolean DEFAULT true NOT NULL;--> statement-breakpoint
