@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useClerk } from '@clerk/nextjs';
+import { useAuth, useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 
 import { PageShell, Toast } from '../../components/ui';
@@ -11,6 +11,7 @@ import type { OrganizerConsoleUser } from '../../features/organizer/types';
 import { useBusyActions } from '../../features/organizer/use-busy-actions';
 import { organizerApi, type CalendarConnectionStatus } from '../../lib/organizer-api';
 import { revokeApiSession } from '../../lib/api-client';
+import { requestAuthSessionBridgeRetry } from '../../lib/auth-session-bridge-retry';
 import { resolvePostAuthRoute } from '../../lib/post-auth-route';
 import { useAuthSession } from '../../lib/use-auth-session';
 import organizerStyles from '../organizer/page.module.css';
@@ -22,6 +23,7 @@ type OnboardingPageClientProps = {
 export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClientProps) {
   const router = useRouter();
   const { signOut } = useClerk();
+  const { isLoaded, isSignedIn } = useAuth();
   const { ready, session, clear, save } = useAuthSession();
   const busy = useBusyActions();
   const [profile, setProfile] = useState<OrganizerConsoleUser | null>(null);
@@ -30,6 +32,8 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
+  const [sessionBridgeTimedOut, setSessionBridgeTimedOut] = useState(false);
+  const [sessionBridgeRetryKey, setSessionBridgeRetryKey] = useState(0);
 
   const refreshOnboardingData = useCallback(async () => {
     if (!session) {
@@ -66,6 +70,9 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
     }
 
     if (!session) {
+      if (isLoaded && isSignedIn) {
+        return;
+      }
       router.replace('/auth/sign-in?redirect_url=%2Fonboarding');
       return;
     }
@@ -76,7 +83,22 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
     }
 
     void refreshOnboardingData();
-  }, [ready, refreshOnboardingData, router, session]);
+  }, [isLoaded, isSignedIn, ready, refreshOnboardingData, router, session]);
+
+  useEffect(() => {
+    if (!(isLoaded && isSignedIn && ready && !session)) {
+      setSessionBridgeTimedOut(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setSessionBridgeTimedOut(true);
+    }, 20_000);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isLoaded, isSignedIn, ready, session, sessionBridgeRetryKey]);
 
   const handleProfileUpdated = (nextUser: OrganizerConsoleUser) => {
     setProfile(nextUser);
@@ -126,6 +148,46 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
       });
     });
   };
+
+  if (isLoaded && isSignedIn && ready && !session) {
+    return (
+      <PageShell
+        eyebrow="Onboarding"
+        title="Set up your scheduling workspace"
+        description="Finalizing your OpenCalendly session…"
+      >
+        <section className={organizerStyles.card}>
+          {sessionBridgeTimedOut ? (
+            <Toast variant="error">
+              Session setup is taking longer than expected.
+              <button
+                type="button"
+                className={organizerStyles.ghostButton}
+                onClick={() => {
+                  setSessionBridgeTimedOut(false);
+                  setSessionBridgeRetryKey((value) => value + 1);
+                  requestAuthSessionBridgeRetry();
+                }}
+              >
+                Retry
+              </button>{' '}
+              <button
+                type="button"
+                className={organizerStyles.ghostButton}
+                onClick={() => {
+                  void handleSignOut();
+                }}
+              >
+                Sign out
+              </button>
+            </Toast>
+          ) : (
+            <Toast variant="info">Finalizing your OpenCalendly session…</Toast>
+          )}
+        </section>
+      </PageShell>
+    );
+  }
 
   if (!ready || loading) {
     return (

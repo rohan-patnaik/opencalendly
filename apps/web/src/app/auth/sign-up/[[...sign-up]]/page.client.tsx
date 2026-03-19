@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { LinkButton, PageShell, Toast } from '../../../../components/ui';
+import { requestAuthSessionBridgeRetry } from '../../../../lib/auth-session-bridge-retry';
 import { resolvePostAuthRoute } from '../../../../lib/post-auth-route';
 import { useAuthSession } from '../../../../lib/use-auth-session';
 import uiStyles from '../../../../components/ui/primitives.module.css';
@@ -91,7 +92,7 @@ export default function SignUpPageClient() {
               onClick={() => {
                 setSessionBridgeTimedOut(false);
                 setSessionBridgeRetryKey((value) => value + 1);
-                router.refresh();
+                requestAuthSessionBridgeRetry();
               }}
             >
               Retry

@@ -1,5 +1,25 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 75 (PR#TBD): Fix onboarding auth loop after OAuth
+
+Scope:
+
+- Stop the signed-in onboarding page from redirecting back to sign-in while the Clerk-to-app session bridge is still finalizing.
+- Keep the fix scoped to the local auth/onboarding redirect behavior after Google, Microsoft, or email auth.
+
+Acceptance criteria:
+
+- A Clerk-authenticated user without a local app session is not immediately redirected away from `/onboarding`.
+- `/onboarding` shows a session-finalizing state while the app session exchange is still pending.
+- If session exchange takes too long, the user sees retry and sign-out actions instead of a redirect loop.
+- Existing onboarding-complete and signed-out redirects still work as before.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 74 (PR#TBD): Fix Cloudflare Pages deploy for organizer section route
 
 Scope:
