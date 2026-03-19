@@ -1,4 +1,9 @@
-const LOCAL_WEB_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000'] as const;
+const LOCAL_WEB_ORIGINS = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+] as const;
 
 export const toCorsOrigin = (raw: string | undefined): string | null => {
   if (!raw) {

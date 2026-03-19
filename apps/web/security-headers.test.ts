@@ -24,7 +24,9 @@ describe('web security headers', () => {
 
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("script-src 'self' 'unsafe-inline' https://api.opencalendly.com");
-    expect(csp).toContain("connect-src 'self' https://opencalendly.com https://api.opencalendly.com https://example.accounts.dev");
+    expect(csp).toContain(
+      "connect-src 'self' https://opencalendly.com https://api.opencalendly.com https://example.accounts.dev https://clerk-telemetry.com",
+    );
     expect(csp).toContain("frame-src 'self' https://opencalendly.com https://challenges.cloudflare.com");
   });
 
