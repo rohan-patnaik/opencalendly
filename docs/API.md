@@ -576,6 +576,9 @@ Required header:
 Behavior:
 
 - Re-validates slot availability inside a DB transaction.
+- Validates `answers` against the event type's configured booking questions at commit time.
+- Rejects unknown question IDs and missing required answers.
+- Persists only non-empty answers for configured questions.
 - Includes organizer time-off blocks in the final write-time conflict check.
 - Includes synced external busy windows in the final write-time conflict check.
 - Uses DB unique slot constraint to avoid duplicate commits.
@@ -1566,6 +1569,7 @@ Behavior:
 - Applies confirmed booking conflicts per member.
 - Applies each member's synced external busy windows (Feature 6) before slot assignment.
 - Applies event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
+- Returns an error when the team event's required-member configuration can no longer be resolved cleanly.
 - Route is rate-limited per IP + team event key.
 
 ### `POST /v0/team-bookings`
@@ -1650,6 +1654,7 @@ Notes:
 - Team assignment rows enforce per-member slot uniqueness.
 - Member selection and commit checks include member time-off blocks.
 - Member selection and commit checks include synced external busy windows.
+- Team booking commit validates `answers` against the configured team event questions, rejects unknown question IDs, and rejects missing required answers.
 - Team booking commit enforces event-type booking caps (`dailyBookingLimit`, `weeklyBookingLimit`, `monthlyBookingLimit`) when configured.
 - Team booking commit schedules enabled reminder/follow-up notification rows.
 - Existing `/v0/bookings/actions/:token/cancel` and `/v0/bookings/actions/:token/reschedule` remain valid for team bookings.

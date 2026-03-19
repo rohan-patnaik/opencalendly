@@ -1,5 +1,22 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 78 (PR#TBD): Fix booking correctness review gaps
+
+Scope:
+
+- Fix the review-reported correctness gaps in booking validation, team scheduling consistency, and calendar writeback handling.
+- Keep the change scoped to server validation, scheduling correctness, writeback behavior, tests, and docs; do not change public request or success response shapes.
+- Preserve the existing same-organizer reschedule writeback path while correcting organizer-changing team reschedules.
+
+Acceptance criteria:
+
+- `POST /v0/bookings` validates submitted `answers` against configured booking questions server-side, rejects unknown question IDs, rejects missing required answers, and persists only non-empty configured answers.
+- `POST /v0/team-bookings` applies the same server-side booking-question validation rules as one-on-one booking.
+- Team booking-cap enforcement uses the event/organizer timezone consistently across availability, commit, and reschedule flows.
+- `GET /v0/teams/:teamSlug/event-types/:eventSlug/availability` returns an error instead of advertising slots when required team members can no longer be resolved.
+- Team reschedules that change organizers queue cancel writeback for the old organizer event and create writeback for the new organizer event, without transferring external-event mappings across organizers.
+- Regression tests cover booking answer validation, timezone-correct team cap enforcement, invalid required-member team availability, and organizer-changing reschedule writeback handling.
+
 ## Feature 77 (PR#TBD): Center desktop app chrome navigation
 
 Scope:

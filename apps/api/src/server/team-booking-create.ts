@@ -16,6 +16,7 @@ import {
   BookingConflictError,
   BookingNotFoundError,
   BookingValidationError,
+  validateBookingAnswers,
 } from '../lib/booking';
 import { buildBookingCapWindowsForSlot } from '../lib/booking-caps';
 import { consumeDemoFeatureCredits } from './demo-quota';
@@ -27,6 +28,8 @@ import {
   toEventTypeBookingCaps,
 } from './team-context';
 import { listTeamMemberSchedules, resolveTeamRequestedSlot } from './team-schedules';
+import { normalizeTimezone } from './core';
+import { toEventQuestions } from './public-events';
 import type { AuthenticatedUser, Bindings, Database, DemoQuotaDb, TeamSchedulingMode } from './types';
 
 type TeamBookingCreateInput = {
@@ -117,6 +120,7 @@ export const createTeamBooking = async (
       locationValue: string | null;
       organizerTimezone: string;
       isActive: boolean;
+      questions: unknown;
     }>(sql`
       select
         tet.id as "teamEventTypeId",
@@ -130,6 +134,7 @@ export const createTeamBooking = async (
         et.monthly_booking_limit as "monthlyBookingLimit",
         et.location_type as "locationType",
         et.location_value as "locationValue",
+        et.questions,
         u.timezone as "organizerTimezone",
         et.is_active as "isActive"
       from team_event_types tet
@@ -144,6 +149,8 @@ export const createTeamBooking = async (
     if (!teamEventRow || !teamEventRow.isActive || !mode) {
       throw new BookingNotFoundError('Team event type not found.');
     }
+    const organizerTimezone = normalizeTimezone(teamEventRow.organizerTimezone);
+    const normalizedAnswers = validateBookingAnswers(toEventQuestions(teamEventRow.questions), input.answers);
 
     const memberRows = await transaction
       .select({ userId: teamEventTypeMembers.userId })
@@ -200,7 +207,7 @@ export const createTeamBooking = async (
     stepStartedAt = Date.now();
     const capWindows = buildBookingCapWindowsForSlot({
       startsAtIso: requestedStartsAtIso,
-      timezone: input.timezone,
+      timezone: organizerTimezone,
       caps: toEventTypeBookingCaps(teamEventRow),
     });
     for (const window of capWindows) {
@@ -221,7 +228,7 @@ export const createTeamBooking = async (
     }
 
     const metadata = JSON.stringify({
-      answers: input.answers ?? {},
+      answers: normalizedAnswers,
       timezone: input.timezone,
       bufferBeforeMinutes: slotResolution.bufferBeforeMinutes,
       bufferAfterMinutes: slotResolution.bufferAfterMinutes,

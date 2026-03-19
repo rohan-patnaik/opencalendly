@@ -48,6 +48,7 @@ const buildDataAccess = (options?: {
   let insertCount = 0;
   let actionTokenInsertCount = 0;
   let transactionCount = 0;
+  let insertedMetadata: string | null = null;
 
   const dataAccess: BookingDataAccess = {
     getPublicEventType: async () => options?.eventType ?? publicEventType,
@@ -67,12 +68,13 @@ const buildDataAccess = (options?: {
           }
           return options?.eventTypeWindowBookingCount ?? 0;
         },
-        insertBooking: async () => {
+        insertBooking: async (bookingInput) => {
           if (options?.throwUniqueConflict) {
             throw new BookingUniqueConstraintError('duplicate slot');
           }
 
           insertCount += 1;
+          insertedMetadata = bookingInput.metadata;
           return {
             id: 'booking-1',
             eventTypeId: 'event-1',
@@ -95,6 +97,7 @@ const buildDataAccess = (options?: {
     getInsertCount: () => insertCount,
     getActionTokenInsertCount: () => actionTokenInsertCount,
     getTransactionCount: () => transactionCount,
+    getInsertedMetadata: () => insertedMetadata,
   };
 };
 
@@ -254,5 +257,78 @@ describe('commitBooking', () => {
     ).resolves.toBeDefined();
 
     expect(harness.getInsertCount()).toBe(1);
+  });
+
+  it('rejects booking when a required configured question is missing', async () => {
+    const harness = buildDataAccess({
+      eventType: {
+        ...publicEventType,
+        questions: [{ id: 'company', label: 'Company', required: true }],
+      },
+    });
+
+    await expect(
+      commitBooking(harness.dataAccess, {
+        username: 'demo',
+        eventSlug: 'intro-call',
+        startsAt: '2026-03-02T09:00:00.000Z',
+        timezone: 'UTC',
+        inviteeName: 'Pat Lee',
+        inviteeEmail: 'pat@example.com',
+        answers: {},
+      }),
+    ).rejects.toThrow('Answer required question: "Company".');
+  });
+
+  it('rejects booking when an unknown answer key is submitted', async () => {
+    const harness = buildDataAccess({
+      eventType: {
+        ...publicEventType,
+        questions: [{ id: 'company', label: 'Company', required: false }],
+      },
+    });
+
+    await expect(
+      commitBooking(harness.dataAccess, {
+        username: 'demo',
+        eventSlug: 'intro-call',
+        startsAt: '2026-03-02T09:00:00.000Z',
+        timezone: 'UTC',
+        inviteeName: 'Pat Lee',
+        inviteeEmail: 'pat@example.com',
+        answers: { teamSize: '50' },
+      }),
+    ).rejects.toThrow('Unknown booking question: "teamSize".');
+  });
+
+  it('persists only trimmed answers for configured questions', async () => {
+    const harness = buildDataAccess({
+      eventType: {
+        ...publicEventType,
+        questions: [
+          { id: 'company', label: 'Company', required: true },
+          { id: 'notes', label: 'Notes', required: false },
+        ],
+      },
+    });
+
+    await expect(
+      commitBooking(harness.dataAccess, {
+        username: 'demo',
+        eventSlug: 'intro-call',
+        startsAt: '2026-03-02T09:00:00.000Z',
+        timezone: 'UTC',
+        inviteeName: 'Pat Lee',
+        inviteeEmail: 'pat@example.com',
+        answers: {
+          company: '  Acme  ',
+          notes: '   ',
+        },
+      }),
+    ).resolves.toBeDefined();
+
+    expect(JSON.parse(harness.getInsertedMetadata() ?? '{}')).toMatchObject({
+      answers: { company: 'Acme' },
+    });
   });
 });

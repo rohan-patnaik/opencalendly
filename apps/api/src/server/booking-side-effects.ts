@@ -3,7 +3,11 @@ import {
   sendBookingConfirmationEmail,
   sendBookingRescheduledEmail,
 } from '../lib/email';
-import { enqueueCalendarWritebacksForBooking } from './calendar-writeback-queue';
+import {
+  emptyWritebackResult,
+  mergeWritebackResults,
+  queueCalendarWriteback,
+} from './booking-writeback-summary';
 import { enqueueWebhookDeliveries } from './webhook-deliveries';
 import { tryRecordAnalyticsFunnelEvent, tryRecordEmailDelivery } from './telemetry';
 import type { Bindings, Database } from './types';
@@ -40,39 +44,11 @@ type ActionUrls = {
   reschedulePageUrl: string;
 };
 
-export const emptyWritebackResult = {
-  queued: 0,
-  processed: 0,
-  succeeded: 0,
-  retried: 0,
-  failed: 0,
-  deferred: false,
-};
-
 export const queuedEmailDelivery = {
   sent: false,
   provider: 'background',
   queued: true,
 } as const;
-
-const queueCalendarWriteback = async (
-  db: Database,
-  input: Parameters<typeof enqueueCalendarWritebacksForBooking>[1],
-) => {
-  const queue = await enqueueCalendarWritebacksForBooking(db, input);
-  if (queue.queued === 0) {
-    return emptyWritebackResult;
-  }
-
-  return {
-    queued: queue.queued,
-    processed: 0,
-    succeeded: 0,
-    retried: 0,
-    failed: 0,
-    deferred: true,
-  };
-};
 
 export const queueBookingCreatedSideEffects = async (
   db: Database,
@@ -305,16 +281,29 @@ export const queueBookingRescheduleSideEffects = async (
     queuedWebhookDeliveries,
     calendarWriteback: input.alreadyProcessed
       ? emptyWritebackResult
-      : await queueCalendarWriteback(db, {
-          bookingId: input.oldBooking.id,
-          organizerId: input.newBooking.organizerId,
-          operation: 'reschedule',
-          rescheduleTarget: {
-            bookingId: input.newBooking.id,
-            startsAtIso: input.newBooking.startsAt.toISOString(),
-            endsAtIso: input.newBooking.endsAt.toISOString(),
-          },
-        }),
+      : input.oldBooking.organizerId === input.newBooking.organizerId
+        ? await queueCalendarWriteback(db, {
+            bookingId: input.oldBooking.id,
+            organizerId: input.newBooking.organizerId,
+            operation: 'reschedule',
+            rescheduleTarget: {
+              bookingId: input.newBooking.id,
+              startsAtIso: input.newBooking.startsAt.toISOString(),
+              endsAtIso: input.newBooking.endsAt.toISOString(),
+            },
+          })
+        : mergeWritebackResults(
+            await queueCalendarWriteback(db, {
+              bookingId: input.oldBooking.id,
+              organizerId: input.oldBooking.organizerId,
+              operation: 'cancel',
+            }),
+            await queueCalendarWriteback(db, {
+              bookingId: input.newBooking.id,
+              organizerId: input.newBooking.organizerId,
+              operation: 'create',
+            }),
+          ),
   };
 };
 

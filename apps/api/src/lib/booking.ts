@@ -123,6 +123,38 @@ export type CommitBookingResult = {
 
 const slotKey = (startsAt: string, endsAt: string): string => `${startsAt}|${endsAt}`;
 
+export const validateBookingAnswers = (
+  questions: PublicEventType['questions'],
+  answers: Record<string, string> | undefined,
+): Record<string, string> => {
+  const providedAnswers = answers ?? {};
+  const questionById = new Map(questions.map((question) => [question.id, question]));
+
+  for (const questionId of Object.keys(providedAnswers)) {
+    if (!questionById.has(questionId)) {
+      throw new BookingValidationError(`Unknown booking question: "${questionId}".`);
+    }
+  }
+
+  const normalizedAnswers: Record<string, string> = {};
+
+  for (const question of questions) {
+    const rawValue = providedAnswers[question.id];
+    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+
+    if (!value) {
+      if (question.required) {
+        throw new BookingValidationError(`Answer required question: "${question.label}".`);
+      }
+      continue;
+    }
+
+    normalizedAnswers[question.id] = value;
+  }
+
+  return normalizedAnswers;
+};
+
 export const createBookingActionTokenSet = (
   now: Date = new Date(),
 ): {
@@ -158,6 +190,7 @@ export const commitBooking = async (
   if (!eventType || !eventType.isActive) {
     throw new BookingNotFoundError('Event type not found.');
   }
+  const normalizedAnswers = validateBookingAnswers(eventType.questions, input.answers);
 
   const startsAt = DateTime.fromISO(input.startsAt, { zone: 'utc' });
   if (!startsAt.isValid) {
@@ -244,7 +277,7 @@ export const commitBooking = async (
     const capCheckMs = Date.now() - capCheckStartedAt;
 
     const metadata = JSON.stringify({
-      answers: input.answers ?? {},
+      answers: normalizedAnswers,
       timezone: input.timezone,
       bufferBeforeMinutes: matchingSlot.bufferBeforeMinutes,
       bufferAfterMinutes: matchingSlot.bufferAfterMinutes,

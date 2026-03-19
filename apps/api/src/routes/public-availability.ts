@@ -311,6 +311,19 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
         rangeEnd.toJSDate(),
       );
       const dataLoadMs = Date.now() - dataLoadStartedAt;
+      if (memberSchedules.length !== teamEventContext.members.length) {
+        emitTeamAvailabilityAudit({
+          level: 'warn',
+          route: '/v0/teams/:teamSlug/event-types/:eventSlug/availability',
+          statusCode: 409,
+          durationMs: Date.now() - startedAt,
+          teamSlug,
+          eventSlug,
+          dataLoadMs,
+          memberCount: memberSchedules.length,
+        });
+        return jsonError(context, 409, 'Some required team members no longer exist.');
+      }
 
       const computeStartedAt = Date.now();
       const availability = computeTeamAvailabilitySlots({
