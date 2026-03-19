@@ -1,5 +1,70 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 72 (PR#TBD): Private pre-GA staging, observability, and performance hardening
+
+Scope:
+
+- Add a dedicated private staging deployment path for Cloudflare Pages + Worker using `staging.opencalendly.com` and `api-staging.opencalendly.com`.
+- Enforce production-only observability env gates and wire lightweight Sentry exception capture for web and API.
+- Reduce the slow availability and booking paths by reusing runtime DB connections, batching team schedule reads, and emitting timing breakdowns that can be used during staging load rehearsal.
+- Update GA-facing deploy, security, runbook, and release artifacts so public production is blocked on a successful private staging sign-off.
+
+Acceptance criteria:
+
+- Repository scripts and workflows support staging deploy + staging domain checks:
+  - `npm run deploy:api:staging`
+  - `npm run deploy:web:staging`
+  - `npm run domain:check:staging`
+  - `.github/workflows/deploy-staging.yml`
+- Worker config includes a dedicated `staging` environment targeting `api-staging.opencalendly.com/*`.
+- Production env validation fails when any of these are missing:
+  - `WEBHOOK_SECRET_ENCRYPTION_KEY`
+  - `TELEMETRY_HMAC_KEY`
+  - `SENTRY_DSN_API`
+  - `SENTRY_DSN_WEB`
+  - `SENTRY_ENVIRONMENT`
+- Web and API runtime errors can be reported to Sentry via configured DSNs without exposing secrets to logs or responses.
+- Availability read and booking/team-booking commit audit events include timing breakdowns sufficient to identify slow stages during rehearsal.
+- Team availability reads no longer use N+1 member schedule queries, and runtime DB usage no longer reconnects for every request.
+- Docs updated:
+  - `docs/CLOUDFLARE_DOMAIN_SETUP.md`
+  - `docs/PROD_DEPLOY_CHECKLIST.md`
+  - `docs/SECURITY_CHECKLIST.md`
+  - `docs/OPERATOR_RUNBOOK.md`
+  - `docs/README.md`
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
+## Feature 71 (PR#TBD): Execute GA k6 rehearsal and calibrate the harness
+
+Scope:
+
+- Run the existing `k6` smoke, baseline, and contention profiles against a dedicated local rehearsal setup using real booking, webhook, and calendar-writeback flows.
+- Fix only harness defects found during the first live execution so the results reflect app behavior rather than test-rig behavior.
+- Record the rehearsal inputs, outcomes, and cleanup steps in the GA readiness artifact.
+
+Acceptance criteria:
+
+- The `k6` harness treats explicit booking outcomes (`200`, `409`, `429`) and booking-action outcomes (`200`, `404`, `409`, `410`) as expected where the scripts intentionally allow them.
+- The baseline booking profile uses slot offsets that align with generated availability slots instead of generating artificial conflicts.
+- Smoke, baseline, and contention are executed against a dedicated local rehearsal setup with:
+  - one public one-on-one event route
+  - one public team event route
+  - a real worker auth token
+  - real cancel/reschedule action tokens
+- The GA artifact records:
+  - exact rehearsal inputs used
+  - p95/p99 latency observed
+  - contention conflict behavior
+  - whether duplicate bookings were observed
+  - any queue backlog behavior during the run
+  - cleanup performed for temporary local seed data
+- Temporary local-only rehearsal data is removed after the run unless it is explicitly useful to keep for repeatability.
+
 ## Feature 70 (PR#79): GA security hardening and reliability verification
 
 Scope:
@@ -41,12 +106,12 @@ Acceptance criteria:
   - webhook delivery batch execution
   - calendar writeback runner execution
 - Load-testing docs define smoke, baseline, and contention profiles with pass/fail criteria and setup requirements.
-- A versioned GA-readiness artifact exists under `docs/releases/` with the required verification/checklist sections.
+- The GA sign-off requirements are captured in `docs/PROD_DEPLOY_CHECKLIST.md`.
 - Docs updated:
   - `docs/SECURITY_CHECKLIST.md`
   - `docs/PROD_DEPLOY_CHECKLIST.md`
   - `docs/OPERATOR_RUNBOOK.md`
-  - `docs/SECURITY_TRACKER.md`
+  - `docs/README.md`
 - Validation passes:
   - `npm run env:check`
   - `npm run lint`

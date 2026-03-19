@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { Client } from 'pg';
+import { Client, Pool } from 'pg';
 
 import * as schema from './schema';
 
@@ -28,6 +28,23 @@ type CreatePgClientOptions = {
   enforceNeon?: boolean;
 };
 
+type RuntimeDbEntry = {
+  client: Pool;
+  db: ReturnType<typeof drizzle<typeof schema>>;
+};
+
+const getRuntimeDbCache = (): Map<string, RuntimeDbEntry> => {
+  const globalCache = globalThis as typeof globalThis & {
+    __opencalendlyRuntimeDbCache__?: Map<string, RuntimeDbEntry>;
+  };
+
+  if (!globalCache.__opencalendlyRuntimeDbCache__) {
+    globalCache.__opencalendlyRuntimeDbCache__ = new Map();
+  }
+
+  return globalCache.__opencalendlyRuntimeDbCache__;
+};
+
 export const createPgClient = (
   databaseUrl = getDatabaseUrl(),
   options: CreatePgClientOptions = {},
@@ -43,8 +60,77 @@ export const createPgClient = (
   });
 };
 
+export const createPgPool = (
+  databaseUrl = getDatabaseUrl(),
+  options: CreatePgClientOptions = {},
+): Pool => {
+  const { enforceNeon = true } = options;
+  if (enforceNeon) {
+    assertNeonDatabaseUrl(databaseUrl);
+  }
+
+  return new Pool({
+    connectionString: databaseUrl,
+    ssl: { rejectUnauthorized: false },
+    max: 20,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    allowExitOnIdle: true,
+  });
+};
+
 export const createDb = (databaseUrl = getDatabaseUrl(), options: CreatePgClientOptions = {}) => {
   const client = createPgClient(databaseUrl, options);
   const db = drizzle({ client, schema });
   return { client, db };
+};
+
+export const createPooledDb = (databaseUrl = getDatabaseUrl(), options: CreatePgClientOptions = {}) => {
+  const client = createPgPool(databaseUrl, options);
+  const db = drizzle({ client, schema });
+  return { client, db };
+};
+
+export const createRuntimeDb = (
+  databaseUrl = getDatabaseUrl(),
+  options: CreatePgClientOptions = {},
+) => {
+  const { enforceNeon = true } = options;
+  if (enforceNeon) {
+    assertNeonDatabaseUrl(databaseUrl);
+  }
+
+  const cacheKey = `${enforceNeon ? 'strict' : 'relaxed'}:${databaseUrl}`;
+  const cache = getRuntimeDbCache();
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const entry = createPooledDb(databaseUrl, { enforceNeon });
+  cache.set(cacheKey, entry);
+  return entry;
+};
+
+export const clearRuntimeDb = async (
+  databaseUrl = getDatabaseUrl(),
+  options: CreatePgClientOptions = {},
+): Promise<void> => {
+  const { enforceNeon = true } = options;
+  const cacheKey = `${enforceNeon ? 'strict' : 'relaxed'}:${databaseUrl}`;
+  const cache = getRuntimeDbCache();
+  const cached = cache.get(cacheKey);
+  if (!cached) {
+    return;
+  }
+
+  cache.delete(cacheKey);
+  await cached.client.end().catch(() => undefined);
+};
+
+export const clearAllRuntimeDbs = async (): Promise<void> => {
+  const cache = getRuntimeDbCache();
+  const entries = Array.from(cache.values());
+  cache.clear();
+  await Promise.all(entries.map((entry) => entry.client.end().catch(() => undefined)));
 };

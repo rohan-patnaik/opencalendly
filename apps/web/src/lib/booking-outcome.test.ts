@@ -26,6 +26,18 @@ describe('buildEmailDeliveryMessage', () => {
     ).toBe('Booking confirmed, but we could not deliver the confirmation email.');
   });
 
+  it('returns queued message when delivery is deferred', () => {
+    expect(
+      buildEmailDeliveryMessage(
+        {
+          sent: false,
+          queued: true,
+        },
+        'invitee@example.com',
+      ),
+    ).toBe('Booking confirmed. Confirmation email to invitee@example.com is queued.');
+  });
+
   it('returns fallback failure message when delivery fails without error text', () => {
     expect(
       buildEmailDeliveryMessage(

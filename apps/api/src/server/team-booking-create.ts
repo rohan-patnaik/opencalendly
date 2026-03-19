@@ -7,6 +7,7 @@ import {
   teamBookingAssignments,
   teamEventTypeMembers,
   teamEventTypes,
+  teams,
   users,
 } from '@opencalendly/db';
 
@@ -59,6 +60,15 @@ export const createTeamBooking = async (
   actionTokens: ReturnType<typeof createBookingActionTokenSet>['publicTokens'];
   assignmentUserIds: string[];
   queuedNotifications: number;
+  performance: {
+    teamContextLoadMs: number;
+    memberScheduleLoadMs: number;
+    slotResolutionMs: number;
+    capCheckMs: number;
+    insertMs: number;
+    assignmentInsertMs: number;
+    notificationMs: number;
+  };
 }> => {
   const startsAt = DateTime.fromISO(input.startsAt, { zone: 'utc' });
   if (!startsAt.isValid) {
@@ -71,10 +81,30 @@ export const createTeamBooking = async (
   }
 
   return db.transaction(async (transaction) => {
+    const performance = {
+      teamContextLoadMs: 0,
+      memberScheduleLoadMs: 0,
+      slotResolutionMs: 0,
+      capCheckMs: 0,
+      insertMs: 0,
+      assignmentInsertMs: 0,
+      notificationMs: 0,
+    };
+    let stepStartedAt = Date.now();
+    const [team] = await transaction
+      .select({
+        id: teams.id,
+        name: teams.name,
+      })
+      .from(teams)
+      .where(eq(teams.slug, input.teamSlug))
+      .limit(1);
+    if (!team) {
+      throw new BookingNotFoundError('Team not found.');
+    }
+
     const lockedTeamEventResult = await transaction.execute<{
       teamEventTypeId: string;
-      teamId: string;
-      teamName: string;
       mode: string;
       roundRobinCursor: number;
       eventTypeId: string;
@@ -90,8 +120,6 @@ export const createTeamBooking = async (
     }>(sql`
       select
         tet.id as "teamEventTypeId",
-        tet.team_id as "teamId",
-        t.name as "teamName",
         tet.mode,
         tet.round_robin_cursor as "roundRobinCursor",
         et.id as "eventTypeId",
@@ -105,11 +133,10 @@ export const createTeamBooking = async (
         u.timezone as "organizerTimezone",
         et.is_active as "isActive"
       from team_event_types tet
-      inner join teams t on t.id = tet.team_id
       inner join event_types et on et.id = tet.event_type_id
       inner join users u on u.id = et.user_id
-      where t.slug = ${input.teamSlug} and et.slug = ${input.eventSlug}
-      for update
+      where tet.team_id = ${team.id} and et.slug = ${input.eventSlug}
+      for update of tet, et
     `);
 
     const teamEventRow = lockedTeamEventResult.rows[0];
@@ -133,6 +160,7 @@ export const createTeamBooking = async (
     if (memberUserIds.length === 0) {
       throw new BookingValidationError('Team event has no required members.');
     }
+    performance.teamContextLoadMs = Date.now() - stepStartedAt;
 
     const rangeStart = startsAt.minus({ days: 1 });
     const requestedEndsAt = startsAt.plus({ minutes: teamEventRow.durationMinutes });
@@ -142,6 +170,7 @@ export const createTeamBooking = async (
       throw new BookingValidationError('Unable to build slot validation range.');
     }
 
+    stepStartedAt = Date.now();
     const memberSchedules = await listTeamMemberSchedules(
       transaction,
       memberUserIds,
@@ -151,7 +180,9 @@ export const createTeamBooking = async (
     if (memberSchedules.length !== memberUserIds.length) {
       throw new BookingValidationError('Some required team members no longer exist.');
     }
+    performance.memberScheduleLoadMs = Date.now() - stepStartedAt;
 
+    stepStartedAt = Date.now();
     const slotResolution = resolveTeamRequestedSlot({
       mode,
       memberSchedules,
@@ -164,7 +195,9 @@ export const createTeamBooking = async (
     if (!slotResolution) {
       throw new BookingConflictError('Selected slot is no longer available.');
     }
+    performance.slotResolutionMs = Date.now() - stepStartedAt;
 
+    stepStartedAt = Date.now();
     const capWindows = buildBookingCapWindowsForSlot({
       startsAtIso: requestedStartsAtIso,
       timezone: input.timezone,
@@ -180,6 +213,7 @@ export const createTeamBooking = async (
         throw new BookingConflictError('Booking limit reached for this event window.');
       }
     }
+    performance.capCheckMs = Date.now() - stepStartedAt;
 
     const organizerId = slotResolution.assignmentUserIds[0];
     if (!organizerId) {
@@ -192,7 +226,7 @@ export const createTeamBooking = async (
       bufferBeforeMinutes: slotResolution.bufferBeforeMinutes,
       bufferAfterMinutes: slotResolution.bufferAfterMinutes,
       team: {
-        teamId: teamEventRow.teamId,
+        teamId: team.id,
         teamSlug: input.teamSlug,
         teamEventTypeId: teamEventRow.teamEventTypeId,
         mode,
@@ -214,6 +248,7 @@ export const createTeamBooking = async (
       | null = null;
 
     try {
+      stepStartedAt = Date.now();
       const [bookingInsert] = await transaction
         .insert(bookings)
         .values({
@@ -235,6 +270,7 @@ export const createTeamBooking = async (
           endsAt: bookings.endsAt,
         });
       insertedBooking = bookingInsert ?? null;
+      performance.insertMs = Date.now() - stepStartedAt;
     } catch (error) {
       if (isUniqueViolation(error, 'bookings_unique_slot')) {
         throw new BookingConflictError('Selected slot is no longer available.');
@@ -255,9 +291,14 @@ export const createTeamBooking = async (
       })),
     );
 
+    const assignmentWriteOrder = [...slotResolution.assignmentUserIds].sort((left, right) =>
+      left.localeCompare(right),
+    );
+
     try {
+      stepStartedAt = Date.now();
       await transaction.insert(teamBookingAssignments).values(
-        slotResolution.assignmentUserIds.map((memberUserId) => ({
+        assignmentWriteOrder.map((memberUserId) => ({
           bookingId: insertedBooking.id,
           teamEventTypeId: teamEventRow.teamEventTypeId,
           userId: memberUserId,
@@ -265,6 +306,7 @@ export const createTeamBooking = async (
           endsAt: insertedBooking.endsAt,
         })),
       );
+      performance.assignmentInsertMs = Date.now() - stepStartedAt;
     } catch (error) {
       if (isUniqueViolation(error, 'team_booking_assignments_user_slot_unique')) {
         throw new BookingConflictError('Selected slot is no longer available.');
@@ -288,6 +330,7 @@ export const createTeamBooking = async (
       throw new Error('Assigned organizer not found.');
     }
 
+    stepStartedAt = Date.now();
     const queuedNotifications = await enqueueScheduledNotificationsForBooking(transaction, {
       bookingId: insertedBooking.id,
       organizerId: insertedBooking.organizerId,
@@ -297,6 +340,7 @@ export const createTeamBooking = async (
       startsAt: insertedBooking.startsAt,
       endsAt: insertedBooking.endsAt,
     });
+    performance.notificationMs = Date.now() - stepStartedAt;
 
     if (authedUser) {
       await consumeDemoFeatureCredits(transaction as DemoQuotaDb, env, authedUser, {
@@ -320,8 +364,8 @@ export const createTeamBooking = async (
         locationValue: teamEventRow.locationValue,
       },
       team: {
-        id: teamEventRow.teamId,
-        name: teamEventRow.teamName,
+        id: team.id,
+        name: team.name,
         mode,
         teamEventTypeId: teamEventRow.teamEventTypeId,
       },
@@ -329,6 +373,7 @@ export const createTeamBooking = async (
       actionTokens: tokenSet.publicTokens,
       assignmentUserIds: slotResolution.assignmentUserIds,
       queuedNotifications,
+      performance,
     };
   });
 };

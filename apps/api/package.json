@@ -6,6 +6,7 @@
     "dev": "node ./scripts/dev-with-local-hyperdrive.mjs",
     "deploy": "wrangler deploy --config wrangler.toml",
     "deploy:production": "wrangler deploy --config wrangler.toml --env production",
+    "deploy:staging": "wrangler deploy --config wrangler.toml --env staging",
     "typecheck": "tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {

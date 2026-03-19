@@ -6,7 +6,8 @@ import {
   apiBaseUrl,
   availabilityUrl,
   buildAuthedHeaders,
-  buildIdempotentHeaders,
+  buildPublicHeaders,
+  buildPublicIdempotentHeaders,
   expectStatus,
   getJson,
   oneOnOneBookingPayload,
@@ -16,6 +17,8 @@ import {
   shiftIsoByMinutes,
   teamBookingPayload,
 } from './lib/config.js';
+
+const SLOT_OFFSET_STEP_MINUTES = 15;
 
 const scenarios = {
   availability_reads: {
@@ -74,7 +77,11 @@ export default function availabilityReads() {
         eventSlug: __ENV.ONE_ON_ONE_EVENT_SLUG,
         start: __ENV.ONE_ON_ONE_STARTS_AT,
       }),
-      { tags: { flow: 'availability', profile: 'baseline' } },
+      {
+        headers: buildPublicHeaders(),
+        tags: { flow: 'availability', profile: 'baseline' },
+        expectedStatuses: [200],
+      },
     );
     expectStatus(response, [200], 'baseline availability responds');
   });
@@ -82,22 +89,30 @@ export default function availabilityReads() {
 }
 
 export function bookingCommits() {
-  const oneOnOneStartsAt = shiftIsoByMinutes(__ENV.ONE_ON_ONE_STARTS_AT, __ITER % 12);
-  const teamStartsAt = shiftIsoByMinutes(__ENV.TEAM_STARTS_AT, (__ITER % 12) + 12);
+  const oneOnOneStartsAt = shiftIsoByMinutes(
+    __ENV.ONE_ON_ONE_STARTS_AT,
+    (__ITER % 12) * SLOT_OFFSET_STEP_MINUTES,
+  );
+  const teamStartsAt = shiftIsoByMinutes(
+    __ENV.TEAM_STARTS_AT,
+    ((__ITER % 12) + 12) * SLOT_OFFSET_STEP_MINUTES,
+  );
 
   const bookingResponse = postJson(
     `${apiBaseUrl}/v0/bookings`,
     oneOnOneBookingPayload({ startsAt: oneOnOneStartsAt }),
     {
-    headers: buildIdempotentHeaders('baseline-booking'),
-    tags: { flow: 'booking', profile: 'baseline', kind: 'one_on_one' },
+      headers: buildPublicIdempotentHeaders('baseline-booking'),
+      tags: { flow: 'booking', profile: 'baseline', kind: 'one_on_one' },
+      expectedStatuses: [200, 409, 429],
     },
   );
   expectStatus(bookingResponse, [200, 409], 'baseline one-on-one booking explicit');
 
   const teamResponse = postJson(`${apiBaseUrl}/v0/team-bookings`, teamBookingPayload({ startsAt: teamStartsAt }), {
-    headers: buildIdempotentHeaders('baseline-team-booking'),
+    headers: buildPublicIdempotentHeaders('baseline-team-booking'),
     tags: { flow: 'booking', profile: 'baseline', kind: 'team' },
+    expectedStatuses: [200, 409, 429],
   });
   expectStatus(teamResponse, [200, 409], 'baseline team booking explicit');
 }
@@ -106,12 +121,14 @@ export function workerBatches() {
   const webhookRun = runWorker(`${apiBaseUrl}/v0/webhooks/deliveries/run`, 25, {
     headers: buildAuthedHeaders(),
     tags: { flow: 'worker', profile: 'baseline', kind: 'webhooks' },
+    expectedStatuses: [200],
   });
   expectStatus(webhookRun, [200], 'baseline webhook worker explicit');
 
   const writebackRun = runWorker(`${apiBaseUrl}/v0/calendar/writeback/run`, 25, {
     headers: buildAuthedHeaders(),
     tags: { flow: 'worker', profile: 'baseline', kind: 'writeback' },
+    expectedStatuses: [200],
   });
   expectStatus(writebackRun, [200], 'baseline writeback worker explicit');
 }

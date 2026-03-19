@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import AppChrome from '../components/app-chrome';
 import AuthSessionBridge from '../components/auth-session-bridge';
+import SentryBrowserListener from '../components/sentry-browser-listener';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     >
       <body>
         <ClerkProvider publishableKey={clerkPublishableKey}>
+          <SentryBrowserListener />
           <AuthSessionBridge />
           <AppChrome>{children}</AppChrome>
         </ClerkProvider>

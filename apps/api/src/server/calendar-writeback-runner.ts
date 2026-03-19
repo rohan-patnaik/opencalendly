@@ -9,28 +9,10 @@ import {
 } from '@opencalendly/db';
 
 import { parseBookingMetadata } from '../lib/booking-actions';
-import { encryptSecret } from '../lib/calendar-crypto';
 import { processCalendarWriteback } from '../lib/calendar-writeback';
-import {
-  resolveGoogleAccessToken,
-  resolveMicrosoftAccessToken,
-} from '../lib/calendar-sync';
-import {
-  cancelGoogleCalendarEvent,
-  createGoogleCalendarEvent,
-  findGoogleCalendarEventByIdempotencyKey,
-  updateGoogleCalendarEvent,
-} from '../lib/google-calendar';
-import {
-  cancelMicrosoftCalendarEvent,
-  createMicrosoftCalendarEvent,
-  findMicrosoftCalendarEventByIdempotencyKey,
-  updateMicrosoftCalendarEvent,
-} from '../lib/microsoft-calendar';
 import { normalizeTimezone } from './core';
 import {
   CALENDAR_WRITEBACK_DEFAULT_MAX_ATTEMPTS,
-  GOOGLE_CALENDAR_PROVIDER,
   resolveCalendarEncryptionSecret,
   resolveGoogleOAuthConfig,
   resolveMicrosoftOAuthConfig,
@@ -41,7 +23,9 @@ import {
   parseCalendarWritebackPayload,
 } from './calendar-writeback-queue';
 import { emitAuditEvent, sanitizeErrorForAudit } from './audit';
+import { captureApiException } from './sentry';
 import type { Bindings, CalendarWritebackOperation, Database } from './types';
+import { buildCalendarWritebackProviderClient } from './calendar-writeback-provider';
 
 export type CalendarWritebackRunResult = {
   processed: number;
@@ -188,6 +172,19 @@ export const runCalendarWritebackBatch = async (
         result.retried += 1;
       } else {
         result.failed += 1;
+        void captureApiException(env, writebackResult.lastError ?? 'calendar_writeback_failed', {
+          route: 'calendar_writeback_runner',
+          statusCode: 500,
+          tags: {
+            provider: provider ?? 'unknown',
+            operation,
+          },
+          extra: {
+            bookingId: row.bookingId,
+            writebackId: row.id,
+            attempts: writebackResult.attemptCount,
+          },
+        });
         emitAuditEvent({
           event: 'calendar_writeback_failed_permanently',
           level: 'warn',
@@ -249,120 +246,19 @@ export const runCalendarWritebackBatch = async (
       continue;
     }
 
-    const connectionId = row.connectionId;
-    const connectionAccessTokenEncrypted = row.connectionAccessTokenEncrypted;
-    const connectionRefreshTokenEncrypted = row.connectionRefreshTokenEncrypted;
-    const connectionAccessTokenExpiresAt = row.connectionAccessTokenExpiresAt;
-
-    const getToken = async (): Promise<string> => {
-      if (provider === GOOGLE_CALENDAR_PROVIDER) {
-        if (!googleConfig) {
-          throw new Error('Google OAuth is not configured for calendar writeback.');
-        }
-        const resolved = await resolveGoogleAccessToken({
-          connection: {
-            accessTokenEncrypted: connectionAccessTokenEncrypted,
-            refreshTokenEncrypted: connectionRefreshTokenEncrypted,
-            accessTokenExpiresAt: connectionAccessTokenExpiresAt,
-          },
-          encryptionSecret,
-          clientId: googleConfig.clientId,
-          clientSecret: googleConfig.clientSecret,
-          now,
-        });
-        await db
-          .update(calendarConnections)
-          .set({
-            accessTokenEncrypted: encryptSecret(resolved.accessToken, encryptionSecret),
-            refreshTokenEncrypted: encryptSecret(resolved.refreshToken, encryptionSecret),
-            accessTokenExpiresAt: resolved.accessTokenExpiresAt,
-            lastError: null,
-            updatedAt: now,
-          })
-          .where(eq(calendarConnections.id, connectionId));
-        return resolved.accessToken;
-      }
-
-      if (!microsoftConfig) {
-        throw new Error('Microsoft OAuth is not configured for calendar writeback.');
-      }
-      const resolved = await resolveMicrosoftAccessToken({
-        connection: {
-          accessTokenEncrypted: connectionAccessTokenEncrypted,
-          refreshTokenEncrypted: connectionRefreshTokenEncrypted,
-          accessTokenExpiresAt: connectionAccessTokenExpiresAt,
-        },
-        encryptionSecret,
-        clientId: microsoftConfig.clientId,
-        clientSecret: microsoftConfig.clientSecret,
-        now,
-      });
-      await db
-        .update(calendarConnections)
-        .set({
-          accessTokenEncrypted: encryptSecret(resolved.accessToken, encryptionSecret),
-          refreshTokenEncrypted: encryptSecret(resolved.refreshToken, encryptionSecret),
-          accessTokenExpiresAt: resolved.accessTokenExpiresAt,
-          lastError: null,
-          updatedAt: now,
-        })
-        .where(eq(calendarConnections.id, connectionId));
-      return resolved.accessToken;
-    };
-
-    const providerClient = {
-      createEvent: async (bookingContext: {
-        idempotencyKey: string;
-        eventName: string;
-        inviteeName: string;
-        inviteeEmail: string;
-        startsAtIso: string;
-        endsAtIso: string;
-        timezone: string;
-        locationType: string;
-        locationValue: string | null;
-      }) => {
-        const accessToken = await getToken();
-        return provider === GOOGLE_CALENDAR_PROVIDER
-          ? createGoogleCalendarEvent({ accessToken, ...bookingContext })
-          : createMicrosoftCalendarEvent({
-              accessToken,
-              idempotencyKey: bookingContext.idempotencyKey,
-              eventName: bookingContext.eventName,
-              inviteeName: bookingContext.inviteeName,
-              inviteeEmail: bookingContext.inviteeEmail,
-              startsAtIso: bookingContext.startsAtIso,
-              endsAtIso: bookingContext.endsAtIso,
-              locationValue: bookingContext.locationValue,
-            });
-      },
-      findEventByIdempotencyKey: async ({ idempotencyKey }: { idempotencyKey: string }) => {
-        const accessToken = await getToken();
-        return provider === GOOGLE_CALENDAR_PROVIDER
-          ? findGoogleCalendarEventByIdempotencyKey({ accessToken, idempotencyKey })
-          : findMicrosoftCalendarEventByIdempotencyKey({ accessToken, idempotencyKey });
-      },
-      cancelEvent: async ({ externalEventId }: { externalEventId: string }) => {
-        const accessToken = await getToken();
-        if (provider === GOOGLE_CALENDAR_PROVIDER) {
-          await cancelGoogleCalendarEvent({ accessToken, externalEventId });
-          return;
-        }
-        await cancelMicrosoftCalendarEvent({ accessToken, externalEventId });
-      },
-      updateEvent: async (updateInput: {
-        externalEventId: string;
-        startsAtIso: string;
-        endsAtIso: string;
-      }) => {
-        const accessToken = await getToken();
-        if (provider === GOOGLE_CALENDAR_PROVIDER) {
-          await updateGoogleCalendarEvent({ accessToken, timezone, ...updateInput });
-          return;
-        }
-        await updateMicrosoftCalendarEvent({ accessToken, ...updateInput });
-      },
-    };
+    const providerClient = buildCalendarWritebackProviderClient({
+      db,
+      now,
+      provider,
+      timezone,
+      connectionId: row.connectionId,
+      connectionAccessTokenEncrypted: row.connectionAccessTokenEncrypted,
+      connectionRefreshTokenEncrypted: row.connectionRefreshTokenEncrypted,
+      connectionAccessTokenExpiresAt: row.connectionAccessTokenExpiresAt,
+      encryptionSecret,
+      googleConfig,
+      microsoftConfig,
+    });
 
     await applyResult(
       await processCalendarWriteback({

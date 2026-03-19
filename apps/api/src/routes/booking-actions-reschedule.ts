@@ -4,9 +4,13 @@ import { BookingConflictError, BookingValidationError } from '../lib/booking';
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { actionTokenMap, buildActionUrls, hashActionToken } from '../server/booking-action-links';
-import { runBookingRescheduleSideEffects } from '../server/booking-side-effects';
-import { jsonError, normalizeTimezone } from '../server/core';
-import { withDatabase } from '../server/database';
+import {
+  queueBookingRescheduleSideEffects,
+  queuedEmailDelivery,
+  sendBookingRescheduleEmailSideEffects,
+} from '../server/booking-side-effects';
+import { jsonError, normalizeTimezone, queueBackgroundTask } from '../server/core';
+import { withConnectedDatabase, withDatabase } from '../server/database';
 import { jsonDemoQuotaError } from '../server/demo-quota';
 import { PUBLIC_BOOKING_RATE_LIMIT_MAX_BOOKING_REQUESTS_PER_SCOPE, resolveAppBaseUrl } from '../server/env';
 import {
@@ -104,14 +108,35 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
           startsAt: parsed.data.startsAt,
           timezone,
         });
-        const sideEffects = await runBookingRescheduleSideEffects(context.env, db, {
+        const sideEffects = await queueBookingRescheduleSideEffects(db, {
           oldBooking: result.oldBooking,
           newBooking: result.newBooking,
-          eventType: { name: result.eventType.name },
-          organizer: { email: result.organizer.email, displayName: result.organizer.displayName },
-          timezone,
           alreadyProcessed: result.alreadyProcessed,
         });
+        if (!result.alreadyProcessed) {
+          queueBackgroundTask(
+            context,
+            withConnectedDatabase(context, async (backgroundDb) => {
+              await sendBookingRescheduleEmailSideEffects(context.env, backgroundDb, {
+                oldBooking: result.oldBooking,
+                newBooking: result.newBooking,
+                eventType: { name: result.eventType.name },
+                organizer: { email: result.organizer.email, displayName: result.organizer.displayName },
+                timezone,
+                alreadyProcessed: false,
+              });
+            }).catch((error) => {
+              emitAuditEvent({
+                event: 'booking_side_effect_failed',
+                level: 'error',
+                route: '/v0/bookings/actions/:token/reschedule',
+                bookingId: result.newBooking.id,
+                actionType: 'reschedule',
+                error: sanitizeErrorForAudit(error, 'booking_reschedule_email_failed'),
+              });
+            }),
+          );
+        }
 
         const actions = result.actionTokens
           ? (() => {
@@ -151,7 +176,7 @@ export const registerBookingActionRescheduleRoutes = (app: ApiApp): void => {
             endsAt: result.newBooking.endsAt.toISOString(),
           },
           actions,
-          email: sideEffects.email,
+          ...(result.alreadyProcessed ? {} : { email: queuedEmailDelivery }),
           notifications: {
             canceledForOldBooking: result.canceledNotificationsForOldBooking,
             queuedForNewBooking: result.queuedNotificationsForNewBooking,

@@ -12,6 +12,24 @@ export const logInternalError = (scope: string, error: unknown): void => {
   console.error(scope, error);
 };
 
+export const queueBackgroundTask = (
+  context: ContextLike,
+  task: Promise<unknown>,
+): void => {
+  const executionCtx = (context as ContextLike & {
+    executionCtx?: { waitUntil: (promise: Promise<unknown>) => void };
+  }).executionCtx;
+
+  if (executionCtx?.waitUntil) {
+    executionCtx.waitUntil(task);
+    return;
+  }
+
+  void task.catch((error) => {
+    console.error('background_task_failed', error);
+  });
+};
+
 export const isUuid = (value: string): boolean => {
   return UUID_PATTERN.test(value);
 };

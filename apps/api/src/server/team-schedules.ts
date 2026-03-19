@@ -63,111 +63,197 @@ export const listTeamMemberSchedules = async (
   }
 
   const uniqueMemberIds = Array.from(new Set(memberIds));
-  const memberUsers = await db
-    .select({ id: users.id, timezone: users.timezone })
-    .from(users)
-    .where(inArray(users.id, uniqueMemberIds));
+  const [
+    memberUsers,
+    rulesRows,
+    overrideRows,
+    externalBusyRows,
+    timeOffRows,
+    directBookingRows,
+    assignedBookingRows,
+  ] = await Promise.all([
+    db
+      .select({ id: users.id, timezone: users.timezone })
+      .from(users)
+      .where(inArray(users.id, uniqueMemberIds)),
+    db
+      .select({
+        userId: availabilityRules.userId,
+        dayOfWeek: availabilityRules.dayOfWeek,
+        startMinute: availabilityRules.startMinute,
+        endMinute: availabilityRules.endMinute,
+        bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
+        bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
+      })
+      .from(availabilityRules)
+      .where(inArray(availabilityRules.userId, uniqueMemberIds)),
+    db
+      .select({
+        userId: availabilityOverrides.userId,
+        startAt: availabilityOverrides.startAt,
+        endAt: availabilityOverrides.endAt,
+        isAvailable: availabilityOverrides.isAvailable,
+      })
+      .from(availabilityOverrides)
+      .where(
+        and(
+          inArray(availabilityOverrides.userId, uniqueMemberIds),
+          lt(availabilityOverrides.startAt, rangeEnd),
+          gt(availabilityOverrides.endAt, rangeStart),
+        ),
+      ),
+    db
+      .select({
+        userId: calendarBusyWindows.userId,
+        startsAt: calendarBusyWindows.startsAt,
+        endsAt: calendarBusyWindows.endsAt,
+      })
+      .from(calendarBusyWindows)
+      .where(
+        and(
+          inArray(calendarBusyWindows.userId, uniqueMemberIds),
+          lt(calendarBusyWindows.startsAt, rangeEnd),
+          gt(calendarBusyWindows.endsAt, rangeStart),
+        ),
+      ),
+    db
+      .select({
+        userId: timeOffBlocks.userId,
+        startAt: timeOffBlocks.startAt,
+        endAt: timeOffBlocks.endAt,
+      })
+      .from(timeOffBlocks)
+      .where(
+        and(
+          inArray(timeOffBlocks.userId, uniqueMemberIds),
+          lt(timeOffBlocks.startAt, rangeEnd),
+          gt(timeOffBlocks.endAt, rangeStart),
+        ),
+      ),
+    db
+      .select({
+        userId: bookings.organizerId,
+        startsAt: bookings.startsAt,
+        endsAt: bookings.endsAt,
+        status: bookings.status,
+        metadata: bookings.metadata,
+      })
+      .from(bookings)
+      .where(
+        and(
+          inArray(bookings.organizerId, uniqueMemberIds),
+          eq(bookings.status, 'confirmed'),
+          lt(bookings.startsAt, rangeEnd),
+          gt(bookings.endsAt, rangeStart),
+        ),
+      ),
+    db
+      .select({
+        userId: teamBookingAssignments.userId,
+        startsAt: teamBookingAssignments.startsAt,
+        endsAt: teamBookingAssignments.endsAt,
+        status: bookings.status,
+        metadata: bookings.metadata,
+      })
+      .from(teamBookingAssignments)
+      .innerJoin(bookings, eq(bookings.id, teamBookingAssignments.bookingId))
+      .where(
+        and(
+          inArray(teamBookingAssignments.userId, uniqueMemberIds),
+          eq(bookings.status, 'confirmed'),
+          lt(teamBookingAssignments.startsAt, rangeEnd),
+          gt(teamBookingAssignments.endsAt, rangeStart),
+        ),
+      ),
+  ]);
 
   const timezoneByUserId = new Map(
     memberUsers.map((memberUser) => [memberUser.id, normalizeTimezone(memberUser.timezone)]),
   );
+
+  const rulesByUserId = new Map<
+    string,
+    TeamMemberScheduleRecord['rules']
+  >();
+  for (const row of rulesRows) {
+    const existing = rulesByUserId.get(row.userId) ?? [];
+    existing.push({
+      dayOfWeek: row.dayOfWeek,
+      startMinute: row.startMinute,
+      endMinute: row.endMinute,
+      bufferBeforeMinutes: row.bufferBeforeMinutes,
+      bufferAfterMinutes: row.bufferAfterMinutes,
+    });
+    rulesByUserId.set(row.userId, existing);
+  }
+
+  const overridesByUserId = new Map<
+    string,
+    TeamMemberScheduleRecord['overrides']
+  >();
+  const appendOverride = (
+    userId: string,
+    value: TeamMemberScheduleRecord['overrides'][number],
+  ) => {
+    const existing = overridesByUserId.get(userId) ?? [];
+    existing.push(value);
+    overridesByUserId.set(userId, existing);
+  };
+  for (const row of overrideRows) {
+    appendOverride(row.userId, {
+      startAt: row.startAt,
+      endAt: row.endAt,
+      isAvailable: row.isAvailable,
+    });
+  }
+  for (const row of timeOffRows) {
+    appendOverride(row.userId, {
+      startAt: row.startAt,
+      endAt: row.endAt,
+      isAvailable: false,
+    });
+  }
+  for (const row of externalBusyRows) {
+    appendOverride(row.userId, {
+      startAt: row.startsAt,
+      endAt: row.endsAt,
+      isAvailable: false,
+    });
+  }
+
+  const bookingsByUserId = new Map<
+    string,
+    Map<string, TeamMemberScheduleRecord['bookings'][number]>
+  >();
+  const appendBooking = (
+    userId: string,
+    booking: TeamMemberScheduleRecord['bookings'][number],
+  ) => {
+    const existing = bookingsByUserId.get(userId) ?? new Map();
+    const key = `${booking.startsAt.toISOString()}|${booking.endsAt.toISOString()}|${booking.metadata ?? ''}`;
+    existing.set(key, booking);
+    bookingsByUserId.set(userId, existing);
+  };
+  for (const booking of directBookingRows) {
+    appendBooking(booking.userId, booking);
+  }
+  for (const booking of assignedBookingRows) {
+    appendBooking(booking.userId, booking);
+  }
+
   const schedules: TeamMemberScheduleRecord[] = [];
-
   for (const userId of uniqueMemberIds) {
-    if (!timezoneByUserId.has(userId)) {
+    const timezone = timezoneByUserId.get(userId);
+    if (!timezone) {
       continue;
-    }
-
-    const [rules, overrides, externalBusyWindows, userTimeOffBlocks, directBookings, assignedBookings] =
-      await Promise.all([
-        db
-          .select({
-            dayOfWeek: availabilityRules.dayOfWeek,
-            startMinute: availabilityRules.startMinute,
-            endMinute: availabilityRules.endMinute,
-            bufferBeforeMinutes: availabilityRules.bufferBeforeMinutes,
-            bufferAfterMinutes: availabilityRules.bufferAfterMinutes,
-          })
-          .from(availabilityRules)
-          .where(eq(availabilityRules.userId, userId)),
-        db
-          .select({
-            startAt: availabilityOverrides.startAt,
-            endAt: availabilityOverrides.endAt,
-            isAvailable: availabilityOverrides.isAvailable,
-          })
-          .from(availabilityOverrides)
-          .where(
-            and(
-              eq(availabilityOverrides.userId, userId),
-              lt(availabilityOverrides.startAt, rangeEnd),
-              gt(availabilityOverrides.endAt, rangeStart),
-            ),
-          ),
-        listExternalBusyWindowsForUser(db, userId, rangeStart, rangeEnd),
-        listTimeOffBlocksForUser(db, userId, rangeStart, rangeEnd),
-        db
-          .select({
-            startsAt: bookings.startsAt,
-            endsAt: bookings.endsAt,
-            status: bookings.status,
-            metadata: bookings.metadata,
-          })
-          .from(bookings)
-          .where(
-            and(
-              eq(bookings.organizerId, userId),
-              eq(bookings.status, 'confirmed'),
-              lt(bookings.startsAt, rangeEnd),
-              gt(bookings.endsAt, rangeStart),
-            ),
-          ),
-        db
-          .select({
-            startsAt: teamBookingAssignments.startsAt,
-            endsAt: teamBookingAssignments.endsAt,
-            status: bookings.status,
-            metadata: bookings.metadata,
-          })
-          .from(teamBookingAssignments)
-          .innerJoin(bookings, eq(bookings.id, teamBookingAssignments.bookingId))
-          .where(
-            and(
-              eq(teamBookingAssignments.userId, userId),
-              eq(bookings.status, 'confirmed'),
-              lt(teamBookingAssignments.startsAt, rangeEnd),
-              gt(teamBookingAssignments.endsAt, rangeStart),
-            ),
-          ),
-      ]);
-
-    const dedupedBookings = new Map<
-      string,
-      { startsAt: Date; endsAt: Date; status: string; metadata: string | null }
-    >();
-    for (const booking of [...directBookings, ...assignedBookings]) {
-      const key = `${booking.startsAt.toISOString()}|${booking.endsAt.toISOString()}|${booking.metadata ?? ''}`;
-      dedupedBookings.set(key, booking);
     }
 
     schedules.push({
       userId,
-      timezone: timezoneByUserId.get(userId) ?? 'UTC',
-      rules,
-      overrides: [
-        ...overrides,
-        ...userTimeOffBlocks.map((block) => ({
-          startAt: block.startAt,
-          endAt: block.endAt,
-          isAvailable: false,
-        })),
-        ...externalBusyWindows.map((window) => ({
-          startAt: window.startsAt,
-          endAt: window.endsAt,
-          isAvailable: false,
-        })),
-      ],
-      bookings: Array.from(dedupedBookings.values()),
+      timezone,
+      rules: rulesByUserId.get(userId) ?? [],
+      overrides: overridesByUserId.get(userId) ?? [],
+      bookings: Array.from(bookingsByUserId.get(userId)?.values() ?? []),
     });
   }
 

@@ -41,7 +41,7 @@ Build a practical open-source scheduling platform for solo creators, consultants
 - Calendar sync hardening (Google + Microsoft) with external busy conflict blocking and writeback retry.
 - Analytics/operator dashboard API + baseline web dashboard.
 - Reliability hardening (rate limiting, idempotency keys, CI smoke coverage, platform policy enforcement).
-- Launch readiness docs + `v1.0.0` release artifacts.
+- Launch readiness docs and release handoff.
 - Migration bootstrap hotfix for fresh Neon environments.
 
 ### Post-v1 app-first parity track

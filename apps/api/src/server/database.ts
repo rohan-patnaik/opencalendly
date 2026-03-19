@@ -1,4 +1,4 @@
-import { createDb } from '@opencalendly/db';
+import { createRuntimeDb } from '@opencalendly/db';
 
 import { jsonError } from './core';
 import { isNeonDatabaseUrl, resolveConnectionString } from './env';
@@ -33,13 +33,26 @@ export const withDatabase = async (
     return jsonError(context, 500, 'DATABASE_URL must point to Neon Postgres (*.neon.tech).');
   }
 
-  const { client, db } = createDb(connection.connectionString, {
+  const { db } = createRuntimeDb(connection.connectionString, {
     enforceNeon: connection.source === 'database_url',
   });
-  try {
-    await client.connect();
-    return await handler(db);
-  } finally {
-    await client.end();
+  return handler(db);
+};
+
+export const withConnectedDatabase = async <T>(
+  context: Pick<ContextLike, 'env'>,
+  handler: (db: Database) => Promise<T>,
+): Promise<T> => {
+  const connection = resolveConnectionString(context.env);
+  if (!connection) {
+    throw new Error('Missing database connection string. Configure Hyperdrive or a Neon DATABASE_URL.');
   }
+  if (connection.source === 'database_url' && !isNeonDatabaseUrl(connection.connectionString)) {
+    throw new Error('DATABASE_URL must point to Neon Postgres (*.neon.tech).');
+  }
+
+  const { db } = createRuntimeDb(connection.connectionString, {
+    enforceNeon: connection.source === 'database_url',
+  });
+  return handler(db);
 };

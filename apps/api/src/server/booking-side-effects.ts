@@ -1,10 +1,19 @@
-import { sendBookingCancellationEmail, sendBookingConfirmationEmail, sendBookingRescheduledEmail } from '../lib/email';
-import { enqueueWebhookDeliveries } from './webhook-deliveries';
+import {
+  sendBookingCancellationEmail,
+  sendBookingConfirmationEmail,
+  sendBookingRescheduledEmail,
+} from '../lib/email';
 import { enqueueCalendarWritebacksForBooking } from './calendar-writeback-queue';
-import { runCalendarWritebackBatch } from './calendar-writeback-runner';
+import { enqueueWebhookDeliveries } from './webhook-deliveries';
 import { tryRecordAnalyticsFunnelEvent, tryRecordEmailDelivery } from './telemetry';
 import type { Bindings, Database } from './types';
-import { clampCalendarWritebackBatchLimit } from './env';
+
+const buildSkippedEmailPair = (message: string) => {
+  return [
+    { sent: false, provider: 'none' as const, error: message },
+    { sent: false, provider: 'none' as const, error: message },
+  ];
+};
 
 type BookingRecord = {
   id: string;
@@ -31,17 +40,23 @@ type ActionUrls = {
   reschedulePageUrl: string;
 };
 
-const emptyWritebackResult = {
+export const emptyWritebackResult = {
   queued: 0,
   processed: 0,
   succeeded: 0,
   retried: 0,
   failed: 0,
+  deferred: false,
 };
 
-const runImmediateWriteback = async (
+export const queuedEmailDelivery = {
+  sent: false,
+  provider: 'background',
+  queued: true,
+} as const;
+
+const queueCalendarWriteback = async (
   db: Database,
-  env: Bindings,
   input: Parameters<typeof enqueueCalendarWritebacksForBooking>[1],
 ) => {
   const queue = await enqueueCalendarWritebacksForBooking(db, input);
@@ -49,17 +64,17 @@ const runImmediateWriteback = async (
     return emptyWritebackResult;
   }
 
-  const outcome = await runCalendarWritebackBatch(db, env, {
-    organizerId: input.organizerId,
-    rowIds: queue.rowIds,
-    limit: clampCalendarWritebackBatchLimit(queue.queued),
-  });
-
-  return { queued: queue.queued, ...outcome };
+  return {
+    queued: queue.queued,
+    processed: 0,
+    succeeded: 0,
+    retried: 0,
+    failed: 0,
+    deferred: true,
+  };
 };
 
-export const runBookingCreatedSideEffects = async (
-  env: Bindings,
+export const queueBookingCreatedSideEffects = async (
   db: Database,
   input: {
     booking: BookingRecord;
@@ -79,6 +94,46 @@ export const runBookingCreatedSideEffects = async (
     occurredAt: new Date(),
   });
 
+  const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
+    organizerId: input.booking.organizerId,
+    type: 'booking.created',
+    booking: {
+      id: input.booking.id,
+      eventTypeId: input.booking.eventTypeId,
+      organizerId: input.booking.organizerId,
+      inviteeEmail: input.booking.inviteeEmail,
+      inviteeName: input.booking.inviteeName,
+      startsAtIso: input.booking.startsAt.toISOString(),
+      endsAtIso: input.booking.endsAt.toISOString(),
+    },
+    metadata: {
+      actionLookupCancelUrl: input.actionUrls.lookupCancelUrl,
+      actionLookupRescheduleUrl: input.actionUrls.lookupRescheduleUrl,
+      ...(input.webhookMetadata ?? {}),
+    },
+  });
+
+  return {
+    queuedWebhookDeliveries,
+    calendarWriteback: await queueCalendarWriteback(db, {
+      bookingId: input.booking.id,
+      organizerId: input.booking.organizerId,
+      operation: 'create',
+    }),
+  };
+};
+
+export const sendBookingCreatedEmailSideEffects = async (
+  env: Bindings,
+  db: Database,
+  input: {
+    booking: BookingRecord;
+    eventType: EventTypeRecord;
+    organizerDisplayName: string;
+    timezone: string;
+    actionUrls: ActionUrls;
+  },
+) => {
   const email = await sendBookingConfirmationEmail(env, {
     inviteeEmail: input.booking.inviteeEmail,
     inviteeName: input.booking.inviteeName,
@@ -105,109 +160,17 @@ export const runBookingCreatedSideEffects = async (
     ...(email.error ? { error: email.error } : {}),
   });
 
-  const queuedWebhookDeliveries = await enqueueWebhookDeliveries(db, {
-    organizerId: input.booking.organizerId,
-    type: 'booking.created',
-    booking: {
-      id: input.booking.id,
-      eventTypeId: input.booking.eventTypeId,
-      organizerId: input.booking.organizerId,
-      inviteeEmail: input.booking.inviteeEmail,
-      inviteeName: input.booking.inviteeName,
-      startsAtIso: input.booking.startsAt.toISOString(),
-      endsAtIso: input.booking.endsAt.toISOString(),
-    },
-    metadata: {
-      actionLookupCancelUrl: input.actionUrls.lookupCancelUrl,
-      actionLookupRescheduleUrl: input.actionUrls.lookupRescheduleUrl,
-      ...(input.webhookMetadata ?? {}),
-    },
-  });
-
-  return {
-    email,
-    queuedWebhookDeliveries,
-    calendarWriteback: await runImmediateWriteback(db, env, {
-      bookingId: input.booking.id,
-      organizerId: input.booking.organizerId,
-      operation: 'create',
-    }),
-  };
+  return email;
 };
 
-export const runBookingCancellationSideEffects = async (
-  env: Bindings,
+export const queueBookingCancellationSideEffects = async (
   db: Database,
   input: {
     booking: BookingRecord & { status: string };
-    eventType: { name: string };
-    organizer: { email: string; displayName: string };
-    timezone: string;
     cancellationReason?: string | null;
     alreadyProcessed: boolean;
   },
 ) => {
-  const email = input.alreadyProcessed
-    ? {
-        sent: false,
-        provider: 'none' as const,
-        error: 'Idempotent replay: cancellation already processed.',
-      }
-    : await Promise.all([
-        sendBookingCancellationEmail(env, {
-          recipientEmail: input.booking.inviteeEmail,
-          recipientName: input.booking.inviteeName,
-          recipientRole: 'invitee',
-          organizerDisplayName: input.organizer.displayName,
-          eventName: input.eventType.name,
-          startsAt: input.booking.startsAt.toISOString(),
-          timezone: input.timezone,
-          cancellationReason: input.cancellationReason ?? null,
-          idempotencyKey: `booking-cancel:${input.booking.id}:invitee`,
-        }),
-        sendBookingCancellationEmail(env, {
-          recipientEmail: input.organizer.email,
-          recipientName: input.organizer.displayName,
-          recipientRole: 'organizer',
-          organizerDisplayName: input.organizer.displayName,
-          eventName: input.eventType.name,
-          startsAt: input.booking.startsAt.toISOString(),
-          timezone: input.timezone,
-          cancellationReason: input.cancellationReason ?? null,
-          idempotencyKey: `booking-cancel:${input.booking.id}:organizer`,
-        }),
-      ]);
-
-  if (!input.alreadyProcessed && Array.isArray(email)) {
-    const [inviteeEmailResult, organizerEmailResult] = email;
-    if (inviteeEmailResult) {
-      await tryRecordEmailDelivery(env, db, {
-        organizerId: input.booking.organizerId,
-        bookingId: input.booking.id,
-        eventTypeId: input.booking.eventTypeId,
-        recipientEmail: input.booking.inviteeEmail,
-        emailType: 'booking_cancellation',
-        provider: inviteeEmailResult.provider,
-        status: inviteeEmailResult.sent ? 'succeeded' : 'failed',
-        ...(inviteeEmailResult.messageId ? { providerMessageId: inviteeEmailResult.messageId } : {}),
-        ...(inviteeEmailResult.error ? { error: inviteeEmailResult.error } : {}),
-      });
-    }
-    if (organizerEmailResult) {
-      await tryRecordEmailDelivery(env, db, {
-        organizerId: input.booking.organizerId,
-        bookingId: input.booking.id,
-        eventTypeId: input.booking.eventTypeId,
-        recipientEmail: input.organizer.email,
-        emailType: 'booking_cancellation',
-        provider: organizerEmailResult.provider,
-        status: organizerEmailResult.sent ? 'succeeded' : 'failed',
-        ...(organizerEmailResult.messageId ? { providerMessageId: organizerEmailResult.messageId } : {}),
-        ...(organizerEmailResult.error ? { error: organizerEmailResult.error } : {}),
-      });
-    }
-  }
-
   const queuedWebhookDeliveries = input.alreadyProcessed
     ? 0
     : await enqueueWebhookDeliveries(db, {
@@ -226,11 +189,10 @@ export const runBookingCancellationSideEffects = async (
       });
 
   return {
-    email,
     queuedWebhookDeliveries,
     calendarWriteback: input.alreadyProcessed
       ? emptyWritebackResult
-      : await runImmediateWriteback(db, env, {
+      : await queueCalendarWriteback(db, {
           bookingId: input.booking.id,
           organizerId: input.booking.organizerId,
           operation: 'cancel',
@@ -238,79 +200,86 @@ export const runBookingCancellationSideEffects = async (
   };
 };
 
-export const runBookingRescheduleSideEffects = async (
+export const sendBookingCancellationEmailSideEffects = async (
   env: Bindings,
+  db: Database,
+  input: {
+    booking: BookingRecord & { status: string };
+    eventType: { name: string };
+    organizer: { email: string; displayName: string };
+    timezone: string;
+    cancellationReason?: string | null;
+    alreadyProcessed: boolean;
+  },
+) => {
+  if (input.alreadyProcessed) {
+    return buildSkippedEmailPair('Idempotent replay: cancellation already processed.');
+  }
+
+  const email = await Promise.all([
+    sendBookingCancellationEmail(env, {
+      recipientEmail: input.booking.inviteeEmail,
+      recipientName: input.booking.inviteeName,
+      recipientRole: 'invitee',
+      organizerDisplayName: input.organizer.displayName,
+      eventName: input.eventType.name,
+      startsAt: input.booking.startsAt.toISOString(),
+      timezone: input.timezone,
+      cancellationReason: input.cancellationReason ?? null,
+      idempotencyKey: `booking-cancel:${input.booking.id}:invitee`,
+    }),
+    sendBookingCancellationEmail(env, {
+      recipientEmail: input.organizer.email,
+      recipientName: input.organizer.displayName,
+      recipientRole: 'organizer',
+      organizerDisplayName: input.organizer.displayName,
+      eventName: input.eventType.name,
+      startsAt: input.booking.startsAt.toISOString(),
+      timezone: input.timezone,
+      cancellationReason: input.cancellationReason ?? null,
+      idempotencyKey: `booking-cancel:${input.booking.id}:organizer`,
+    }),
+  ]);
+
+  const [inviteeEmailResult, organizerEmailResult] = email;
+  if (inviteeEmailResult) {
+    await tryRecordEmailDelivery(env, db, {
+      organizerId: input.booking.organizerId,
+      bookingId: input.booking.id,
+      eventTypeId: input.booking.eventTypeId,
+      recipientEmail: input.booking.inviteeEmail,
+      emailType: 'booking_cancellation',
+      provider: inviteeEmailResult.provider,
+      status: inviteeEmailResult.sent ? 'succeeded' : 'failed',
+      ...(inviteeEmailResult.messageId ? { providerMessageId: inviteeEmailResult.messageId } : {}),
+      ...(inviteeEmailResult.error ? { error: inviteeEmailResult.error } : {}),
+    });
+  }
+  if (organizerEmailResult) {
+    await tryRecordEmailDelivery(env, db, {
+      organizerId: input.booking.organizerId,
+      bookingId: input.booking.id,
+      eventTypeId: input.booking.eventTypeId,
+      recipientEmail: input.organizer.email,
+      emailType: 'booking_cancellation',
+      provider: organizerEmailResult.provider,
+      status: organizerEmailResult.sent ? 'succeeded' : 'failed',
+      ...(organizerEmailResult.messageId ? { providerMessageId: organizerEmailResult.messageId } : {}),
+      ...(organizerEmailResult.error ? { error: organizerEmailResult.error } : {}),
+    });
+  }
+
+  return email;
+};
+
+export const queueBookingRescheduleSideEffects = async (
   db: Database,
   input: {
     oldBooking: BookingRecord & { status: string };
     newBooking: BookingRecord;
-    eventType: { name: string };
-    organizer: { email: string; displayName: string };
-    timezone: string;
     alreadyProcessed: boolean;
   },
 ) => {
-  const email = input.alreadyProcessed
-    ? {
-        sent: false,
-        provider: 'none' as const,
-        error: 'Idempotent replay: reschedule already processed.',
-      }
-    : await Promise.all([
-        sendBookingRescheduledEmail(env, {
-          recipientEmail: input.newBooking.inviteeEmail,
-          recipientName: input.newBooking.inviteeName,
-          recipientRole: 'invitee',
-          organizerDisplayName: input.organizer.displayName,
-          eventName: input.eventType.name,
-          oldStartsAt: input.oldBooking.startsAt.toISOString(),
-          newStartsAt: input.newBooking.startsAt.toISOString(),
-          timezone: input.timezone,
-          idempotencyKey: `booking-rescheduled:${input.oldBooking.id}:${input.newBooking.id}:invitee`,
-        }),
-        sendBookingRescheduledEmail(env, {
-          recipientEmail: input.organizer.email,
-          recipientName: input.organizer.displayName,
-          recipientRole: 'organizer',
-          organizerDisplayName: input.organizer.displayName,
-          eventName: input.eventType.name,
-          oldStartsAt: input.oldBooking.startsAt.toISOString(),
-          newStartsAt: input.newBooking.startsAt.toISOString(),
-          timezone: input.timezone,
-          idempotencyKey: `booking-rescheduled:${input.oldBooking.id}:${input.newBooking.id}:organizer`,
-        }),
-      ]);
-
-  if (!input.alreadyProcessed && Array.isArray(email)) {
-    const [inviteeEmailResult, organizerEmailResult] = email;
-    if (inviteeEmailResult) {
-      await tryRecordEmailDelivery(env, db, {
-        organizerId: input.newBooking.organizerId,
-        bookingId: input.newBooking.id,
-        eventTypeId: input.newBooking.eventTypeId,
-        recipientEmail: input.newBooking.inviteeEmail,
-        emailType: 'booking_rescheduled',
-        provider: inviteeEmailResult.provider,
-        status: inviteeEmailResult.sent ? 'succeeded' : 'failed',
-        ...(inviteeEmailResult.messageId ? { providerMessageId: inviteeEmailResult.messageId } : {}),
-        ...(inviteeEmailResult.error ? { error: inviteeEmailResult.error } : {}),
-      });
-    }
-    if (organizerEmailResult) {
-      await tryRecordEmailDelivery(env, db, {
-        organizerId: input.newBooking.organizerId,
-        bookingId: input.newBooking.id,
-        eventTypeId: input.newBooking.eventTypeId,
-        recipientEmail: input.organizer.email,
-        emailType: 'booking_rescheduled',
-        provider: organizerEmailResult.provider,
-        status: organizerEmailResult.sent ? 'succeeded' : 'failed',
-        ...(organizerEmailResult.messageId ? { providerMessageId: organizerEmailResult.messageId } : {}),
-        ...(organizerEmailResult.error ? { error: organizerEmailResult.error } : {}),
-      });
-    }
-  }
-
   const queuedWebhookDeliveries = input.alreadyProcessed
     ? 0
     : await enqueueWebhookDeliveries(db, {
@@ -333,11 +302,10 @@ export const runBookingRescheduleSideEffects = async (
       });
 
   return {
-    email,
     queuedWebhookDeliveries,
     calendarWriteback: input.alreadyProcessed
       ? emptyWritebackResult
-      : await runImmediateWriteback(db, env, {
+      : await queueCalendarWriteback(db, {
           bookingId: input.oldBooking.id,
           organizerId: input.newBooking.organizerId,
           operation: 'reschedule',
@@ -348,4 +316,76 @@ export const runBookingRescheduleSideEffects = async (
           },
         }),
   };
+};
+
+export const sendBookingRescheduleEmailSideEffects = async (
+  env: Bindings,
+  db: Database,
+  input: {
+    oldBooking: BookingRecord & { status: string };
+    newBooking: BookingRecord;
+    eventType: { name: string };
+    organizer: { email: string; displayName: string };
+    timezone: string;
+    alreadyProcessed: boolean;
+  },
+) => {
+  if (input.alreadyProcessed) {
+    return buildSkippedEmailPair('Idempotent replay: reschedule already processed.');
+  }
+
+  const email = await Promise.all([
+    sendBookingRescheduledEmail(env, {
+      recipientEmail: input.newBooking.inviteeEmail,
+      recipientName: input.newBooking.inviteeName,
+      recipientRole: 'invitee',
+      organizerDisplayName: input.organizer.displayName,
+      eventName: input.eventType.name,
+      oldStartsAt: input.oldBooking.startsAt.toISOString(),
+      newStartsAt: input.newBooking.startsAt.toISOString(),
+      timezone: input.timezone,
+      idempotencyKey: `booking-rescheduled:${input.oldBooking.id}:${input.newBooking.id}:invitee`,
+    }),
+    sendBookingRescheduledEmail(env, {
+      recipientEmail: input.organizer.email,
+      recipientName: input.organizer.displayName,
+      recipientRole: 'organizer',
+      organizerDisplayName: input.organizer.displayName,
+      eventName: input.eventType.name,
+      oldStartsAt: input.oldBooking.startsAt.toISOString(),
+      newStartsAt: input.newBooking.startsAt.toISOString(),
+      timezone: input.timezone,
+      idempotencyKey: `booking-rescheduled:${input.oldBooking.id}:${input.newBooking.id}:organizer`,
+    }),
+  ]);
+
+  const [inviteeEmailResult, organizerEmailResult] = email;
+  if (inviteeEmailResult) {
+    await tryRecordEmailDelivery(env, db, {
+      organizerId: input.newBooking.organizerId,
+      bookingId: input.newBooking.id,
+      eventTypeId: input.newBooking.eventTypeId,
+      recipientEmail: input.newBooking.inviteeEmail,
+      emailType: 'booking_rescheduled',
+      provider: inviteeEmailResult.provider,
+      status: inviteeEmailResult.sent ? 'succeeded' : 'failed',
+      ...(inviteeEmailResult.messageId ? { providerMessageId: inviteeEmailResult.messageId } : {}),
+      ...(inviteeEmailResult.error ? { error: inviteeEmailResult.error } : {}),
+    });
+  }
+  if (organizerEmailResult) {
+    await tryRecordEmailDelivery(env, db, {
+      organizerId: input.newBooking.organizerId,
+      bookingId: input.newBooking.id,
+      eventTypeId: input.newBooking.eventTypeId,
+      recipientEmail: input.organizer.email,
+      emailType: 'booking_rescheduled',
+      provider: organizerEmailResult.provider,
+      status: organizerEmailResult.sent ? 'succeeded' : 'failed',
+      ...(organizerEmailResult.messageId ? { providerMessageId: organizerEmailResult.messageId } : {}),
+      ...(organizerEmailResult.error ? { error: organizerEmailResult.error } : {}),
+    });
+  }
+
+  return email;
 };

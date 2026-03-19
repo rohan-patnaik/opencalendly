@@ -27,6 +27,12 @@ Primary tools for GA:
 - Exception capture: Sentry
 - Uptime/synthetic probes: Better Stack
 
+Required pre-GA proof points:
+
+- staging web exception captured in Sentry
+- staging API exception captured in Sentry
+- Better Stack probes green for staging web and API
+
 Alert thresholds:
 
 - Auth exchange failures:
@@ -129,6 +135,44 @@ Authentication requirements for webhook operations:
 4. If failures are non-conflict:
    - inspect recent deploy diff
    - inspect queue side effects separately from booking-commit correctness
+5. Use the staged timing breakdowns from audit events to isolate the slow stage:
+   - availability read:
+     - `dataLoadMs`
+     - `computeMs`
+     - `capFilterMs`
+   - booking/team-booking commit:
+     - lock/context load
+     - member schedule load
+     - availability/slot resolution
+     - cap checks
+     - insert/assignment insert
+     - notification enqueue
+
+## 5a) Staging sign-off before public launch
+
+1. Deploy the candidate SHA to staging only.
+2. Confirm Cloudflare Access is still enforcing the internal allowlist.
+3. Verify OAuth callback settings for Clerk, Google, and Microsoft match staging domains.
+4. Run functional smoke:
+   - Google sign-in + calendar
+   - Microsoft sign-in + calendar
+   - one-on-one booking create/reschedule/cancel
+   - team booking create/cancel
+   - organizer reads/writes
+   - webhook subscription create + delivery batch
+5. Trigger and confirm:
+   - one staging browser exception in Sentry
+   - one staging API exception in Sentry
+6. Run:
+   - `npm run load:test:smoke`
+   - `npm run load:test:baseline`
+   - `npm run load:test:contention`
+7. Update the GA artifact with:
+   - p95/p99
+   - conflict rate
+   - backlog behavior
+   - Sentry/Better Stack status
+8. Only after staging passes every gate should public production traffic be opened.
 
 ## 6) Database restore drill (Neon)
 
@@ -153,4 +197,4 @@ Authentication requirements for webhook operations:
 4. If this incident changed a threshold, update:
    - `docs/PROD_DEPLOY_CHECKLIST.md`
    - `docs/SECURITY_CHECKLIST.md`
-   - `docs/releases/ga-readiness-2026-03-19.md`
+   - `docs/README.md` if the canonical operator guidance changed

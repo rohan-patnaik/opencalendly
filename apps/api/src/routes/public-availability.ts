@@ -1,9 +1,5 @@
 import { and, eq, gt, lt } from 'drizzle-orm';
-import { DateTime } from 'luxon';
 
-import {
-  availabilityQuerySchema,
-} from '@opencalendly/shared';
 import { availabilityOverrides, availabilityRules, bookings } from '@opencalendly/db';
 
 import { computeAvailabilitySlots } from '../lib/availability';
@@ -35,6 +31,8 @@ import {
 import { isPublicBookingRateLimited, resolveRateLimitClientKey } from '../server/rate-limit';
 import { PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE } from '../server/env';
 import type { ApiApp } from '../server/types';
+import { emitTeamAvailabilityAudit, emitUserAvailabilityAudit } from './public-availability-audit';
+import { parseAvailabilityInput } from './public-availability-helpers';
 
 export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
   app.get('/v0/users/:username/event-types/:slug/availability', async (context) => {
@@ -42,9 +40,18 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
     const slug = context.req.param('slug');
 
     return withDatabase(context, async (db) => {
+      const startedAt = Date.now();
       if (requiresLaunchDemoAuthForUserRoute(username)) {
         const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
         if (!authedUser) {
+          emitUserAvailabilityAudit({
+            level: 'warn',
+            route: '/v0/users/:username/event-types/:slug/availability',
+            statusCode: 401,
+            durationMs: Date.now() - startedAt,
+            username,
+            eventSlug: slug,
+          });
           return jsonError(context, 401, 'Sign in to access the launch demo.');
         }
       }
@@ -57,34 +64,48 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
           perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
         })
       ) {
+        emitUserAvailabilityAudit({
+          level: 'warn',
+          route: '/v0/users/:username/event-types/:slug/availability',
+          statusCode: 429,
+          durationMs: Date.now() - startedAt,
+          username,
+          eventSlug: slug,
+        });
         return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
       }
 
       const eventType = await findPublicEventType(db, username, slug);
       if (!eventType) {
+        emitUserAvailabilityAudit({
+          level: 'warn',
+          route: '/v0/users/:username/event-types/:slug/availability',
+          statusCode: 404,
+          durationMs: Date.now() - startedAt,
+          username,
+          eventSlug: slug,
+        });
         return jsonError(context, 404, 'Event type not found.');
       }
 
-      const query = availabilityQuerySchema.safeParse({
+      const availabilityInput = parseAvailabilityInput({
         timezone: context.req.query('timezone') ?? undefined,
         start: context.req.query('start') ?? undefined,
         days: context.req.query('days') ?? undefined,
       });
-      if (!query.success) {
-        return jsonError(context, 400, query.error.issues[0]?.message ?? 'Invalid query params.');
+      if (!availabilityInput.ok) {
+        emitUserAvailabilityAudit({
+          level: 'warn',
+          route: '/v0/users/:username/event-types/:slug/availability',
+          statusCode: 400,
+          durationMs: Date.now() - startedAt,
+          username,
+          eventSlug: slug,
+        });
+        return jsonError(context, 400, availabilityInput.message);
       }
 
-      const startIso = query.data.start ?? DateTime.utc().toISO();
-      if (!startIso) {
-        return jsonError(context, 400, 'Invalid range start.');
-      }
-      const rangeStart = DateTime.fromISO(startIso, { zone: 'utc' });
-      if (!rangeStart.isValid) {
-        return jsonError(context, 400, 'Invalid range start.');
-      }
-
-      const days = query.data.days ?? 7;
-      const rangeEnd = rangeStart.plus({ days });
+      const { days, rangeEnd, rangeStart, startIso, timezone } = availabilityInput;
       const bookingCaps = toEventTypeBookingCaps(eventType);
       const capUsageRange = resolveBookingCapUsageRange({
         rangeStartIso: startIso,
@@ -93,6 +114,7 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
         caps: bookingCaps,
       });
 
+      const dataLoadStartedAt = Date.now();
       const [rules, overrides, userTimeOffBlocks, externalBusyWindows, existingBookings, eventTypeBookingsForCapUsage] =
         await Promise.all([
           db
@@ -145,7 +167,9 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
               })
             : Promise.resolve([]),
         ]);
+      const dataLoadMs = Date.now() - dataLoadStartedAt;
 
+      const computeStartedAt = Date.now();
       const slots = computeAvailabilitySlots({
         organizerTimezone: eventType.organizerTimezone,
         rangeStartIso: startIso,
@@ -167,7 +191,9 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
         ],
         bookings: existingBookings,
       });
+      const computeMs = Date.now() - computeStartedAt;
 
+      const capFilterStartedAt = Date.now();
       const slotsWithBookingCaps = hasBookingCaps(bookingCaps)
         ? filterSlotsByBookingCaps({
             slots,
@@ -176,10 +202,23 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
             usage: buildBookingCapUsage(eventTypeBookingsForCapUsage, eventType.organizerTimezone),
           })
         : slots;
+      const capFilterMs = Date.now() - capFilterStartedAt;
+
+      emitUserAvailabilityAudit({
+        route: '/v0/users/:username/event-types/:slug/availability',
+        statusCode: 200,
+        durationMs: Date.now() - startedAt,
+        username,
+        eventSlug: slug,
+        dataLoadMs,
+        computeMs,
+        capFilterMs,
+        slotCount: slotsWithBookingCaps.length,
+      });
 
       return context.json({
         ok: true,
-        timezone: normalizeTimezone(query.data.timezone),
+        timezone: normalizeTimezone(timezone),
         slots: slotsWithBookingCaps.map((slot) => ({ startsAt: slot.startsAt, endsAt: slot.endsAt })),
       });
     });
@@ -190,9 +229,18 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
     const eventSlug = context.req.param('eventSlug');
 
     return withDatabase(context, async (db) => {
+      const startedAt = Date.now();
       if (requiresLaunchDemoAuthForTeamRoute(teamSlug)) {
         const authedUser = await resolveAuthenticatedUser(db, context.req.raw);
         if (!authedUser) {
+          emitTeamAvailabilityAudit({
+            level: 'warn',
+            route: '/v0/teams/:teamSlug/event-types/:eventSlug/availability',
+            statusCode: 401,
+            durationMs: Date.now() - startedAt,
+            teamSlug,
+            eventSlug,
+          });
           return jsonError(context, 401, 'Sign in to access the launch demo.');
         }
       }
@@ -205,34 +253,48 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
           perScopeLimit: PUBLIC_BOOKING_RATE_LIMIT_MAX_AVAILABILITY_REQUESTS_PER_SCOPE,
         })
       ) {
+        emitTeamAvailabilityAudit({
+          level: 'warn',
+          route: '/v0/teams/:teamSlug/event-types/:eventSlug/availability',
+          statusCode: 429,
+          durationMs: Date.now() - startedAt,
+          teamSlug,
+          eventSlug,
+        });
         return jsonError(context, 429, 'Rate limit exceeded. Try again in a minute.');
       }
 
       const teamEventContext = await findTeamEventTypeContext(db, teamSlug, eventSlug);
       if (!teamEventContext) {
+        emitTeamAvailabilityAudit({
+          level: 'warn',
+          route: '/v0/teams/:teamSlug/event-types/:eventSlug/availability',
+          statusCode: 404,
+          durationMs: Date.now() - startedAt,
+          teamSlug,
+          eventSlug,
+        });
         return jsonError(context, 404, 'Team event type not found.');
       }
 
-      const query = availabilityQuerySchema.safeParse({
+      const availabilityInput = parseAvailabilityInput({
         timezone: context.req.query('timezone') ?? undefined,
         start: context.req.query('start') ?? undefined,
         days: context.req.query('days') ?? undefined,
       });
-      if (!query.success) {
-        return jsonError(context, 400, query.error.issues[0]?.message ?? 'Invalid query params.');
+      if (!availabilityInput.ok) {
+        emitTeamAvailabilityAudit({
+          level: 'warn',
+          route: '/v0/teams/:teamSlug/event-types/:eventSlug/availability',
+          statusCode: 400,
+          durationMs: Date.now() - startedAt,
+          teamSlug,
+          eventSlug,
+        });
+        return jsonError(context, 400, availabilityInput.message);
       }
 
-      const startIso = query.data.start ?? DateTime.utc().toISO();
-      if (!startIso) {
-        return jsonError(context, 400, 'Invalid range start.');
-      }
-      const rangeStart = DateTime.fromISO(startIso, { zone: 'utc' });
-      if (!rangeStart.isValid) {
-        return jsonError(context, 400, 'Invalid range start.');
-      }
-
-      const days = query.data.days ?? 7;
-      const rangeEnd = rangeStart.plus({ days });
+      const { days, rangeEnd, rangeStart, startIso, timezone } = availabilityInput;
       const organizerTimezone = teamEventContext.eventType.organizerTimezone ?? 'UTC';
       const bookingCaps = toEventTypeBookingCaps(teamEventContext.eventType);
       const capUsageRange = resolveBookingCapUsageRange({
@@ -241,13 +303,16 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
         timezone: organizerTimezone,
         caps: bookingCaps,
       });
+      const dataLoadStartedAt = Date.now();
       const memberSchedules = await listTeamMemberSchedules(
         db,
         teamEventContext.members.map((member) => member.userId),
         rangeStart.toJSDate(),
         rangeEnd.toJSDate(),
       );
+      const dataLoadMs = Date.now() - dataLoadStartedAt;
 
+      const computeStartedAt = Date.now();
       const availability = computeTeamAvailabilitySlots({
         mode: teamEventContext.mode,
         members: memberSchedules,
@@ -256,6 +321,7 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
         durationMinutes: teamEventContext.eventType.durationMinutes,
         roundRobinCursor: teamEventContext.roundRobinCursor,
       });
+      const computeMs = Date.now() - computeStartedAt;
 
       const eventTypeBookingsForCapUsage = capUsageRange
         ? await listConfirmedBookingStartsForEventType(db, {
@@ -264,6 +330,7 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
             endsAt: capUsageRange.endsAt,
           })
         : [];
+      const capFilterStartedAt = Date.now();
       const slotsWithBookingCaps = hasBookingCaps(bookingCaps)
         ? filterSlotsByBookingCaps({
             slots: availability.slots,
@@ -272,11 +339,25 @@ export const registerPublicAvailabilityRoutes = (app: ApiApp): void => {
             usage: buildBookingCapUsage(eventTypeBookingsForCapUsage, organizerTimezone),
           })
         : availability.slots;
+      const capFilterMs = Date.now() - capFilterStartedAt;
+
+      emitTeamAvailabilityAudit({
+        route: '/v0/teams/:teamSlug/event-types/:eventSlug/availability',
+        statusCode: 200,
+        durationMs: Date.now() - startedAt,
+        teamSlug,
+        eventSlug,
+        dataLoadMs,
+        computeMs,
+        capFilterMs,
+        slotCount: slotsWithBookingCaps.length,
+        memberCount: memberSchedules.length,
+      });
 
       return context.json({
         ok: true,
         mode: teamEventContext.mode,
-        timezone: normalizeTimezone(query.data.timezone),
+        timezone: normalizeTimezone(timezone),
         slots: slotsWithBookingCaps.map((slot) => ({
           startsAt: slot.startsAt,
           endsAt: slot.endsAt,
