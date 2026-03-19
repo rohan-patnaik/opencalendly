@@ -1,5 +1,24 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 77 (PR#TBD): Center desktop app chrome navigation
+
+Scope:
+
+- Center the desktop marketing navigation links in the shared app chrome.
+- Keep the change scoped to desktop header layout only, without changing mobile drawer behavior or right-side signed-in controls.
+
+Acceptance criteria:
+
+- On desktop widths, `Home`, `Features`, `Pricing`, `Book Demo`, and `Organizer` are visually centered on the page.
+- The left brand and right action cluster remain aligned and do not overlap the centered nav.
+- Mobile header and drawer behavior remain unchanged.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 76 (PR#TBD): Audit and fix Google/Microsoft provider flows end to end
 
 Scope:

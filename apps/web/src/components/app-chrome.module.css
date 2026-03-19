@@ -9,7 +9,7 @@
   top: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
   min-height: var(--app-header-height);
@@ -24,6 +24,8 @@
   display: flex;
   align-items: center;
   gap: 0.55rem;
+  justify-self: start;
+  min-width: 0;
 }
 
 .brand {
@@ -72,6 +74,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.15rem;
+  justify-self: center;
 }
 
 .navLink {
@@ -101,6 +104,8 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
+  justify-self: end;
+  min-width: 0;
 }
 
 .sessionChip {
