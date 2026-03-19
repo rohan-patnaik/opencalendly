@@ -134,16 +134,27 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
         const [existingConnection] = await db
           .select({
             id: calendarConnections.id,
+            userId: calendarConnections.userId,
             refreshTokenEncrypted: calendarConnections.refreshTokenEncrypted,
+            useForConflictChecks: calendarConnections.useForConflictChecks,
+            useForWriteback: calendarConnections.useForWriteback,
           })
           .from(calendarConnections)
           .where(
             and(
-              eq(calendarConnections.userId, authedUser.id),
               eq(calendarConnections.provider, MICROSOFT_CALENDAR_PROVIDER),
+              eq(calendarConnections.externalAccountId, profile.sub),
             ),
           )
           .limit(1);
+
+        if (existingConnection && existingConnection.userId !== authedUser.id) {
+          return jsonError(
+            context,
+            409,
+            'This Microsoft calendar is already connected to another OpenCalendly account.',
+          );
+        }
 
         const refreshTokenEncrypted =
           tokenPayload.refresh_token && tokenPayload.refresh_token.length > 0
@@ -160,6 +171,17 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
         const now = new Date();
         const accessTokenExpiresAt = new Date(now.getTime() + tokenPayload.expires_in * 1000);
         await db.transaction(async (transaction) => {
+          const [existingWritebackConnection] = await transaction
+            .select({ id: calendarConnections.id })
+            .from(calendarConnections)
+            .where(
+              and(
+                eq(calendarConnections.userId, authedUser.id),
+                eq(calendarConnections.useForWriteback, true),
+              ),
+            )
+            .limit(1);
+
           await transaction
             .insert(calendarConnections)
             .values({
@@ -171,18 +193,25 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
               refreshTokenEncrypted,
               accessTokenExpiresAt,
               scope: tokenPayload.scope ?? null,
+              useForConflictChecks: existingConnection?.useForConflictChecks ?? true,
+              useForWriteback:
+                existingConnection?.useForWriteback ?? !existingWritebackConnection,
               lastError: null,
               updatedAt: now,
             })
             .onConflictDoUpdate({
-              target: [calendarConnections.userId, calendarConnections.provider],
+              target: [calendarConnections.provider, calendarConnections.externalAccountId],
               set: {
+                userId: authedUser.id,
                 externalAccountId: profile.sub,
                 externalEmail: profile.email ?? null,
                 accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
                 refreshTokenEncrypted,
                 accessTokenExpiresAt,
                 scope: tokenPayload.scope ?? null,
+                useForConflictChecks: existingConnection?.useForConflictChecks ?? true,
+                useForWriteback:
+                  existingConnection?.useForWriteback ?? !existingWritebackConnection,
                 lastError: null,
                 updatedAt: now,
               },
@@ -201,7 +230,10 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
 
         const [connection] = await db
           .select({
+            id: calendarConnections.id,
             externalEmail: calendarConnections.externalEmail,
+            useForConflictChecks: calendarConnections.useForConflictChecks,
+            useForWriteback: calendarConnections.useForWriteback,
             lastSyncedAt: calendarConnections.lastSyncedAt,
             nextSyncAt: calendarConnections.nextSyncAt,
             lastError: calendarConnections.lastError,
@@ -209,8 +241,8 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           .from(calendarConnections)
           .where(
             and(
-              eq(calendarConnections.userId, authedUser.id),
               eq(calendarConnections.provider, MICROSOFT_CALENDAR_PROVIDER),
+              eq(calendarConnections.externalAccountId, profile.sub),
             ),
           )
           .limit(1);
@@ -234,6 +266,7 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           level: 'info',
           actorUserId: authedUser.id,
           provider: MICROSOFT_CALENDAR_PROVIDER,
+          connectionId: connection.id,
           route: '/v0/calendar/microsoft/connect/complete',
           statusCode: 200,
           connected: true,
@@ -242,8 +275,11 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
         return context.json({
           ok: true,
           connection: toCalendarConnectionStatus({
+            id: connection.id,
             provider: MICROSOFT_CALENDAR_PROVIDER,
             externalEmail: connection.externalEmail,
+            useForConflictChecks: connection.useForConflictChecks,
+            useForWriteback: connection.useForWriteback,
             lastSyncedAt: connection.lastSyncedAt,
             nextSyncAt: connection.nextSyncAt,
             lastError: connection.lastError,

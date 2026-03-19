@@ -5,12 +5,7 @@ import { bookingExternalEvents, calendarConnections } from '@opencalendly/db';
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { jsonError } from '../server/core';
 import { withDatabase } from '../server/database';
-import {
-  GOOGLE_CALENDAR_PROVIDER,
-  MICROSOFT_CALENDAR_PROVIDER,
-  toCalendarConnectionStatus,
-  toCalendarProvider,
-} from '../server/env';
+import { toCalendarConnectionStatus, toCalendarProvider } from '../server/env';
 import type { ApiApp, CalendarConnectionStatus, CalendarProvider } from '../server/types';
 
 export const registerCalendarStatusRoutes = (app: ApiApp): void => {
@@ -23,8 +18,11 @@ export const registerCalendarStatusRoutes = (app: ApiApp): void => {
 
       const rows = await db
         .select({
+          id: calendarConnections.id,
           provider: calendarConnections.provider,
           externalEmail: calendarConnections.externalEmail,
+          useForConflictChecks: calendarConnections.useForConflictChecks,
+          useForWriteback: calendarConnections.useForWriteback,
           lastSyncedAt: calendarConnections.lastSyncedAt,
           nextSyncAt: calendarConnections.nextSyncAt,
           lastError: calendarConnections.lastError,
@@ -38,8 +36,11 @@ export const registerCalendarStatusRoutes = (app: ApiApp): void => {
           const provider = toCalendarProvider(row.provider);
           return provider
             ? toCalendarConnectionStatus({
+                id: row.id,
                 provider,
                 externalEmail: row.externalEmail,
+                useForConflictChecks: row.useForConflictChecks,
+                useForWriteback: row.useForWriteback,
                 lastSyncedAt: row.lastSyncedAt,
                 nextSyncAt: row.nextSyncAt,
                 lastError: row.lastError,
@@ -48,21 +49,11 @@ export const registerCalendarStatusRoutes = (app: ApiApp): void => {
         })
         .filter((status): status is CalendarConnectionStatus => status !== null);
 
-      const requiredProviders: CalendarProvider[] = [GOOGLE_CALENDAR_PROVIDER, MICROSOFT_CALENDAR_PROVIDER];
-      for (const provider of requiredProviders) {
-        if (!statuses.some((status) => status.provider === provider)) {
-          statuses.push({
-            provider,
-            connected: false,
-            externalEmail: null,
-            lastSyncedAt: null,
-            nextSyncAt: null,
-            lastError: null,
-          });
-        }
-      }
-
-      return context.json({ ok: true, providers: statuses });
+      return context.json({
+        ok: true,
+        availableProviders: ['google', 'microsoft'] satisfies CalendarProvider[],
+        connections: statuses,
+      });
     });
   });
 

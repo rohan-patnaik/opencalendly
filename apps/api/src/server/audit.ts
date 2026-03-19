@@ -15,6 +15,8 @@ export type AuditEventName =
   | 'calendar_sync_completed'
   | 'calendar_writeback_batch_completed'
   | 'calendar_writeback_failed_permanently'
+  | 'onboarding_completed'
+  | 'profile_updated'
   | 'webhook_delivery_batch_completed'
   | 'webhook_delivery_failed_permanently'
   | 'webhook_subscription_created'

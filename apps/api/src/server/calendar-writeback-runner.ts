@@ -118,7 +118,8 @@ export const runCalendarWritebackBatch = async (
         writebackResult.status === 'succeeded' &&
         writebackResult.transferExternalEventToBookingId &&
         writebackResult.externalEventId &&
-        provider
+        provider &&
+        row.connectionId
       ) {
         const [targetRow] = await db
           .select({ id: bookingExternalEvents.id })
@@ -126,7 +127,7 @@ export const runCalendarWritebackBatch = async (
           .where(
             and(
               eq(bookingExternalEvents.bookingId, writebackResult.transferExternalEventToBookingId),
-              eq(bookingExternalEvents.provider, provider),
+              eq(bookingExternalEvents.connectionId, row.connectionId),
             ),
           )
           .limit(1);

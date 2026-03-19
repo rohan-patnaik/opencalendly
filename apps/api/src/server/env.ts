@@ -135,16 +135,22 @@ export const resolveClerkAllowedAudiences = (env: Bindings): string[] => {
 };
 
 export const toCalendarConnectionStatus = (input: {
+  id: string;
   provider: CalendarProvider;
   externalEmail: string | null;
+  useForConflictChecks: boolean;
+  useForWriteback: boolean;
   lastSyncedAt: Date | null;
   nextSyncAt: Date | null;
   lastError: string | null;
 }): CalendarConnectionStatus => {
   return {
+    id: input.id,
     provider: input.provider,
     connected: true,
     externalEmail: input.externalEmail,
+    useForConflictChecks: input.useForConflictChecks,
+    useForWriteback: input.useForWriteback,
     lastSyncedAt: input.lastSyncedAt ? input.lastSyncedAt.toISOString() : null,
     nextSyncAt: input.nextSyncAt ? input.nextSyncAt.toISOString() : null,
     lastError: input.lastError,

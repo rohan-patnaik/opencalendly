@@ -91,6 +91,7 @@ export const useOrganizerSession = ({
     authChecking,
     authError,
     authedUser,
+    setAuthedUser,
     handleSignOut,
   };
 };

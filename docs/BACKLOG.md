@@ -1,5 +1,57 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 73 (PR#TBD): Cal.com-inspired onboarding, settings, and multi-calendar UX
+
+Scope:
+
+- Make the homepage hero session-aware so signed-in users do not see sign-up CTAs.
+- Add first-run onboarding for authenticated users with profile and calendar setup before they enter the product.
+- Replace the single long organizer console with route-based organizer/settings navigation around the existing product domains.
+- Add editable account profile state, including username, display name, and timezone.
+- Expand calendar integrations from one connection per provider to multiple connections per user, with separate conflict-check and writeback preferences.
+- Preserve existing booking correctness, booking-action flows, provider integrations, analytics, and webhook behavior.
+
+Acceptance criteria:
+
+- Homepage behavior is session-aware:
+  - signed-out users still see Google, Microsoft, and email sign-up CTAs
+  - signed-in users see authenticated actions instead of sign-up buttons
+- Newly authenticated users who have not completed setup are routed through onboarding before using the organizer.
+- User profile state persists:
+  - `displayName`
+  - `username`
+  - `timezone`
+  - `onboardingCompleted`
+- Auth session payloads and `/v0/auth/me` include onboarding/profile fields needed by the web app.
+- Organizer navigation is route-based and exposes dedicated sections for:
+  - Event types
+  - Availability
+  - Calendars
+  - Teams
+  - Webhooks
+  - Profile
+  - Writeback queue
+- Dashboard analytics remains available as a dedicated authenticated surface linked from organizer navigation.
+- `/organizer` remains the default signed-in organizer landing page and behaves as the `Event types` entrypoint.
+- Users can connect multiple Google and/or Microsoft calendar accounts without overwriting an existing connection for the same provider.
+- Calendar settings let a user:
+  - view all connected calendars
+  - connect additional calendars
+  - disconnect a specific calendar
+  - choose which calendars block availability
+  - choose exactly one writeback target calendar
+- Availability conflict checks honor every connected calendar marked for conflict checking.
+- Booking writeback targets only the selected writeback connection, while booking still succeeds when no writeback target is selected.
+- Cancel and reschedule update the configured writeback connection correctly.
+- Existing Google/Microsoft sign-in, one-on-one/team booking, booking-action links, dashboard analytics, and webhook flows continue to work.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run complexity:check:enforce`
+  - `git diff --check`
+
 ## Feature 72 (PR#TBD): Private pre-GA staging, observability, and performance hardening
 
 Scope:

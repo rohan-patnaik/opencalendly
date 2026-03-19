@@ -1,6 +1,6 @@
 'use client';
 
-import { organizerApi, type CalendarProviderStatus } from '../../lib/organizer-api';
+import { organizerApi, type CalendarConnectionStatus } from '../../lib/organizer-api';
 import type { AuthSession } from '../../lib/auth-session';
 
 type OrganizerStyles = Record<string, string>;
@@ -19,7 +19,7 @@ export const CalendarsPanel = ({
 }: {
   apiBaseUrl: string;
   session: AuthSession | null;
-  calendarStatuses: CalendarProviderStatus[];
+  calendarStatuses: CalendarConnectionStatus[];
   refreshOrganizerState: () => Promise<void>;
   isBusy: (action: string) => boolean;
   beginBusy: (action: string) => void;
@@ -51,84 +51,190 @@ export const CalendarsPanel = ({
     }
   };
 
-  const handleCalendarSync = async (provider: 'google' | 'microsoft') => {
+  const handleCalendarSync = async (connection: CalendarConnectionStatus) => {
     if (!session) {
       return;
     }
 
-    const action = `calendarSync:${provider}`;
+    const action = `calendarSync:${connection.id}`;
     beginBusy(action);
     setPanelError(null);
     setPanelMessage(null);
 
     try {
-      const result =
-        provider === 'google'
-          ? await organizerApi.syncGoogle(apiBaseUrl, session)
-          : await organizerApi.syncMicrosoft(apiBaseUrl, session);
+      const result = await organizerApi.syncConnection(apiBaseUrl, session, connection.id);
       setPanelMessage(
-        `${provider === 'google' ? 'Google' : 'Microsoft'} sync complete: ${result.busyWindowCount} busy windows refreshed.`,
+        `${connection.provider === 'google' ? 'Google' : 'Microsoft'} sync complete: ${result.busyWindowCount} busy windows refreshed.`,
       );
       await refreshOrganizerState();
     } catch (caught) {
-      setPanelError(caught instanceof Error ? caught.message : `Unable to sync ${provider} calendar.`);
+      setPanelError(
+        caught instanceof Error
+          ? caught.message
+          : `Unable to sync ${connection.provider} calendar.`,
+      );
     } finally {
       endBusy(action);
     }
   };
 
-  const handleCalendarDisconnect = async (provider: 'google' | 'microsoft') => {
+  const handleCalendarDisconnect = async (connection: CalendarConnectionStatus) => {
     if (!session) {
       return;
     }
+    if (!window.confirm('Disconnect this calendar? Existing booking links will stay active.')) {
+      return;
+    }
 
-    const action = `calendarDisconnect:${provider}`;
+    const action = `calendarDisconnect:${connection.id}`;
     beginBusy(action);
     setPanelError(null);
     setPanelMessage(null);
 
     try {
-      if (provider === 'google') {
-        await organizerApi.disconnectGoogle(apiBaseUrl, session);
-      } else {
-        await organizerApi.disconnectMicrosoft(apiBaseUrl, session);
-      }
-      setPanelMessage(`${provider === 'google' ? 'Google' : 'Microsoft'} calendar disconnected.`);
+      await organizerApi.disconnectConnection(apiBaseUrl, session, connection.id);
+      setPanelMessage(
+        `${connection.provider === 'google' ? 'Google' : 'Microsoft'} calendar disconnected.`,
+      );
       await refreshOrganizerState();
     } catch (caught) {
-      setPanelError(caught instanceof Error ? caught.message : `Unable to disconnect ${provider} calendar.`);
+      setPanelError(
+        caught instanceof Error
+          ? caught.message
+          : `Unable to disconnect ${connection.provider} calendar.`,
+      );
     } finally {
       endBusy(action);
     }
   };
 
-  return calendarStatuses.length === 0 ? (
-    <p className={styles.empty}>No provider statuses available.</p>
-  ) : (
-    <div className={styles.listGrid}>
-      {calendarStatuses.map((status) => (
-        <article key={status.provider} className={styles.itemCard}>
-          <div className={styles.itemHead}>
-            <strong>{status.provider === 'google' ? 'Google Calendar' : 'Microsoft Calendar'}</strong>
-            <span className={styles.badge}>{status.connected ? 'connected' : 'not connected'}</span>
+  const handlePreferenceChange = async (
+    connection: CalendarConnectionStatus,
+    body: { useForConflictChecks?: boolean; useForWriteback?: boolean },
+  ) => {
+    if (!session) {
+      return;
+    }
+
+    const action = `calendarPreferences:${connection.id}`;
+    beginBusy(action);
+    setPanelError(null);
+    setPanelMessage(null);
+
+    try {
+      await organizerApi.updateCalendarConnectionPreferences(apiBaseUrl, session, connection.id, body);
+      setPanelMessage('Calendar preferences saved.');
+      await refreshOrganizerState();
+    } catch (caught) {
+      setPanelError(
+        caught instanceof Error ? caught.message : 'Unable to update calendar preferences.',
+      );
+    } finally {
+      endBusy(action);
+    }
+  };
+
+  return (
+    <div className={styles.splitGrid}>
+      <div className={styles.form}>
+        <h3>Add calendars</h3>
+        <p className={styles.helperText}>
+          Connect as many Google and Microsoft calendars as you need.
+        </p>
+        <div className={styles.inlineActions}>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => void handleStartCalendarConnect('google')}
+            disabled={isBusy('calendarConnect:google')}
+          >
+            {isBusy('calendarConnect:google') ? 'Starting…' : 'Add Google calendar'}
+          </button>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => void handleStartCalendarConnect('microsoft')}
+            disabled={isBusy('calendarConnect:microsoft')}
+          >
+            {isBusy('calendarConnect:microsoft') ? 'Starting…' : 'Add Microsoft calendar'}
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.form}>
+        <h3>Connected calendars</h3>
+        {calendarStatuses.length === 0 ? (
+          <p className={styles.empty}>No calendars connected yet.</p>
+        ) : (
+          <div className={styles.listGrid}>
+            {calendarStatuses.map((status) => (
+              <article key={status.id} className={styles.itemCard}>
+                <div className={styles.itemHead}>
+                  <strong>
+                    {status.provider === 'google' ? 'Google Calendar' : 'Microsoft Calendar'}
+                  </strong>
+                  <span className={styles.badge}>connected</span>
+                </div>
+                <p>Email: {status.externalEmail ?? 'n/a'}</p>
+                <p>
+                  Last sync:{' '}
+                  {status.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleString() : 'never'}
+                </p>
+                <p>
+                  Next sync:{' '}
+                  {status.nextSyncAt ? new Date(status.nextSyncAt).toLocaleString() : 'not scheduled'}
+                </p>
+                {status.lastError ? <p className={styles.error}>{status.lastError}</p> : null}
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={status.useForConflictChecks}
+                    onChange={() =>
+                      void handlePreferenceChange(status, {
+                        useForConflictChecks: !status.useForConflictChecks,
+                      })
+                    }
+                    disabled={isBusy(`calendarPreferences:${status.id}`)}
+                  />
+                  Use for conflict checks
+                </label>
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={status.useForWriteback}
+                    onChange={() =>
+                      void handlePreferenceChange(status, { useForWriteback: !status.useForWriteback })
+                    }
+                    disabled={isBusy(`calendarPreferences:${status.id}`)}
+                  />
+                  Default writeback calendar
+                </label>
+                <p className={styles.helperText}>
+                  Only one connected calendar can be the default writeback target at a time.
+                </p>
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => void handleCalendarSync(status)}
+                    disabled={isBusy(`calendarSync:${status.id}`)}
+                  >
+                    {isBusy(`calendarSync:${status.id}`) ? 'Syncing…' : 'Sync now'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.ghostButton}
+                    onClick={() => void handleCalendarDisconnect(status)}
+                    disabled={isBusy(`calendarDisconnect:${status.id}`)}
+                  >
+                    {isBusy(`calendarDisconnect:${status.id}`) ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                </div>
+              </article>
+            ))}
           </div>
-          <p>Email: {status.externalEmail ?? 'n/a'}</p>
-          <p>Last sync: {status.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleString() : 'never'}</p>
-          <p>Next sync: {status.nextSyncAt ? new Date(status.nextSyncAt).toLocaleString() : 'not scheduled'}</p>
-          {status.lastError ? <p className={styles.error}>{status.lastError}</p> : null}
-          <div className={styles.inlineActions}>
-            <button type="button" className={styles.secondaryButton} onClick={() => void handleStartCalendarConnect(status.provider)} disabled={isBusy(`calendarConnect:${status.provider}`)}>
-              {isBusy(`calendarConnect:${status.provider}`) ? 'Starting…' : 'Connect'}
-            </button>
-            <button type="button" className={styles.secondaryButton} onClick={() => void handleCalendarSync(status.provider)} disabled={isBusy(`calendarSync:${status.provider}`)}>
-              {isBusy(`calendarSync:${status.provider}`) ? 'Syncing…' : 'Sync now'}
-            </button>
-            <button type="button" className={styles.ghostButton} onClick={() => void handleCalendarDisconnect(status.provider)} disabled={isBusy(`calendarDisconnect:${status.provider}`)}>
-              {isBusy(`calendarDisconnect:${status.provider}`) ? 'Disconnecting…' : 'Disconnect'}
-            </button>
-          </div>
-        </article>
-      ))}
+        )}
+      </div>
     </div>
   );
 };

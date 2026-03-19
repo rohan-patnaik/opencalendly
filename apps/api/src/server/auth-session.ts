@@ -138,6 +138,7 @@ export const resolveAuthenticatedUser = async (
       username: users.username,
       displayName: users.displayName,
       timezone: users.timezone,
+      onboardingCompleted: users.onboardingCompleted,
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
@@ -154,6 +155,7 @@ export const resolveAuthenticatedUser = async (
     username: row.username,
     displayName: row.displayName,
     timezone: normalizeTimezone(row.timezone),
+    onboardingCompleted: row.onboardingCompleted,
   };
 };
 

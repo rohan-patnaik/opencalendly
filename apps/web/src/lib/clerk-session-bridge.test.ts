@@ -16,6 +16,7 @@ const buildSession = (email: string): AuthSession => ({
     username: 'demo',
     displayName: 'Demo User',
     timezone: 'Asia/Kolkata',
+    onboardingCompleted: true,
   },
 });
 

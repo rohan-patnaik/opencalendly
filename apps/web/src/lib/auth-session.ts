@@ -4,6 +4,7 @@ export type AuthUser = {
   username: string;
   displayName: string;
   timezone: string;
+  onboardingCompleted: boolean;
 };
 
 export type AuthSession = {
@@ -65,7 +66,8 @@ export const readAuthSession = (): AuthSession | null => {
       typeof parsed.user.email !== 'string' ||
       typeof parsed.user.username !== 'string' ||
       typeof parsed.user.displayName !== 'string' ||
-      typeof parsed.user.timezone !== 'string'
+      typeof parsed.user.timezone !== 'string' ||
+      typeof parsed.user.onboardingCompleted !== 'boolean'
     ) {
       removeSessionFromStorage();
       return null;

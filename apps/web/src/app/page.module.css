@@ -62,6 +62,7 @@
 }
 
 .authButton {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -78,6 +79,12 @@
     background var(--motion-fast),
     border-color var(--motion-fast),
     transform var(--motion-fast);
+}
+
+.heroInlineError {
+  margin: 0;
+  color: var(--state-error);
+  font-size: 0.86rem;
 }
 
 .authButton:hover {

@@ -1,7 +1,7 @@
 import type {
   AvailabilityOverride,
   AvailabilityRule,
-  CalendarProviderStatus,
+  CalendarConnectionStatus,
   NotificationRule,
   OrganizerEventType,
   OrganizerWebhook,
@@ -18,6 +18,7 @@ export type OrganizerConsoleUser = {
   username: string;
   displayName: string;
   timezone: string;
+  onboardingCompleted: boolean;
 };
 
 export type AuthMeResponse = {
@@ -32,7 +33,7 @@ export type OrganizerSectionsState = {
   timeOffBlocks: TimeOffBlock[];
   teams: TeamSummary[];
   webhooks: OrganizerWebhook[];
-  calendarStatuses: CalendarProviderStatus[];
+  calendarStatuses: CalendarConnectionStatus[];
   writebackStatus: WritebackStatus | null;
 };
 

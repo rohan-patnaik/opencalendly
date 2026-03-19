@@ -17,6 +17,7 @@ import { registerBookingActionRescheduleRoutes } from './routes/booking-actions-
 import { registerBookingActionViewRoutes } from './routes/booking-actions-view';
 import { registerBookingCreateRoutes } from './routes/bookings-create';
 import { registerGoogleCalendarConnectRoutes } from './routes/calendar-google-connect';
+import { registerCalendarConnectionRoutes } from './routes/calendar-connections';
 import { registerGoogleCalendarSyncRoutes } from './routes/calendar-google-sync';
 import { registerMicrosoftCalendarConnectRoutes } from './routes/calendar-microsoft-connect';
 import { registerMicrosoftCalendarSyncRoutes } from './routes/calendar-microsoft-sync';
@@ -32,6 +33,7 @@ import { registerOrganizerNotificationRuleRoutes } from './routes/organizer-noti
 import { registerOrganizerTeamReadRoutes } from './routes/organizer-teams-read';
 import { registerOrganizerTeamWriteRoutes } from './routes/organizer-teams-write';
 import { registerOrganizerTimeOffRoutes } from './routes/organizer-time-off';
+import { registerProfileRoutes } from './routes/profile';
 import { registerPublicAvailabilityRoutes } from './routes/public-availability';
 import { registerPublicEventRoutes } from './routes/public-events';
 import { registerTeamBookingCreateRoutes } from './routes/team-bookings-create';
@@ -89,12 +91,14 @@ app.use('*', async (context, next) => {
 registerHealthRoutes(app);
 registerAuthRoutes(app);
 registerClerkAuthRoutes(app);
+registerProfileRoutes(app);
 
 registerAnalyticsFunnelRoutes(app);
 registerAnalyticsTeamRoutes(app);
 registerAnalyticsOperatorRoutes(app);
 
 registerCalendarStatusRoutes(app);
+registerCalendarConnectionRoutes(app);
 registerGoogleCalendarConnectRoutes(app);
 registerGoogleCalendarSyncRoutes(app);
 registerMicrosoftCalendarConnectRoutes(app);

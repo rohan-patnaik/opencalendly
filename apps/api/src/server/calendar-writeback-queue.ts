@@ -99,6 +99,7 @@ export const enqueueCalendarWritebacksForBooking = async (
     .where(
       and(
         eq(calendarConnections.userId, input.organizerId),
+        eq(calendarConnections.useForWriteback, true),
         inArray(calendarConnections.provider, [GOOGLE_CALENDAR_PROVIDER, MICROSOFT_CALENDAR_PROVIDER]),
       ),
     );
@@ -110,13 +111,17 @@ export const enqueueCalendarWritebacksForBooking = async (
   const existingRows = await db
     .select({
       id: bookingExternalEvents.id,
-      provider: bookingExternalEvents.provider,
+      connectionId: bookingExternalEvents.connectionId,
       maxAttempts: bookingExternalEvents.maxAttempts,
     })
     .from(bookingExternalEvents)
     .where(eq(bookingExternalEvents.bookingId, input.bookingId));
 
-  const existingByProvider = new Map(existingRows.map((row) => [row.provider, row]));
+  const existingByConnectionId = new Map(
+    existingRows
+      .filter((row) => row.connectionId)
+      .map((row) => [row.connectionId as string, row]),
+  );
   const payload =
     input.operation === 'reschedule' && input.rescheduleTarget
       ? { rescheduleTarget: input.rescheduleTarget }
@@ -130,7 +135,7 @@ export const enqueueCalendarWritebacksForBooking = async (
       continue;
     }
 
-    const existing = existingByProvider.get(connection.provider);
+    const existing = existingByConnectionId.get(connection.id);
     if (existing) {
       await db
         .update(bookingExternalEvents)

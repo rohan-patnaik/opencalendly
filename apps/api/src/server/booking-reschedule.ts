@@ -157,7 +157,8 @@ export const rescheduleBooking = async (
         email,
         username,
         display_name as "displayName",
-        timezone
+        timezone,
+        onboarding_completed as "onboardingCompleted"
       from users
       where id = ${booking.organizerId}
       for update
@@ -331,6 +332,7 @@ export const rescheduleBooking = async (
         username: users.username,
         displayName: users.displayName,
         timezone: users.timezone,
+        onboardingCompleted: users.onboardingCompleted,
       })
       .from(users)
       .where(eq(users.id, insertedBooking.organizerId))
