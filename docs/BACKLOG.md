@@ -1,5 +1,27 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 80 (PR#TBD): Surface real booking email status and calendar connect actions
+
+Scope:
+
+- Return the initial booking confirmation email send result in public booking responses instead of a background-only placeholder.
+- Make Google and Microsoft calendar connect controls obvious from the signed-in organizer shell without requiring users to discover the Calendars section first.
+- Keep the change scoped to booking response behavior, organizer UX, tests, and docs.
+
+Acceptance criteria:
+
+- `POST /v0/bookings` returns the actual initial booking confirmation email send result (`sent`/`failed`) in the success payload.
+- `POST /v0/team-bookings` returns the same real initial booking confirmation email send result shape.
+- Public booking UI surfaces the real delivery outcome already present in the response instead of always showing a queued-only message.
+- The organizer shell exposes prominent Google and Microsoft calendar connect actions from the main signed-in surface.
+- The organizer shell also links directly to the dedicated calendar integrations section.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 79 (PR#TBD): Fix final booking review gaps
 
 Scope:

@@ -83,6 +83,28 @@
   gap: 0.7rem;
 }
 
+.integrationCallout {
+  margin-top: 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 10%, transparent), transparent 55%),
+    var(--bg-elevated);
+  padding: var(--spacing-4);
+  display: grid;
+  gap: 0.8rem;
+}
+
+.integrationCopy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.integrationCopy h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
 .consoleLayout {
   display: grid;
   gap: 0.7rem;

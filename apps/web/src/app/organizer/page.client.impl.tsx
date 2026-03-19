@@ -167,6 +167,11 @@ export default function OrganizerConsolePageClient({
         demoQuotaLoading={demoQuotaLoading}
         demoQuotaError={demoQuotaError}
         refreshDemoQuota={refreshDemoQuota}
+        calendarStatuses={organizer.state.calendarStatuses}
+        isBusy={busy.isBusy}
+        beginBusy={busy.beginBusy}
+        endBusy={busy.endBusy}
+        setPanelError={setPanelError}
         styles={styles}
       />
 

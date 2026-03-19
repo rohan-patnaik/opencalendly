@@ -6,11 +6,10 @@ import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { actionTokenMap, buildActionUrls } from '../server/booking-action-links';
 import {
   queueBookingCreatedSideEffects,
-  queuedEmailDelivery,
   sendBookingCreatedEmailSideEffects,
 } from '../server/booking-side-effects';
-import { jsonError, normalizeTimezone, queueBackgroundTask } from '../server/core';
-import { withConnectedDatabase, withDatabase } from '../server/database';
+import { jsonError, normalizeTimezone } from '../server/core';
+import { withDatabase } from '../server/database';
 import {
   jsonDemoQuotaError,
   requiresLaunchDemoAuthForUserRoute,
@@ -130,26 +129,13 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
           timezone,
           actionUrls,
         });
-        queueBackgroundTask(
-          context,
-          withConnectedDatabase(context, async (backgroundDb) => {
-            await sendBookingCreatedEmailSideEffects(context.env, backgroundDb, {
-              booking: result.booking,
-              eventType: result.eventType,
-              organizerDisplayName: result.eventType.organizerDisplayName,
-              timezone,
-              actionUrls,
-            });
-          }).catch((error) => {
-            emitAuditEvent({
-              event: 'booking_side_effect_failed',
-              level: 'error',
-              route: '/v0/bookings',
-              bookingId: result.booking.id,
-              error: sanitizeErrorForAudit(error, 'booking_confirmation_email_failed'),
-            });
-          }),
-        );
+        const email = await sendBookingCreatedEmailSideEffects(context.env, db, {
+          booking: result.booking,
+          eventType: result.eventType,
+          organizerDisplayName: result.eventType.organizerDisplayName,
+          timezone,
+          actionUrls,
+        });
 
         const responseBody: Record<string, unknown> = {
           ok: true,
@@ -178,7 +164,7 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
               url: actionUrls.rescheduleUrl,
             },
           },
-          email: queuedEmailDelivery,
+          email,
           notifications: { queued: result.queuedNotifications },
           webhooks: { queued: sideEffects.queuedWebhookDeliveries },
           calendarWriteback: sideEffects.calendarWriteback,

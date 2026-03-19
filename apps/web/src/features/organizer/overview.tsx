@@ -4,8 +4,11 @@ import Link from 'next/link';
 
 import { DemoQuotaCard } from '../../components/demo-quota-card';
 import { Button, LinkButton, Toast } from '../../components/ui';
+import type { CalendarConnectionStatus } from '../../lib/organizer-api';
 import type { AuthSession } from '../../lib/auth-session';
 import type { DemoQuotaStatusResponse } from '../../lib/demo-quota';
+import { CalendarConnectActions } from './calendar-connect-actions';
+import { buildCalendarConnectionSummary } from './calendar-connect';
 import { organizerSections } from './utils';
 
 type OrganizerStyles = Record<string, string>;
@@ -25,6 +28,11 @@ export const OrganizerHero = ({
   demoQuotaLoading,
   demoQuotaError,
   refreshDemoQuota,
+  calendarStatuses,
+  isBusy,
+  beginBusy,
+  endBusy,
+  setPanelError,
   styles,
 }: {
   apiBaseUrl: string;
@@ -41,8 +49,16 @@ export const OrganizerHero = ({
   demoQuotaLoading: boolean;
   demoQuotaError: string | null;
   refreshDemoQuota: () => Promise<unknown> | void;
+  calendarStatuses: CalendarConnectionStatus[];
+  isBusy: (action: string) => boolean;
+  beginBusy: (action: string) => void;
+  endBusy: (action: string) => void;
+  setPanelError: (message: string | null) => void;
   styles: OrganizerStyles;
 }) => {
+  const connectedCalendars = calendarStatuses.filter((status) => status.connected).length;
+  const calendarSummary = buildCalendarConnectionSummary(calendarStatuses);
+
   return (
     <>
       <section className={styles.heroCard}>
@@ -73,6 +89,29 @@ export const OrganizerHero = ({
         {globalError ? <Toast variant="error">{globalError}</Toast> : null}
         {panelError ? <Toast variant="error">{panelError}</Toast> : null}
         {panelMessage ? <Toast variant="success">{panelMessage}</Toast> : null}
+
+        <div className={styles.integrationCallout}>
+          <div className={styles.integrationCopy}>
+            <p className={styles.kicker}>Calendar integrations</p>
+            <h2>Connect Google and Microsoft from here</h2>
+            <p>{calendarSummary}</p>
+            <p className={styles.helperText}>
+              {connectedCalendars === 0
+                ? 'Start with one provider so busy time blocks bookings and new bookings can write back.'
+                : 'Add more providers or open the dedicated integrations section to tune sync and writeback preferences.'}
+            </p>
+          </div>
+          <CalendarConnectActions
+            apiBaseUrl={apiBaseUrl}
+            session={session}
+            isBusy={isBusy}
+            beginBusy={beginBusy}
+            endBusy={endBusy}
+            setPanelError={setPanelError}
+            styles={styles}
+            includeManageLink
+          />
+        </div>
       </section>
 
       <section className={styles.card}>
