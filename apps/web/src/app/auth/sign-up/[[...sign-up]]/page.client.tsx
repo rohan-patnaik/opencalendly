@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { LinkButton, PageShell, Toast } from '../../../../components/ui';
+import { resolvePostAuthRoute } from '../../../../lib/post-auth-route';
 import { useAuthSession } from '../../../../lib/use-auth-session';
 import uiStyles from '../../../../components/ui/primitives.module.css';
 import styles from '../../shared.module.css';
@@ -17,12 +18,13 @@ export default function SignUpPageClient() {
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
   const [sessionBridgeTimedOut, setSessionBridgeTimedOut] = useState(false);
   const [sessionBridgeRetryKey, setSessionBridgeRetryKey] = useState(0);
+  const destination = session ? resolvePostAuthRoute(session.user.onboardingCompleted) : '/onboarding';
 
   useEffect(() => {
     if (isLoaded && isSignedIn && sessionReady && session) {
-      router.replace('/dashboard');
+      router.replace(destination);
     }
-  }, [isLoaded, isSignedIn, router, session, sessionReady]);
+  }, [destination, isLoaded, isSignedIn, router, session, sessionReady]);
 
   useEffect(() => {
     if (!(isLoaded && isSignedIn && sessionReady && !session)) {
@@ -70,8 +72,8 @@ export default function SignUpPageClient() {
           path="/auth/sign-up"
           routing="path"
           signInUrl="/auth/sign-in"
-          forceRedirectUrl="/auth/sign-in"
-          fallbackRedirectUrl="/auth/sign-in"
+          forceRedirectUrl="/onboarding"
+          fallbackRedirectUrl="/onboarding"
           appearance={{
             elements: {
               footer: styles.clerkFooterHidden,

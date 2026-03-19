@@ -2,8 +2,10 @@
 
 import { useEffect } from 'react';
 import { useClerk } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 
 import { Card, PageShell } from '../../components/ui';
+import { resolvePostAuthRoute } from '../../lib/post-auth-route';
 import { useAuthSession } from '../../lib/use-auth-session';
 import {
   DashboardFilters,
@@ -23,6 +25,7 @@ type DashboardPageClientProps = {
 };
 
 export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientProps) {
+  const router = useRouter();
   const { session, ready, clear } = useAuthSession();
   const { signOut } = useClerk();
   const { authChecking, authError, authedUser, signOutError, handleSignOut } = useDashboardSession({
@@ -39,6 +42,12 @@ export default function DashboardPageClient({ apiBaseUrl }: DashboardPageClientP
       dashboard.clearData();
     }
   }, [dashboard, session]);
+
+  useEffect(() => {
+    if (authedUser && !authedUser.onboardingCompleted) {
+      router.replace(resolvePostAuthRoute(false));
+    }
+  }, [authedUser, router]);
 
   if (!ready || authChecking) {
     return (

@@ -45,6 +45,7 @@ export const registerAuthRoutes = (app: ApiApp): void => {
           username: users.username,
           displayName: users.displayName,
           timezone: users.timezone,
+          onboardingCompleted: users.onboardingCompleted,
         })
         .from(users)
         .where(eq(users.email, requestedEmail))

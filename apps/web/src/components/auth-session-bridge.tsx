@@ -26,6 +26,7 @@ type ClerkExchangeResponse = {
     username: string;
     displayName: string;
     timezone: string;
+    onboardingCompleted: boolean;
   };
   error?: string;
 };
@@ -149,7 +150,8 @@ export default function AuthSessionBridge() {
         typeof maybeUser.email === 'string' &&
         typeof maybeUser.username === 'string' &&
         typeof maybeUser.displayName === 'string' &&
-        typeof maybeUser.timezone === 'string';
+        typeof maybeUser.timezone === 'string' &&
+        typeof maybeUser.onboardingCompleted === 'boolean';
 
       if (!response.ok) {
         const error = new Error(payload?.error || 'Unable to exchange Clerk session.') as Error & {

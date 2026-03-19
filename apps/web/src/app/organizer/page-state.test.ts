@@ -10,6 +10,7 @@ describe('getOrganizerConsolePageState', () => {
       username: 'user-123',
       displayName: 'User 123',
       timezone: 'Asia/Kolkata',
+      onboardingCompleted: true,
     },
   };
 
@@ -19,6 +20,7 @@ describe('getOrganizerConsolePageState', () => {
     username: 'user-123',
     displayName: 'User 123',
     timezone: 'Asia/Kolkata',
+    onboardingCompleted: true,
   };
 
   it('shows auth loading until auth settles', () => {

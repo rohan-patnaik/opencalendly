@@ -4,6 +4,7 @@ export type DashboardUser = {
   username: string;
   displayName: string;
   timezone: string;
+  onboardingCompleted: boolean;
 };
 
 export type AuthMeResponse = {

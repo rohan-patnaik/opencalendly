@@ -135,12 +135,25 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           .select({
             id: calendarConnections.id,
             refreshTokenEncrypted: calendarConnections.refreshTokenEncrypted,
+            useForConflictChecks: calendarConnections.useForConflictChecks,
+            useForWriteback: calendarConnections.useForWriteback,
           })
           .from(calendarConnections)
           .where(
             and(
-              eq(calendarConnections.userId, authedUser.id),
               eq(calendarConnections.provider, MICROSOFT_CALENDAR_PROVIDER),
+              eq(calendarConnections.externalAccountId, profile.sub),
+            ),
+          )
+          .limit(1);
+
+        const [existingWritebackConnection] = await db
+          .select({ id: calendarConnections.id })
+          .from(calendarConnections)
+          .where(
+            and(
+              eq(calendarConnections.userId, authedUser.id),
+              eq(calendarConnections.useForWriteback, true),
             ),
           )
           .limit(1);
@@ -171,18 +184,25 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
               refreshTokenEncrypted,
               accessTokenExpiresAt,
               scope: tokenPayload.scope ?? null,
+              useForConflictChecks: existingConnection?.useForConflictChecks ?? true,
+              useForWriteback:
+                existingConnection?.useForWriteback ?? !existingWritebackConnection,
               lastError: null,
               updatedAt: now,
             })
             .onConflictDoUpdate({
-              target: [calendarConnections.userId, calendarConnections.provider],
+              target: [calendarConnections.provider, calendarConnections.externalAccountId],
               set: {
+                userId: authedUser.id,
                 externalAccountId: profile.sub,
                 externalEmail: profile.email ?? null,
                 accessTokenEncrypted: encryptSecret(tokenPayload.access_token, encryptionSecret),
                 refreshTokenEncrypted,
                 accessTokenExpiresAt,
                 scope: tokenPayload.scope ?? null,
+                useForConflictChecks: existingConnection?.useForConflictChecks ?? true,
+                useForWriteback:
+                  existingConnection?.useForWriteback ?? !existingWritebackConnection,
                 lastError: null,
                 updatedAt: now,
               },
@@ -201,7 +221,10 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
 
         const [connection] = await db
           .select({
+            id: calendarConnections.id,
             externalEmail: calendarConnections.externalEmail,
+            useForConflictChecks: calendarConnections.useForConflictChecks,
+            useForWriteback: calendarConnections.useForWriteback,
             lastSyncedAt: calendarConnections.lastSyncedAt,
             nextSyncAt: calendarConnections.nextSyncAt,
             lastError: calendarConnections.lastError,
@@ -209,8 +232,8 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           .from(calendarConnections)
           .where(
             and(
-              eq(calendarConnections.userId, authedUser.id),
               eq(calendarConnections.provider, MICROSOFT_CALENDAR_PROVIDER),
+              eq(calendarConnections.externalAccountId, profile.sub),
             ),
           )
           .limit(1);
@@ -242,8 +265,11 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
         return context.json({
           ok: true,
           connection: toCalendarConnectionStatus({
+            id: connection.id,
             provider: MICROSOFT_CALENDAR_PROVIDER,
             externalEmail: connection.externalEmail,
+            useForConflictChecks: connection.useForConflictChecks,
+            useForWriteback: connection.useForWriteback,
             lastSyncedAt: connection.lastSyncedAt,
             nextSyncAt: connection.nextSyncAt,
             lastError: connection.lastError,

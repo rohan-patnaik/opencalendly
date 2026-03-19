@@ -94,9 +94,11 @@ export const OrganizerHero = ({
 
 export const OrganizerSidebar = ({
   organizerSummary,
+  activeSection,
   styles,
 }: {
   organizerSummary: Array<{ label: string; value: string }>;
+  activeSection: string;
   styles: OrganizerStyles;
 }) => {
   return (
@@ -104,10 +106,20 @@ export const OrganizerSidebar = ({
       <div className={styles.sectionNav}>
         <p className={styles.sectionNavTitle}>Console sections</p>
         {organizerSections.map((section) => (
-          <a key={section.id} className={styles.sectionNavLink} href={`#${section.id}`}>
+          <Link
+            key={section.id}
+            className={`${styles.sectionNavLink} ${activeSection === section.id ? styles.sectionNavLinkActive : ''}`.trim()}
+            href={section.id === 'event-types' ? '/organizer' : `/organizer/${section.id}`}
+          >
             {section.label}
-          </a>
+          </Link>
         ))}
+        <Link
+          className={`${styles.sectionNavLink} ${activeSection === 'analytics' ? styles.sectionNavLinkActive : ''}`.trim()}
+          href="/dashboard"
+        >
+          Analytics
+        </Link>
       </div>
 
       <div className={styles.summaryGrid}>

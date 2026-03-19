@@ -1,11 +1,11 @@
-import { authedGetJson, authedPostJson } from '../api-client';
+import { authedGetJson, authedPatchJson, authedPostJson } from '../api-client';
 import type { AuthSession } from '../auth-session';
 import { organizerApiFallback as fallback } from './fallback';
-import type { CalendarProviderStatus, WritebackStatus } from './types';
+import type { CalendarConnectionStatus, WritebackStatus } from './types';
 
 export const organizerCalendarApi = {
   getCalendarSyncStatus: async (apiBaseUrl: string, session: AuthSession | null) => {
-    return authedGetJson<{ ok: true; providers: CalendarProviderStatus[] }>({
+    return authedGetJson<{ ok: true; availableProviders: Array<'google' | 'microsoft'>; connections: CalendarConnectionStatus[] }>({
       url: `${apiBaseUrl}/v0/calendar/sync/status`,
       session,
       fallbackError: fallback.calendarStatus,
@@ -44,52 +44,12 @@ export const organizerCalendarApi = {
   ) => {
     return authedPostJson<{
       ok: true;
-      connection: CalendarProviderStatus;
+      connection: CalendarConnectionStatus;
     }>({
       url: `${apiBaseUrl}/v0/calendar/google/connect/complete`,
       session,
       body,
       fallbackError: fallback.calendarGoogleConnectComplete,
-    });
-  },
-
-  disconnectGoogle: async (apiBaseUrl: string, session: AuthSession | null) => {
-    return authedPostJson<{
-      ok: true;
-      provider: 'google';
-      disconnected: boolean;
-    }>({
-      url: `${apiBaseUrl}/v0/calendar/google/disconnect`,
-      session,
-      body: {},
-      fallbackError: fallback.calendarGoogleDisconnect,
-    });
-  },
-
-  syncGoogle: async (
-    apiBaseUrl: string,
-    session: AuthSession | null,
-    body?: {
-      start?: string;
-      end?: string;
-    },
-  ) => {
-    return authedPostJson<{
-      ok: true;
-      provider: 'google';
-      syncWindow: {
-        startIso: string;
-        endIso: string;
-      };
-      busyWindowCount: number;
-      refreshedAccessToken: boolean;
-      lastSyncedAt: string;
-      nextSyncAt: string;
-    }>({
-      url: `${apiBaseUrl}/v0/calendar/google/sync`,
-      session,
-      body,
-      fallbackError: fallback.calendarGoogleSync,
     });
   },
 
@@ -125,7 +85,7 @@ export const organizerCalendarApi = {
   ) => {
     return authedPostJson<{
       ok: true;
-      connection: CalendarProviderStatus;
+      connection: CalendarConnectionStatus;
     }>({
       url: `${apiBaseUrl}/v0/calendar/microsoft/connect/complete`,
       session,
@@ -134,22 +94,27 @@ export const organizerCalendarApi = {
     });
   },
 
-  disconnectMicrosoft: async (apiBaseUrl: string, session: AuthSession | null) => {
+  disconnectConnection: async (
+    apiBaseUrl: string,
+    session: AuthSession | null,
+    connectionId: string,
+  ) => {
     return authedPostJson<{
       ok: true;
-      provider: 'microsoft';
+      connectionId: string;
       disconnected: boolean;
     }>({
-      url: `${apiBaseUrl}/v0/calendar/microsoft/disconnect`,
+      url: `${apiBaseUrl}/v0/calendar/connections/${encodeURIComponent(connectionId)}/disconnect`,
       session,
       body: {},
-      fallbackError: fallback.calendarMicrosoftDisconnect,
+      fallbackError: fallback.calendarConnectionDisconnect,
     });
   },
 
-  syncMicrosoft: async (
+  syncConnection: async (
     apiBaseUrl: string,
     session: AuthSession | null,
+    connectionId: string,
     body?: {
       start?: string;
       end?: string;
@@ -157,7 +122,7 @@ export const organizerCalendarApi = {
   ) => {
     return authedPostJson<{
       ok: true;
-      provider: 'microsoft';
+      provider: 'google' | 'microsoft';
       syncWindow: {
         startIso: string;
         endIso: string;
@@ -166,11 +131,32 @@ export const organizerCalendarApi = {
       refreshedAccessToken: boolean;
       lastSyncedAt: string;
       nextSyncAt: string;
+      connection: CalendarConnectionStatus;
     }>({
-      url: `${apiBaseUrl}/v0/calendar/microsoft/sync`,
+      url: `${apiBaseUrl}/v0/calendar/connections/${encodeURIComponent(connectionId)}/sync`,
       session,
       body,
-      fallbackError: fallback.calendarMicrosoftSync,
+      fallbackError: fallback.calendarConnectionSync,
+    });
+  },
+
+  updateCalendarConnectionPreferences: async (
+    apiBaseUrl: string,
+    session: AuthSession | null,
+    connectionId: string,
+    body: {
+      useForConflictChecks?: boolean;
+      useForWriteback?: boolean;
+    },
+  ) => {
+    return authedPatchJson<{
+      ok: true;
+      connection: CalendarConnectionStatus;
+    }>({
+      url: `${apiBaseUrl}/v0/calendar/connections/${encodeURIComponent(connectionId)}/preferences`,
+      session,
+      body,
+      fallbackError: fallback.calendarConnectionPreferences,
     });
   },
 

@@ -99,6 +99,7 @@ export const users = pgTable('users', {
   username: varchar('username', { length: 64 }).notNull().unique(),
   displayName: varchar('display_name', { length: 120 }).notNull(),
   timezone: varchar('timezone', { length: 80 }).notNull().default('UTC'),
+  onboardingCompleted: boolean('onboarding_completed').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -791,6 +792,8 @@ export const calendarConnections = pgTable(
     refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
     accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }).notNull(),
     scope: text('scope'),
+    useForConflictChecks: boolean('use_for_conflict_checks').notNull().default(true),
+    useForWriteback: boolean('use_for_writeback').notNull().default(false),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
     nextSyncAt: timestamp('next_sync_at', { withTimezone: true }),
     lastError: text('last_error'),
@@ -798,12 +801,16 @@ export const calendarConnections = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    uniqueUserProvider: unique('calendar_connections_user_provider_unique').on(
-      table.userId,
+    uniqueProviderExternalAccount: unique('calendar_connections_provider_external_account_unique').on(
       table.provider,
+      table.externalAccountId,
     ),
-    uniqueIdProvider: unique('calendar_connections_id_provider_unique').on(table.id, table.provider),
     userProviderIndex: index('calendar_connections_user_provider_idx').on(table.userId, table.provider),
+    userWritebackIndex: index('calendar_connections_user_writeback_idx').on(table.userId, table.useForWriteback),
+    userConflictChecksIndex: index('calendar_connections_user_conflict_checks_idx').on(
+      table.userId,
+      table.useForConflictChecks,
+    ),
   }),
 );
 
@@ -877,9 +884,9 @@ export const bookingExternalEvents = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    uniqueBookingProvider: unique('booking_external_events_booking_provider_unique').on(
+    uniqueBookingConnection: unique('booking_external_events_booking_connection_unique').on(
       table.bookingId,
-      table.provider,
+      table.connectionId,
     ),
     organizerStatusNextAttemptIndex: index(
       'booking_external_events_organizer_status_next_attempt_idx',
@@ -889,11 +896,11 @@ export const bookingExternalEvents = pgTable(
       table.nextAttemptAt,
     ),
     connectionIndex: index('booking_external_events_connection_idx').on(table.connectionId),
-    connectionProviderFk: foreignKey({
-      columns: [table.connectionId, table.provider],
-      foreignColumns: [calendarConnections.id, calendarConnections.provider],
-      name: 'booking_external_events_connection_provider_fk',
-    }).onDelete('no action'),
+    connectionFk: foreignKey({
+      columns: [table.connectionId],
+      foreignColumns: [calendarConnections.id],
+      name: 'booking_external_events_connection_fk',
+    }).onDelete('set null'),
     attemptCountCheck: check('booking_external_events_attempt_count_check', sql`${table.attemptCount} >= 0`),
     maxAttemptsCheck: check('booking_external_events_max_attempts_check', sql`${table.maxAttempts} >= 1`),
   }),

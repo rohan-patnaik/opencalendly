@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { Card, LinkButton, PageShell, Toast } from '../../../../components/ui';
+import { resolvePostAuthRoute } from '../../../../lib/post-auth-route';
 import { useAuthSession } from '../../../../lib/use-auth-session';
 import uiStyles from '../../../../components/ui/primitives.module.css';
 import styles from '../../shared.module.css';
@@ -38,12 +39,13 @@ export default function SignInPageClient() {
   const { ready: sessionReady, session } = useAuthSession();
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
   const redirectPath = sanitizeRedirectPath(searchParams.get('redirect_url'));
+  const destination = session ? resolvePostAuthRoute(session.user.onboardingCompleted) : redirectPath;
 
   useEffect(() => {
     if (isLoaded && isSignedIn && sessionReady && session) {
-      router.replace(redirectPath);
+      router.replace(searchParams.get('redirect_url') ? redirectPath : destination);
     }
-  }, [isLoaded, isSignedIn, redirectPath, router, session, sessionReady]);
+  }, [destination, isLoaded, isSignedIn, redirectPath, router, searchParams, session, sessionReady]);
 
   if (!clerkPublishableKey) {
     return (

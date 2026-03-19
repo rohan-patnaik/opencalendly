@@ -10,6 +10,7 @@ const buildSession = (expiresAt: string): AuthSession => ({
     username: 'user',
     displayName: 'User',
     timezone: 'Asia/Kolkata',
+    onboardingCompleted: true,
   },
 });
 

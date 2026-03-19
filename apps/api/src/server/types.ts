@@ -52,6 +52,7 @@ export type AuthenticatedUser = {
   username: string;
   displayName: string;
   timezone: string;
+  onboardingCompleted: boolean;
 };
 export type SessionUserRecord = {
   id: string;
@@ -59,6 +60,7 @@ export type SessionUserRecord = {
   username: string;
   displayName: string;
   timezone: string;
+  onboardingCompleted: boolean;
 };
 export type BookingActionType = 'cancel' | 'reschedule';
 export type LockedActionToken = {
@@ -86,6 +88,7 @@ export type OrganizerProfile = {
   username: string;
   displayName: string;
   timezone: string;
+  onboardingCompleted: boolean;
 };
 export type EventTypeProfile = {
   id: string;
@@ -199,9 +202,12 @@ export type TeamMemberScheduleRecord = {
 };
 export type CalendarProvider = 'google' | 'microsoft';
 export type CalendarConnectionStatus = {
+  id: string;
   provider: CalendarProvider;
   connected: boolean;
   externalEmail: string | null;
+  useForConflictChecks: boolean;
+  useForWriteback: boolean;
   lastSyncedAt: string | null;
   nextSyncAt: string | null;
   lastError: string | null;

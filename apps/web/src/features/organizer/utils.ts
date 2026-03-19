@@ -9,8 +9,11 @@ export const organizerSections = [
   { id: 'teams', label: 'Teams' },
   { id: 'webhooks', label: 'Webhooks' },
   { id: 'calendars', label: 'Calendars' },
+  { id: 'profile', label: 'Profile' },
   { id: 'writeback', label: 'Writeback queue' },
 ] as const;
+
+export type OrganizerSectionId = (typeof organizerSections)[number]['id'];
 
 export const toClockTime = (minuteOfDay: number): string => {
   const clamped = Math.max(0, Math.min(1439, minuteOfDay));

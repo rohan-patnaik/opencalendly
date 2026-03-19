@@ -143,6 +143,12 @@
   transform: translateY(-1px);
 }
 
+.sectionNavLinkActive {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: var(--on-brand);
+}
+
 .summaryGrid {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);

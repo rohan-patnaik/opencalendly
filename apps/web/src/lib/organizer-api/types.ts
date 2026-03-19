@@ -129,10 +129,13 @@ export type OrganizerWebhook = {
   updatedAt: string;
 };
 
-export type CalendarProviderStatus = {
+export type CalendarConnectionStatus = {
+  id: string;
   provider: 'google' | 'microsoft';
   connected: boolean;
   externalEmail: string | null;
+  useForConflictChecks: boolean;
+  useForWriteback: boolean;
   lastSyncedAt: string | null;
   nextSyncAt: string | null;
   lastError: string | null;

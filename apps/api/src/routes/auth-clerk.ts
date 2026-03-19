@@ -214,6 +214,7 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
           username: users.username,
           displayName: users.displayName,
           timezone: users.timezone,
+          onboardingCompleted: users.onboardingCompleted,
         })
         .from(users)
         .where(eq(users.email, email))
@@ -235,6 +236,7 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
           username: existing.username,
           displayName: nextDisplayName,
           timezone: normalizeTimezone(nextTimezone),
+          onboardingCompleted: existing.onboardingCompleted,
         };
       } else {
         const timezone = requestedTimezone ?? 'UTC';
@@ -272,13 +274,20 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
           try {
             const [inserted] = await db
               .insert(users)
-              .values({ email, username, displayName: resolvedDisplayName, timezone })
+              .values({
+                email,
+                username,
+                displayName: resolvedDisplayName,
+                timezone,
+                onboardingCompleted: false,
+              })
               .returning({
                 id: users.id,
                 email: users.email,
                 username: users.username,
                 displayName: users.displayName,
                 timezone: users.timezone,
+                onboardingCompleted: users.onboardingCompleted,
               });
 
             if (inserted) {
@@ -300,6 +309,7 @@ export const registerClerkAuthRoutes = (app: ApiApp): void => {
                 username: users.username,
                 displayName: users.displayName,
                 timezone: users.timezone,
+                onboardingCompleted: users.onboardingCompleted,
               })
               .from(users)
               .where(eq(users.email, email))

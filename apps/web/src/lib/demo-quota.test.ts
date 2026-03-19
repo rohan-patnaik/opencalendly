@@ -13,6 +13,7 @@ const buildSession = (): AuthSession => ({
     username: 'demo',
     displayName: 'Demo User',
     timezone: 'Asia/Kolkata',
+    onboardingCompleted: true,
   },
 });
 

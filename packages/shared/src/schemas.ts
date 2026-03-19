@@ -106,6 +106,16 @@ export const clerkAuthExchangeRequestSchema = z.object({
   timezone: timezoneSchema.optional(),
 });
 
+export const profileUpdateSchema = z
+  .object({
+    username: usernameSchema.optional(),
+    displayName: z.string().min(1).max(120).optional(),
+    timezone: timezoneSchema.optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field is required.',
+  });
+
 export const devAuthBootstrapRequestSchema = z.object({
   email: emailSchema.optional(),
 });
@@ -312,6 +322,17 @@ export const calendarSyncRequestSchema = z
     },
   );
 
+export const calendarConnectionPreferencesUpdateSchema = z
+  .object({
+    useForConflictChecks: z.boolean().optional(),
+    useForWriteback: z.boolean().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field is required.',
+  });
+
+export const onboardingCompleteSchema = z.object({});
+
 export const calendarWritebackRunSchema = z.object({
   limit: z.number().int().min(1).max(100).optional(),
 });
@@ -389,6 +410,7 @@ export const webhookEventSchema = z.object({
 
 export type HealthCheck = z.infer<typeof healthCheckSchema>;
 export type ClerkAuthExchangeRequest = z.infer<typeof clerkAuthExchangeRequestSchema>;
+export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
 export type BookingActionToken = z.infer<typeof bookingActionTokenSchema>;
 export type BookingActionType = z.infer<typeof bookingActionTypeSchema>;
 export type EventTypeCreateInput = z.infer<typeof eventTypeCreateSchema>;
@@ -422,7 +444,11 @@ export type CalendarProvider = z.infer<typeof calendarProviderSchema>;
 export type CalendarConnectStartInput = z.infer<typeof calendarConnectStartSchema>;
 export type CalendarConnectCompleteInput = z.infer<typeof calendarConnectCompleteSchema>;
 export type CalendarSyncRequestInput = z.infer<typeof calendarSyncRequestSchema>;
+export type CalendarConnectionPreferencesUpdateInput = z.infer<
+  typeof calendarConnectionPreferencesUpdateSchema
+>;
 export type CalendarWritebackRunInput = z.infer<typeof calendarWritebackRunSchema>;
+export type OnboardingCompleteInput = z.infer<typeof onboardingCompleteSchema>;
 export type AnalyticsFunnelStage = z.infer<typeof analyticsFunnelStageSchema>;
 export type AnalyticsTrackFunnelEventInput = z.infer<typeof analyticsTrackFunnelEventSchema>;
 export type AnalyticsRangeQueryInput = z.infer<typeof analyticsRangeQuerySchema>;

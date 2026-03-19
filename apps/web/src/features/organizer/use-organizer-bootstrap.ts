@@ -85,7 +85,7 @@ export const useOrganizerBootstrap = ({
         timeOffBlocks: timeOffPayload.timeOffBlocks,
         teams: teamPayload.teams,
         webhooks: webhookPayload.webhooks,
-        calendarStatuses: calendarPayload.providers,
+        calendarStatuses: calendarPayload.connections,
         writebackStatus: {
           summary: writebackPayload.summary,
           failures: writebackPayload.failures,

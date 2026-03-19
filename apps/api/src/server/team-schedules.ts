@@ -6,6 +6,7 @@ import {
   availabilityRules,
   bookings,
   calendarBusyWindows,
+  calendarConnections,
   teamBookingAssignments,
   timeOffBlocks,
   users,
@@ -25,9 +26,11 @@ export const listExternalBusyWindowsForUser = async (
   return db
     .select({ startsAt: calendarBusyWindows.startsAt, endsAt: calendarBusyWindows.endsAt })
     .from(calendarBusyWindows)
+    .innerJoin(calendarConnections, eq(calendarConnections.id, calendarBusyWindows.connectionId))
     .where(
       and(
         eq(calendarBusyWindows.userId, userId),
+        eq(calendarConnections.useForConflictChecks, true),
         lt(calendarBusyWindows.startsAt, rangeEnd),
         gt(calendarBusyWindows.endsAt, rangeStart),
       ),
@@ -109,9 +112,11 @@ export const listTeamMemberSchedules = async (
         endsAt: calendarBusyWindows.endsAt,
       })
       .from(calendarBusyWindows)
+      .innerJoin(calendarConnections, eq(calendarConnections.id, calendarBusyWindows.connectionId))
       .where(
         and(
           inArray(calendarBusyWindows.userId, uniqueMemberIds),
+          eq(calendarConnections.useForConflictChecks, true),
           lt(calendarBusyWindows.startsAt, rangeEnd),
           gt(calendarBusyWindows.endsAt, rangeStart),
         ),

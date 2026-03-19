@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { organizerApi } from '../lib/organizer-api';
+import { resolvePostAuthRoute } from '../lib/post-auth-route';
 import { useAuthSession } from '../lib/use-auth-session';
 import styles from './calendar-connect-callback.module.css';
 
@@ -27,6 +28,7 @@ export default function CalendarConnectCallback({
 
   const providerLabel = provider === 'google' ? 'Google Calendar' : 'Microsoft Calendar';
   const callbackPath = provider === 'google' ? '/settings/calendar/google/callback' : '/settings/calendar/microsoft/callback';
+  const organizerTarget = session ? resolvePostAuthRoute(session.user.onboardingCompleted) : '/organizer';
 
   const search = useMemo(
     () => ({
@@ -121,7 +123,7 @@ export default function CalendarConnectCallback({
             <Link className={styles.primaryButton} href="/auth/sign-in">
               Sign in
             </Link>
-            <Link className={styles.secondaryButton} href="/organizer">
+            <Link className={styles.secondaryButton} href={organizerTarget}>
               Back to organizer console
             </Link>
           </div>
@@ -151,7 +153,7 @@ export default function CalendarConnectCallback({
         ) : null}
 
         <div className={styles.actions}>
-          <Link className={styles.primaryButton} href="/organizer">
+          <Link className={styles.primaryButton} href={organizerTarget}>
             Back to organizer console
           </Link>
           <Link className={styles.secondaryButton} href="/dashboard">
