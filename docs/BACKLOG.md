@@ -1,5 +1,23 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 74 (PR#TBD): Fix Cloudflare Pages deploy for organizer section route
+
+Scope:
+
+- Restore production web deploys after the Cal.com-inspired organizer routing change introduced a non-edge dynamic route.
+- Keep the fix scoped to the Cloudflare Pages requirement for `/organizer/[section]`.
+
+Acceptance criteria:
+
+- `/organizer/[section]` explicitly exports `runtime = 'edge'`.
+- `node ./scripts/build-pages-output.mjs` succeeds locally for the web app.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 73 (PR#TBD): Cal.com-inspired onboarding, settings, and multi-calendar UX
 
 Scope:
