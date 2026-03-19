@@ -1,5 +1,23 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 77 (PR#TBD): Lock homepage footer license copy to GPL
+
+Scope:
+
+- Preserve the existing correct homepage footer license label.
+- Add a focused regression test so the footer cannot drift back to `MIT License`.
+
+Acceptance criteria:
+
+- The homepage footer continues to render `Open source · GPL-3.0-only`.
+- A homepage regression test fails if `MIT License` appears in the rendered footer output.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 76 (PR#TBD): Audit and fix Google/Microsoft provider flows end to end
 
 Scope:
