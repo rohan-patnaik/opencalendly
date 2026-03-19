@@ -111,3 +111,26 @@ export const createRuntimeDb = (
   cache.set(cacheKey, entry);
   return entry;
 };
+
+export const clearRuntimeDb = async (
+  databaseUrl = getDatabaseUrl(),
+  options: CreatePgClientOptions = {},
+): Promise<void> => {
+  const { enforceNeon = true } = options;
+  const cacheKey = `${enforceNeon ? 'strict' : 'relaxed'}:${databaseUrl}`;
+  const cache = getRuntimeDbCache();
+  const cached = cache.get(cacheKey);
+  if (!cached) {
+    return;
+  }
+
+  cache.delete(cacheKey);
+  await cached.client.end().catch(() => undefined);
+};
+
+export const clearAllRuntimeDbs = async (): Promise<void> => {
+  const cache = getRuntimeDbCache();
+  const entries = Array.from(cache.values());
+  cache.clear();
+  await Promise.all(entries.map((entry) => entry.client.end().catch(() => undefined)));
+};

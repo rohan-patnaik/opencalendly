@@ -25,7 +25,9 @@ export const queueBackgroundTask = (
     return;
   }
 
-  void task;
+  void task.catch((error) => {
+    console.error('background_task_failed', error);
+  });
 };
 
 export const isUuid = (value: string): boolean => {

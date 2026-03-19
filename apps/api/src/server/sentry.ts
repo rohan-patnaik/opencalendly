@@ -43,7 +43,31 @@ const createEventId = (): string => {
     return crypto.randomUUID().replace(/-/g, '');
   }
 
-  return `${Date.now().toString(16)}${Math.random().toString(16).slice(2, 18)}`.slice(0, 32);
+  let value = Date.now().toString(16);
+  while (value.length < 32) {
+    value += Math.random().toString(16).slice(2);
+  }
+  return value.slice(0, 32);
+};
+
+const parseStackFrame = (line: string) => {
+  const trimmed = line.trim();
+  const match = trimmed.match(/^at\s+(?:(.+?)\s+\()?(.+?):(\d+):(\d+)\)?$/);
+  if (!match) {
+    return { filename: trimmed };
+  }
+
+  const frameFunction = match[1] ?? '<anonymous>';
+  const frameFilename = match[2] ?? trimmed;
+  const frameLine = Number.parseInt(match[3] ?? '0', 10);
+  const frameColumn = Number.parseInt(match[4] ?? '0', 10);
+
+  return {
+    function: frameFunction,
+    filename: frameFilename,
+    lineno: frameLine,
+    colno: frameColumn,
+  };
 };
 
 const serializeError = (error: unknown) => {
@@ -53,7 +77,7 @@ const serializeError = (error: unknown) => {
       value: error.message || 'Unexpected server error',
       stacktrace: error.stack
         ? {
-            frames: error.stack.split('\n').slice(0, 30).map((line) => ({ filename: line.trim() })),
+            frames: error.stack.split('\n').slice(0, 30).map(parseStackFrame),
           }
         : undefined,
     };

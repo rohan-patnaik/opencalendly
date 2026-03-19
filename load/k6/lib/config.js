@@ -16,7 +16,7 @@ const PUBLIC_CLIENT_POOL_SIZE = Math.max(
 );
 
 const buildSyntheticClientIp = () => {
-  const bucket = ((__VU - 1) % PUBLIC_CLIENT_POOL_SIZE) + 1;
+  const bucket = (((__VU - 1) * 1000 + (__ITER || 0)) % PUBLIC_CLIENT_POOL_SIZE) + 1;
   const thirdOctet = Math.floor((bucket - 1) / 254);
   const fourthOctet = ((bucket - 1) % 254) + 1;
   return `198.51.${thirdOctet}.${fourthOctet}`;
@@ -39,6 +39,12 @@ export const buildAuthedHeaders = () => {
   };
 };
 
+export const buildPublicAuthedHeaders = () => {
+  return buildPublicHeaders(
+    __ENV.AUTH_TOKEN ? { Authorization: buildAuthedHeaders().Authorization } : {},
+  );
+};
+
 export const buildIdempotentHeaders = (scope) => ({
   ...jsonHeaders,
   'Idempotency-Key': `${scope}-${__VU}-${__ITER}-${Date.now()}`,
@@ -57,13 +63,14 @@ const buildResponseCallback = (expectedStatuses) => {
   return http.expectedStatuses(...expectedStatuses);
 };
 
-const buildRequestOptions = (params = {}) => ({
-  headers: params.headers,
-  tags: params.tags,
-  ...(buildResponseCallback(params.expectedStatuses)
-    ? { responseCallback: buildResponseCallback(params.expectedStatuses) }
-    : {}),
-});
+const buildRequestOptions = (params = {}) => {
+  const responseCallback = buildResponseCallback(params.expectedStatuses);
+  return {
+    headers: params.headers,
+    tags: params.tags,
+    ...(responseCallback ? { responseCallback } : {}),
+  };
+};
 
 export const shiftIsoByMinutes = (isoString, minutes) => {
   const base = new Date(isoString);

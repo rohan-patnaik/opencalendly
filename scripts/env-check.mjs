@@ -53,6 +53,8 @@ const PRODUCTION_ONLY_REQUIRED = {
     'Production requires a dedicated encryption key for webhook signing secrets.',
   TELEMETRY_HMAC_KEY:
     'Production requires a dedicated telemetry HMAC key so operational writes and alerts remain enabled.',
+};
+const PRODUCTION_ONLY_SENTRY = {
   SENTRY_DSN_API:
     'Production requires an API Sentry DSN so smoke exceptions and production failures are observable.',
   SENTRY_DSN_WEB:
@@ -235,6 +237,12 @@ if (isProductionValidation) {
 
     if (value.length < 32) {
       errors.push(`${key} must be at least 32 characters in production.`);
+    }
+  }
+
+  for (const [key, help] of Object.entries(PRODUCTION_ONLY_SENTRY)) {
+    if (!parsed[key]) {
+      errors.push(`${key} is empty. ${help}`);
     }
   }
 

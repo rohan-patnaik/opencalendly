@@ -148,7 +148,7 @@ export const executeWebhookDelivery = async (
       reason: targetSafety.reason,
       attempts: delivery.maxAttempts,
     });
-    void captureApiException(env, targetSafety.reason, {
+    void captureApiException(env, 'webhook_target_rejected', {
       route: 'webhook_delivery_runner',
       statusCode: 422,
       tags: { deliveryStatus: 'failed' },
@@ -156,6 +156,7 @@ export const executeWebhookDelivery = async (
         deliveryId: delivery.id,
         subscriptionId: delivery.subscriptionId,
         attempts: delivery.maxAttempts,
+        rejectionKind: 'unsafe_target',
       },
     });
 
@@ -253,7 +254,7 @@ export const executeWebhookDelivery = async (
       reason: errorMessage,
       attempts: attemptedCount,
     });
-    void captureApiException(env, errorMessage ?? 'webhook_delivery_failed', {
+    void captureApiException(env, 'webhook_delivery_failed', {
       route: 'webhook_delivery_runner',
       statusCode: responseStatus ?? 500,
       tags: { deliveryStatus: 'failed' },
@@ -261,6 +262,7 @@ export const executeWebhookDelivery = async (
         deliveryId: delivery.id,
         subscriptionId: delivery.subscriptionId,
         attempts: attemptedCount,
+        httpStatus: responseStatus,
       },
     });
     return 'failed';

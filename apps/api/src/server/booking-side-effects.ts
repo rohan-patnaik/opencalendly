@@ -8,6 +8,13 @@ import { enqueueWebhookDeliveries } from './webhook-deliveries';
 import { tryRecordAnalyticsFunnelEvent, tryRecordEmailDelivery } from './telemetry';
 import type { Bindings, Database } from './types';
 
+const buildSkippedEmailPair = (message: string) => {
+  return [
+    { sent: false, provider: 'none' as const, error: message },
+    { sent: false, provider: 'none' as const, error: message },
+  ];
+};
+
 type BookingRecord = {
   id: string;
   eventTypeId: string;
@@ -206,11 +213,7 @@ export const sendBookingCancellationEmailSideEffects = async (
   },
 ) => {
   if (input.alreadyProcessed) {
-    return {
-      sent: false,
-      provider: 'none' as const,
-      error: 'Idempotent replay: cancellation already processed.',
-    };
+    return buildSkippedEmailPair('Idempotent replay: cancellation already processed.');
   }
 
   const email = await Promise.all([
@@ -328,11 +331,7 @@ export const sendBookingRescheduleEmailSideEffects = async (
   },
 ) => {
   if (input.alreadyProcessed) {
-    return {
-      sent: false,
-      provider: 'none' as const,
-      error: 'Idempotent replay: reschedule already processed.',
-    };
+    return buildSkippedEmailPair('Idempotent replay: reschedule already processed.');
   }
 
   const email = await Promise.all([

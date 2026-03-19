@@ -5,8 +5,8 @@ import { group, sleep } from 'k6';
 import {
   apiBaseUrl,
   availabilityUrl,
-  buildAuthedHeaders,
   buildPublicHeaders,
+  buildPublicAuthedHeaders,
   buildPublicIdempotentHeaders,
   cancelPayload,
   expectStatus,
@@ -107,7 +107,7 @@ export default function smoke() {
         `${apiBaseUrl}/v0/bookings/actions/${__ENV.CANCEL_TOKEN}/cancel`,
         cancelPayload(),
         {
-          headers: buildPublicHeaders(__ENV.AUTH_TOKEN ? { Authorization: buildAuthedHeaders().Authorization } : {}),
+          headers: buildPublicAuthedHeaders(),
           tags: { flow: 'booking_action', kind: 'cancel' },
           expectedStatuses: [200, 404, 410],
         },

@@ -100,7 +100,7 @@ export const createTeamBooking = async (
       .where(eq(teams.slug, input.teamSlug))
       .limit(1);
     if (!team) {
-      throw new BookingNotFoundError('Team event type not found.');
+      throw new BookingNotFoundError('Team not found.');
     }
 
     const lockedTeamEventResult = await transaction.execute<{

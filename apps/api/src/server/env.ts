@@ -39,9 +39,9 @@ export const isNeonDatabaseUrl = (connectionString: string): boolean => {
 };
 
 export const resolveConnectionString = (env: Bindings): ConnectionConfig => {
+  const rawDevBootstrap = env.ENABLE_DEV_AUTH_BOOTSTRAP?.trim();
   const preferDirectDatabaseUrl =
-    env.ENABLE_DEV_AUTH_BOOTSTRAP?.trim().toLowerCase() === 'true' ||
-    env.ENABLE_DEV_AUTH_BOOTSTRAP?.trim() === '1';
+    rawDevBootstrap?.toLowerCase() === 'true' || rawDevBootstrap === '1';
   const databaseUrl = env.DATABASE_URL?.trim();
 
   if (preferDirectDatabaseUrl && databaseUrl) {

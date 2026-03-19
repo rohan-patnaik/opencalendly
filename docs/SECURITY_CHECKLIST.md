@@ -11,7 +11,6 @@ Last reviewed: 19 Mar 2026 (IST)
 - [x] Logs and API responses do not expose raw OAuth tokens, API keys, webhook secrets, or session tokens.
 - [x] Local/dev env validation remains permissive for optional production-only keys.
 - [x] Production env validation fails when either of these is missing:
-- [x] Production env validation fails when either of these is missing:
   - `WEBHOOK_SECRET_ENCRYPTION_KEY`
   - `TELEMETRY_HMAC_KEY`
 - [x] Production env validation also fails when observability is not explicitly configured:
