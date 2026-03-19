@@ -18,7 +18,7 @@ jobs:
   deploy-production:
     if: >
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'opencalendly-web' }}
@@ -73,9 +73,16 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           SENTRY_DSN_API: ${{ secrets.SENTRY_DSN_API }}
           SENTRY_ENVIRONMENT: ${{ vars.SENTRY_ENVIRONMENT || 'production' }}
-        run: npm run deploy:api:production
+        run: |
+          if [ -z "${RESEND_API_KEY//[[:space:]]/}" ]; then
+            echo "Missing required repository secret: RESEND_API_KEY"
+            exit 1
+          fi
+          printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY --config apps/api/wrangler.toml --env production
+          npm run deploy:api:production
 
       - name: Deploy web (Pages production)
         env:
