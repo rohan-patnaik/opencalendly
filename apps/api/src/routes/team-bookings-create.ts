@@ -1,6 +1,11 @@
 import { teamBookingCreateSchema } from '@opencalendly/shared';
 
-import { BookingConflictError, BookingNotFoundError, BookingValidationError } from '../lib/booking';
+import {
+  BookingConflictError,
+  BookingNotFoundError,
+  BookingValidationError,
+  normalizeBookingAnswersForIdempotency,
+} from '../lib/booking';
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { actionTokenMap, buildActionUrls } from '../server/booking-action-links';
@@ -43,6 +48,7 @@ export const registerTeamBookingCreateRoutes = (app: ApiApp): void => {
 
     const payload = parsed.data;
     const timezone = normalizeTimezone(payload.timezone);
+    const canonicalAnswers = normalizeBookingAnswersForIdempotency(payload.answers);
     const clientKey = resolveRateLimitClientKey(context.req.raw);
     const idempotencyRequestHash = hashIdempotencyRequestPayload({
       teamSlug: payload.teamSlug,
@@ -51,7 +57,7 @@ export const registerTeamBookingCreateRoutes = (app: ApiApp): void => {
       timezone,
       inviteeName: payload.inviteeName,
       inviteeEmail: payload.inviteeEmail,
-      answers: payload.answers ?? {},
+      answers: canonicalAnswers,
     });
 
     let appBaseUrl: string;

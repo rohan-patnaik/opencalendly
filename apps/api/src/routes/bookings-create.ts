@@ -33,6 +33,7 @@ import {
   BookingConflictError,
   BookingNotFoundError,
   BookingValidationError,
+  normalizeBookingAnswersForIdempotency,
 } from '../lib/booking';
 
 export const registerBookingCreateRoutes = (app: ApiApp): void => {
@@ -51,6 +52,7 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
 
     const payload = parsed.data;
     const timezone = normalizeTimezone(payload.timezone);
+    const canonicalAnswers = normalizeBookingAnswersForIdempotency(payload.answers);
     const clientKey = resolveRateLimitClientKey(context.req.raw);
     const idempotencyRequestHash = hashIdempotencyRequestPayload({
       username: payload.username,
@@ -59,7 +61,7 @@ export const registerBookingCreateRoutes = (app: ApiApp): void => {
       timezone,
       inviteeName: payload.inviteeName,
       inviteeEmail: payload.inviteeEmail,
-      answers: payload.answers ?? {},
+      answers: canonicalAnswers,
     });
 
     let appBaseUrl: string;

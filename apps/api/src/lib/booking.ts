@@ -123,6 +123,29 @@ export type CommitBookingResult = {
 
 const slotKey = (startsAt: string, endsAt: string): string => `${startsAt}|${endsAt}`;
 
+export const normalizeBookingAnswersForIdempotency = (
+  answers: Record<string, string> | undefined,
+): Record<string, string> => {
+  if (!answers) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(answers).flatMap(([questionId, rawValue]) => {
+      if (typeof rawValue !== 'string') {
+        return [];
+      }
+
+      const value = rawValue.trim();
+      if (!value) {
+        return [];
+      }
+
+      return [[questionId, value]];
+    }),
+  );
+};
+
 export const validateBookingAnswers = (
   questions: PublicEventType['questions'],
   answers: Record<string, string> | undefined,

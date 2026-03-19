@@ -57,7 +57,8 @@ type RescheduleResult = {
     metadata?: string | null;
   };
   eventType: EventTypeProfile;
-  organizer: OrganizerProfile;
+  oldOrganizer: OrganizerProfile;
+  newOrganizer: OrganizerProfile;
   actionTokens: ReturnType<typeof createBookingActionTokenSet>['publicTokens'] | null;
   alreadyProcessed: boolean;
   canceledNotificationsForOldBooking: number;
@@ -199,7 +200,8 @@ export const rescheduleBooking = async (
         oldBooking: booking,
         newBooking: replayBooking,
         eventType,
-        organizer,
+        oldOrganizer: organizer,
+        newOrganizer: organizer,
         actionTokens: null,
         alreadyProcessed: true,
         canceledNotificationsForOldBooking: 0,
@@ -354,7 +356,8 @@ export const rescheduleBooking = async (
       oldBooking: { ...booking, status: 'rescheduled' },
       newBooking: insertedBooking,
       eventType,
-      organizer: effectiveOrganizer,
+      oldOrganizer: organizer,
+      newOrganizer: effectiveOrganizer,
       actionTokens: tokenSet.publicTokens,
       alreadyProcessed: false,
       canceledNotificationsForOldBooking,

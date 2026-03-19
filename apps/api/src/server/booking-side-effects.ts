@@ -1,22 +1,21 @@
 import {
   sendBookingCancellationEmail,
   sendBookingConfirmationEmail,
-  sendBookingRescheduledEmail,
 } from '../lib/email';
 import {
   emptyWritebackResult,
-  mergeWritebackResults,
   queueCalendarWriteback,
 } from './booking-writeback-summary';
 import { enqueueWebhookDeliveries } from './webhook-deliveries';
 import { tryRecordAnalyticsFunnelEvent, tryRecordEmailDelivery } from './telemetry';
 import type { Bindings, Database } from './types';
 
-const buildSkippedEmailPair = (message: string) => {
-  return [
-    { sent: false, provider: 'none' as const, error: message },
-    { sent: false, provider: 'none' as const, error: message },
-  ];
+const buildSkippedEmailResults = (message: string, count = 2) => {
+  return Array.from({ length: count }, () => ({
+    sent: false,
+    provider: 'none' as const,
+    error: message,
+  }));
 };
 
 type BookingRecord = {
@@ -189,7 +188,7 @@ export const sendBookingCancellationEmailSideEffects = async (
   },
 ) => {
   if (input.alreadyProcessed) {
-    return buildSkippedEmailPair('Idempotent replay: cancellation already processed.');
+    return buildSkippedEmailResults('Idempotent replay: cancellation already processed.');
   }
 
   const email = await Promise.all([
@@ -238,137 +237,6 @@ export const sendBookingCancellationEmailSideEffects = async (
       eventTypeId: input.booking.eventTypeId,
       recipientEmail: input.organizer.email,
       emailType: 'booking_cancellation',
-      provider: organizerEmailResult.provider,
-      status: organizerEmailResult.sent ? 'succeeded' : 'failed',
-      ...(organizerEmailResult.messageId ? { providerMessageId: organizerEmailResult.messageId } : {}),
-      ...(organizerEmailResult.error ? { error: organizerEmailResult.error } : {}),
-    });
-  }
-
-  return email;
-};
-
-export const queueBookingRescheduleSideEffects = async (
-  db: Database,
-  input: {
-    oldBooking: BookingRecord & { status: string };
-    newBooking: BookingRecord;
-    alreadyProcessed: boolean;
-  },
-) => {
-  const queuedWebhookDeliveries = input.alreadyProcessed
-    ? 0
-    : await enqueueWebhookDeliveries(db, {
-        organizerId: input.newBooking.organizerId,
-        type: 'booking.rescheduled',
-        booking: {
-          id: input.newBooking.id,
-          eventTypeId: input.newBooking.eventTypeId,
-          organizerId: input.newBooking.organizerId,
-          inviteeEmail: input.newBooking.inviteeEmail,
-          inviteeName: input.newBooking.inviteeName,
-          startsAtIso: input.newBooking.startsAt.toISOString(),
-          endsAtIso: input.newBooking.endsAt.toISOString(),
-        },
-        metadata: {
-          rescheduledFromBookingId: input.oldBooking.id,
-          previousStartsAt: input.oldBooking.startsAt.toISOString(),
-          previousEndsAt: input.oldBooking.endsAt.toISOString(),
-        },
-      });
-
-  return {
-    queuedWebhookDeliveries,
-    calendarWriteback: input.alreadyProcessed
-      ? emptyWritebackResult
-      : input.oldBooking.organizerId === input.newBooking.organizerId
-        ? await queueCalendarWriteback(db, {
-            bookingId: input.oldBooking.id,
-            organizerId: input.newBooking.organizerId,
-            operation: 'reschedule',
-            rescheduleTarget: {
-              bookingId: input.newBooking.id,
-              startsAtIso: input.newBooking.startsAt.toISOString(),
-              endsAtIso: input.newBooking.endsAt.toISOString(),
-            },
-          })
-        : mergeWritebackResults(
-            await queueCalendarWriteback(db, {
-              bookingId: input.oldBooking.id,
-              organizerId: input.oldBooking.organizerId,
-              operation: 'cancel',
-            }),
-            await queueCalendarWriteback(db, {
-              bookingId: input.newBooking.id,
-              organizerId: input.newBooking.organizerId,
-              operation: 'create',
-            }),
-          ),
-  };
-};
-
-export const sendBookingRescheduleEmailSideEffects = async (
-  env: Bindings,
-  db: Database,
-  input: {
-    oldBooking: BookingRecord & { status: string };
-    newBooking: BookingRecord;
-    eventType: { name: string };
-    organizer: { email: string; displayName: string };
-    timezone: string;
-    alreadyProcessed: boolean;
-  },
-) => {
-  if (input.alreadyProcessed) {
-    return buildSkippedEmailPair('Idempotent replay: reschedule already processed.');
-  }
-
-  const email = await Promise.all([
-    sendBookingRescheduledEmail(env, {
-      recipientEmail: input.newBooking.inviteeEmail,
-      recipientName: input.newBooking.inviteeName,
-      recipientRole: 'invitee',
-      organizerDisplayName: input.organizer.displayName,
-      eventName: input.eventType.name,
-      oldStartsAt: input.oldBooking.startsAt.toISOString(),
-      newStartsAt: input.newBooking.startsAt.toISOString(),
-      timezone: input.timezone,
-      idempotencyKey: `booking-rescheduled:${input.oldBooking.id}:${input.newBooking.id}:invitee`,
-    }),
-    sendBookingRescheduledEmail(env, {
-      recipientEmail: input.organizer.email,
-      recipientName: input.organizer.displayName,
-      recipientRole: 'organizer',
-      organizerDisplayName: input.organizer.displayName,
-      eventName: input.eventType.name,
-      oldStartsAt: input.oldBooking.startsAt.toISOString(),
-      newStartsAt: input.newBooking.startsAt.toISOString(),
-      timezone: input.timezone,
-      idempotencyKey: `booking-rescheduled:${input.oldBooking.id}:${input.newBooking.id}:organizer`,
-    }),
-  ]);
-
-  const [inviteeEmailResult, organizerEmailResult] = email;
-  if (inviteeEmailResult) {
-    await tryRecordEmailDelivery(env, db, {
-      organizerId: input.newBooking.organizerId,
-      bookingId: input.newBooking.id,
-      eventTypeId: input.newBooking.eventTypeId,
-      recipientEmail: input.newBooking.inviteeEmail,
-      emailType: 'booking_rescheduled',
-      provider: inviteeEmailResult.provider,
-      status: inviteeEmailResult.sent ? 'succeeded' : 'failed',
-      ...(inviteeEmailResult.messageId ? { providerMessageId: inviteeEmailResult.messageId } : {}),
-      ...(inviteeEmailResult.error ? { error: inviteeEmailResult.error } : {}),
-    });
-  }
-  if (organizerEmailResult) {
-    await tryRecordEmailDelivery(env, db, {
-      organizerId: input.newBooking.organizerId,
-      bookingId: input.newBooking.id,
-      eventTypeId: input.newBooking.eventTypeId,
-      recipientEmail: input.organizer.email,
-      emailType: 'booking_rescheduled',
       provider: organizerEmailResult.provider,
       status: organizerEmailResult.sent ? 'succeeded' : 'failed',
       ...(organizerEmailResult.messageId ? { providerMessageId: organizerEmailResult.messageId } : {}),
