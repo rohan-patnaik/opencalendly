@@ -226,6 +226,7 @@ export function OrganizerSectionContent({
           apiBaseUrl={apiBaseUrl}
           session={session}
           calendarStatuses={organizer.state.calendarStatuses}
+          availableCalendarProviders={organizer.state.availableCalendarProviders}
           refreshOrganizerState={organizer.refreshOrganizerState}
           isBusy={busy.isBusy}
           beginBusy={busy.beginBusy}

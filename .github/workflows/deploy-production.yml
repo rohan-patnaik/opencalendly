@@ -69,13 +69,58 @@ jobs:
             fi
           done
 
-      - name: Deploy API worker (production)
+      - name: Verify required API deploy vars
+        env:
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+        run: |
+          missing=0
+          for key in GOOGLE_CLIENT_ID MICROSOFT_CLIENT_ID GOOGLE_CLIENT_SECRET MICROSOFT_CLIENT_SECRET SESSION_SECRET; do
+            if [ -z "${!key//[[:space:]]/}" ]; then
+              echo "Missing required API calendar OAuth value: ${key}"
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Sync API worker calendar OAuth secrets (production)
+        working-directory: apps/api
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+        run: |
+          printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET --config wrangler.toml --env production
+          printf '%s' "$GOOGLE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.toml --env production
+          printf '%s' "$MICROSOFT_CLIENT_SECRET" | npx wrangler secret put MICROSOFT_CLIENT_SECRET --config wrangler.toml --env production
+
+      - name: Deploy API worker (production)
+        working-directory: apps/api
+        env:
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}
+          RESEND_FROM_EMAIL: ${{ vars.RESEND_FROM_EMAIL || 'OpenCalendly <no-reply@opencalendly.com>' }}
           SENTRY_DSN_API: ${{ secrets.SENTRY_DSN_API }}
           SENTRY_ENVIRONMENT: ${{ vars.SENTRY_ENVIRONMENT || 'production' }}
-        run: npm run deploy:api:production
+        run: |
+          npx wrangler deploy \
+            --config wrangler.toml \
+            --env production \
+            --keep-vars \
+            --var "APP_BASE_URL:${APP_BASE_URL}" \
+            --var "RESEND_FROM_EMAIL:${RESEND_FROM_EMAIL}" \
+            --var "GOOGLE_CLIENT_ID:${GOOGLE_CLIENT_ID}" \
+            --var "MICROSOFT_CLIENT_ID:${MICROSOFT_CLIENT_ID}"
 
       - name: Deploy web (Pages production)
         env:

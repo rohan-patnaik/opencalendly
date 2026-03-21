@@ -21,6 +21,7 @@ const emptyState: OrganizerSectionsState = {
   teams: [],
   webhooks: [],
   calendarStatuses: [],
+  availableCalendarProviders: [],
   writebackStatus: null,
 };
 
@@ -86,6 +87,7 @@ export const useOrganizerBootstrap = ({
         teams: teamPayload.teams,
         webhooks: webhookPayload.webhooks,
         calendarStatuses: calendarPayload.connections,
+        availableCalendarProviders: calendarPayload.availableProviders,
         writebackStatus: {
           summary: writebackPayload.summary,
           failures: writebackPayload.failures,

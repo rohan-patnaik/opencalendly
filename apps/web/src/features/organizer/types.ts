@@ -2,6 +2,7 @@ import type {
   AvailabilityOverride,
   AvailabilityRule,
   CalendarConnectionStatus,
+  CalendarProvider,
   NotificationRule,
   OrganizerEventType,
   OrganizerWebhook,
@@ -34,6 +35,7 @@ export type OrganizerSectionsState = {
   teams: TeamSummary[];
   webhooks: OrganizerWebhook[];
   calendarStatuses: CalendarConnectionStatus[];
+  availableCalendarProviders: CalendarProvider[];
   writebackStatus: WritebackStatus | null;
 };
 

@@ -1,5 +1,27 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 81 (PR#TBD): Verify and fix demo-account calendar connect flows
+
+Scope:
+
+- Verify Google Calendar and Microsoft Calendar connect flows end to end using the existing demo accounts.
+- Fix only the regressions uncovered in those live/demo-account connect paths.
+- Keep the change scoped to provider connect correctness, organizer UX wiring, production OAuth config sync, tests, and minimal docs.
+
+Acceptance criteria:
+
+- The Google Calendar connect flow completes successfully from the signed-in organizer experience with the configured Google demo account.
+- The Microsoft Calendar connect flow completes successfully from the signed-in organizer experience with the configured Microsoft demo account.
+- Organizer UI only advertises providers that are actually configured on the current runtime, and clearly surfaces actionable failure states when a provider is unavailable.
+- Production deploy automation syncs Google/Microsoft OAuth config so the Worker does not silently ship with calendar connect disabled.
+- Any regression discovered during the verification pass is fixed in the same branch with focused coverage where practical.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 80 (PR#TBD): Surface real booking email status and calendar connect actions
 
 Scope:

@@ -168,6 +168,7 @@ export default function OrganizerConsolePageClient({
         demoQuotaError={demoQuotaError}
         refreshDemoQuota={refreshDemoQuota}
         calendarStatuses={organizer.state.calendarStatuses}
+        availableCalendarProviders={organizer.state.availableCalendarProviders}
         isBusy={busy.isBusy}
         beginBusy={busy.beginBusy}
         endBusy={busy.endBusy}
