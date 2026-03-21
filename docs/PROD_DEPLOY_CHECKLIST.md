@@ -82,6 +82,9 @@ Last updated: 19 Mar 2026 (IST)
 - [ ] Confirm Hyperdrive binding points to production Neon connection.
 - [ ] Confirm secrets are set in Worker environment:
   - `DATABASE_URL`, `SESSION_SECRET`, provider secrets, `RESEND_API_KEY`
+- [ ] Confirm GitHub Actions production deploy inputs include calendar OAuth config:
+  - repository vars: `GOOGLE_CLIENT_ID`, `MICROSOFT_CLIENT_ID`
+  - repository secrets: `GOOGLE_CLIENT_SECRET`, `MICROSOFT_CLIENT_SECRET`
 - [ ] Confirm the Worker environment contains:
   - `WEBHOOK_SECRET_ENCRYPTION_KEY`
   - `TELEMETRY_HMAC_KEY`

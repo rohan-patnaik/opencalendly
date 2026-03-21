@@ -9,7 +9,11 @@ import { CalendarsPanel } from '../../features/organizer/calendars-panel';
 import { ProfilePanel } from '../../features/organizer/profile-panel';
 import type { OrganizerConsoleUser } from '../../features/organizer/types';
 import { useBusyActions } from '../../features/organizer/use-busy-actions';
-import { organizerApi, type CalendarConnectionStatus } from '../../lib/organizer-api';
+import {
+  organizerApi,
+  type CalendarConnectionStatus,
+  type CalendarProvider,
+} from '../../lib/organizer-api';
 import { revokeApiSession } from '../../lib/api-client';
 import { requestAuthSessionBridgeRetry } from '../../lib/auth-session-bridge-retry';
 import { resolvePostAuthRoute } from '../../lib/post-auth-route';
@@ -28,6 +32,7 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
   const busy = useBusyActions();
   const [profile, setProfile] = useState<OrganizerConsoleUser | null>(null);
   const [calendarStatuses, setCalendarStatuses] = useState<CalendarConnectionStatus[]>([]);
+  const [availableCalendarProviders, setAvailableCalendarProviders] = useState<CalendarProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
@@ -57,6 +62,7 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
 
       setProfile(profilePayload.user);
       setCalendarStatuses(calendarPayload.connections);
+      setAvailableCalendarProviders(calendarPayload.availableProviders);
     } catch (caught) {
       setGlobalError(caught instanceof Error ? caught.message : 'Unable to load onboarding.');
     } finally {
@@ -260,6 +266,7 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
           apiBaseUrl={apiBaseUrl}
           session={session}
           calendarStatuses={calendarStatuses}
+          availableCalendarProviders={availableCalendarProviders}
           refreshOrganizerState={refreshOnboardingData}
           isBusy={busy.isBusy}
           beginBusy={busy.beginBusy}

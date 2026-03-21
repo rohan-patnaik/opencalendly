@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 import { DemoQuotaCard } from '../../components/demo-quota-card';
 import { Button, LinkButton, Toast } from '../../components/ui';
-import type { CalendarConnectionStatus } from '../../lib/organizer-api';
+import type { CalendarConnectionStatus, CalendarProvider } from '../../lib/organizer-api';
 import type { AuthSession } from '../../lib/auth-session';
 import type { DemoQuotaStatusResponse } from '../../lib/demo-quota';
 import { CalendarConnectActions } from './calendar-connect-actions';
@@ -29,6 +29,7 @@ export const OrganizerHero = ({
   demoQuotaError,
   refreshDemoQuota,
   calendarStatuses,
+  availableCalendarProviders,
   isBusy,
   beginBusy,
   endBusy,
@@ -50,6 +51,7 @@ export const OrganizerHero = ({
   demoQuotaError: string | null;
   refreshDemoQuota: () => Promise<unknown> | void;
   calendarStatuses: CalendarConnectionStatus[];
+  availableCalendarProviders: CalendarProvider[];
   isBusy: (action: string) => boolean;
   beginBusy: (action: string) => void;
   endBusy: (action: string) => void;
@@ -58,6 +60,10 @@ export const OrganizerHero = ({
 }) => {
   const connectedCalendars = calendarStatuses.filter((status) => status.connected).length;
   const calendarSummary = buildCalendarConnectionSummary(calendarStatuses);
+  const calendarCalloutHeading =
+    availableCalendarProviders.length > 0
+      ? 'Connect your configured calendars from here'
+      : 'Calendar integrations are unavailable here';
 
   return (
     <>
@@ -93,10 +99,12 @@ export const OrganizerHero = ({
         <div className={styles.integrationCallout}>
           <div className={styles.integrationCopy}>
             <p className={styles.kicker}>Calendar integrations</p>
-            <h2>Connect Google and Microsoft from here</h2>
+            <h2>{calendarCalloutHeading}</h2>
             <p>{calendarSummary}</p>
             <p className={styles.helperText}>
-              {connectedCalendars === 0
+              {availableCalendarProviders.length === 0
+                ? 'Ask an operator to configure Google or Microsoft OAuth before adding new calendar connections.'
+                : connectedCalendars === 0
                 ? 'Start with one provider so busy time blocks bookings and new bookings can write back.'
                 : 'Add more providers or open the dedicated integrations section to tune sync and writeback preferences.'}
             </p>
@@ -108,6 +116,7 @@ export const OrganizerHero = ({
             beginBusy={beginBusy}
             endBusy={endBusy}
             setPanelError={setPanelError}
+            availableProviders={availableCalendarProviders}
             styles={styles}
             includeManageLink
           />

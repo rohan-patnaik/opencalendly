@@ -5,7 +5,14 @@ import { bookingExternalEvents, calendarConnections } from '@opencalendly/db';
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { jsonError } from '../server/core';
 import { withDatabase } from '../server/database';
-import { toCalendarConnectionStatus, toCalendarProvider } from '../server/env';
+import {
+  GOOGLE_CALENDAR_PROVIDER,
+  MICROSOFT_CALENDAR_PROVIDER,
+  resolveGoogleOAuthConfig,
+  resolveMicrosoftOAuthConfig,
+  toCalendarConnectionStatus,
+  toCalendarProvider,
+} from '../server/env';
 import type { ApiApp, CalendarConnectionStatus, CalendarProvider } from '../server/types';
 
 export const registerCalendarStatusRoutes = (app: ApiApp): void => {
@@ -49,9 +56,14 @@ export const registerCalendarStatusRoutes = (app: ApiApp): void => {
         })
         .filter((status): status is CalendarConnectionStatus => status !== null);
 
+      const availableProviders = [
+        ...(resolveGoogleOAuthConfig(context.env) ? [GOOGLE_CALENDAR_PROVIDER] : []),
+        ...(resolveMicrosoftOAuthConfig(context.env) ? [MICROSOFT_CALENDAR_PROVIDER] : []),
+      ] satisfies CalendarProvider[];
+
       return context.json({
         ok: true,
-        availableProviders: ['google', 'microsoft'] satisfies CalendarProvider[],
+        availableProviders,
         connections: statuses,
       });
     });

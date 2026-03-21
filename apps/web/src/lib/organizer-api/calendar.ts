@@ -1,11 +1,11 @@
 import { authedGetJson, authedPatchJson, authedPostJson } from '../api-client';
 import type { AuthSession } from '../auth-session';
 import { organizerApiFallback as fallback } from './fallback';
-import type { CalendarConnectionStatus, WritebackStatus } from './types';
+import type { CalendarConnectionStatus, CalendarProvider, WritebackStatus } from './types';
 
 export const organizerCalendarApi = {
   getCalendarSyncStatus: async (apiBaseUrl: string, session: AuthSession | null) => {
-    return authedGetJson<{ ok: true; availableProviders: Array<'google' | 'microsoft'>; connections: CalendarConnectionStatus[] }>({
+    return authedGetJson<{ ok: true; availableProviders: CalendarProvider[]; connections: CalendarConnectionStatus[] }>({
       url: `${apiBaseUrl}/v0/calendar/sync/status`,
       session,
       fallbackError: fallback.calendarStatus,

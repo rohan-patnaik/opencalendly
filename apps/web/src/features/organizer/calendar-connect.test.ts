@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildCalendarConnectionSummary } from './calendar-connect';
+import {
+  buildCalendarConnectAvailabilityMessage,
+  buildCalendarConnectionSummary,
+} from './calendar-connect';
 
 describe('buildCalendarConnectionSummary', () => {
   it('returns an onboarding prompt when no calendars are connected', () => {
@@ -54,5 +57,23 @@ describe('buildCalendarConnectionSummary', () => {
         },
       ]),
     ).toBe('2 calendars connected: Google Calendar, Microsoft Calendar.');
+  });
+});
+
+describe('buildCalendarConnectAvailabilityMessage', () => {
+  it('reports when no calendar providers are configured', () => {
+    expect(buildCalendarConnectAvailabilityMessage([])).toBe(
+      'Calendar OAuth is not configured in this environment yet.',
+    );
+  });
+
+  it('returns no warning when every provider is available', () => {
+    expect(buildCalendarConnectAvailabilityMessage(['google', 'microsoft'])).toBeNull();
+  });
+
+  it('lists the unavailable providers for partial runtimes', () => {
+    expect(buildCalendarConnectAvailabilityMessage(['google'])).toBe(
+      'Unavailable here: Microsoft Calendar.',
+    );
   });
 });

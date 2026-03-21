@@ -1,6 +1,6 @@
 'use client';
 
-import { organizerApi, type CalendarConnectionStatus } from '../../lib/organizer-api';
+import { organizerApi, type CalendarConnectionStatus, type CalendarProvider } from '../../lib/organizer-api';
 import type { AuthSession } from '../../lib/auth-session';
 import { CalendarConnectActions } from './calendar-connect-actions';
 
@@ -10,6 +10,7 @@ export const CalendarsPanel = ({
   apiBaseUrl,
   session,
   calendarStatuses,
+  availableCalendarProviders,
   refreshOrganizerState,
   isBusy,
   beginBusy,
@@ -21,6 +22,7 @@ export const CalendarsPanel = ({
   apiBaseUrl: string;
   session: AuthSession | null;
   calendarStatuses: CalendarConnectionStatus[];
+  availableCalendarProviders: CalendarProvider[];
   refreshOrganizerState: () => Promise<void>;
   isBusy: (action: string) => boolean;
   beginBusy: (action: string) => void;
@@ -117,7 +119,9 @@ export const CalendarsPanel = ({
       <div className={styles.form}>
         <h3>Add calendars</h3>
         <p className={styles.helperText}>
-          Connect as many Google and Microsoft calendars as you need.
+          {availableCalendarProviders.length > 0
+            ? 'Connect every configured Google and Microsoft calendar you need.'
+            : 'Calendar connections are unavailable until OAuth is configured for this environment.'}
         </p>
         <CalendarConnectActions
           apiBaseUrl={apiBaseUrl}
@@ -126,6 +130,7 @@ export const CalendarsPanel = ({
           beginBusy={beginBusy}
           endBusy={endBusy}
           setPanelError={setPanelError}
+          availableProviders={availableCalendarProviders}
           styles={styles}
         />
       </div>

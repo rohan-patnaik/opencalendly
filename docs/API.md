@@ -1720,18 +1720,22 @@ Auth required for all endpoints in this section.
 
 ### `GET /v0/calendar/sync/status`
 
-Returns provider-level sync connection state for the authenticated user.
+Returns calendar connection state plus the providers that are configured on the current runtime.
 
 Success response:
 
 ```json
 {
   "ok": true,
-  "providers": [
+  "availableProviders": ["google"],
+  "connections": [
     {
+      "id": "conn_google",
       "provider": "google",
       "connected": true,
       "externalEmail": "owner@example.com",
+      "useForConflictChecks": true,
+      "useForWriteback": true,
       "lastSyncedAt": "2026-03-01T10:15:00.000Z",
       "nextSyncAt": "2026-03-01T10:45:00.000Z",
       "lastError": null
@@ -1742,7 +1746,8 @@ Success response:
 
 Notes:
 
-- If Google is not connected, response still includes a `google` provider row with `connected: false`.
+- `availableProviders` lists only the providers whose OAuth credentials are configured on the current API runtime.
+- `connections` lists the authenticated user’s existing connections, even if a provider is temporarily unavailable for new OAuth starts.
 - Runtime health for this feature depends on outbound HTTPS access from the API worker to Google and Microsoft OAuth/Calendar APIs.
 
 ### `POST /v0/calendar/google/connect/start`

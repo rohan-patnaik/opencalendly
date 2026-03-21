@@ -141,6 +141,8 @@ export type CalendarConnectionStatus = {
   lastError: string | null;
 };
 
+export type CalendarProvider = 'google' | 'microsoft';
+
 export type WritebackFailure = {
   id: string;
   bookingId: string;
