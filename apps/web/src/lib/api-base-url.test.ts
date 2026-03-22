@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const restoreEnv = () => {
   delete process.env.API_BASE_URL;
   delete process.env.APP_BASE_URL;
+  delete process.env.NEXT_PUBLIC_APP_BASE_URL;
   delete process.env.NEXT_PUBLIC_API_BASE_URL;
 };
 
@@ -71,5 +72,41 @@ describe('normalizeLocalBrowserUrl', () => {
     expect(normalizeLocalBrowserUrl('https://api.example.com/v0/test')).toBe(
       'https://api.example.com/v0/test',
     );
+  });
+});
+
+describe('resolveAppBaseUrl', () => {
+  afterEach(() => {
+    restoreEnv();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it('uses the configured public app origin instead of the current browser host', async () => {
+    process.env.NEXT_PUBLIC_APP_BASE_URL = 'https://opencalendly.com/organizer?preview=true';
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'https://www.opencalendly.com',
+        hostname: 'www.opencalendly.com',
+      },
+    });
+
+    const { resolveAppBaseUrl } = await import('./api-base-url');
+
+    expect(resolveAppBaseUrl('calendar connect')).toBe('https://opencalendly.com');
+  });
+
+  it('preserves the active localhost hostname in local development', async () => {
+    process.env.NEXT_PUBLIC_APP_BASE_URL = 'http://127.0.0.1:3000';
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'http://localhost:3001',
+        hostname: 'localhost',
+      },
+    });
+
+    const { resolveAppBaseUrl } = await import('./api-base-url');
+
+    expect(resolveAppBaseUrl('calendar connect')).toBe('http://localhost:3000');
   });
 });

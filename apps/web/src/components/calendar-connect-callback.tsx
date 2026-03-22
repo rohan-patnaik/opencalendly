@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { organizerApi } from '../lib/organizer-api';
+import { resolveAppBaseUrl } from '../lib/api-base-url';
+import { rememberRecentCalendarConnection } from '../features/organizer/calendar-connect-feedback';
 import { resolvePostAuthRoute } from '../lib/post-auth-route';
 import { useAuthSession } from '../lib/use-auth-session';
 import styles from './calendar-connect-callback.module.css';
@@ -18,6 +20,7 @@ export default function CalendarConnectCallback({
   apiBaseUrl,
   provider,
 }: CalendarConnectCallbackProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { ready, session } = useAuthSession();
   const hasCompletedRef = useRef(false);
@@ -70,7 +73,7 @@ export default function CalendarConnectCallback({
       setMessage(`Completing ${providerLabel} connection…`);
 
       try {
-        const redirectUri = `${window.location.origin}${callbackPath}`;
+        const redirectUri = `${resolveAppBaseUrl(`${provider} calendar callback`)}${callbackPath}`;
         const payload =
           provider === 'google'
             ? await organizerApi.completeGoogleConnect(apiBaseUrl, session, {
@@ -86,7 +89,12 @@ export default function CalendarConnectCallback({
 
         setConnectedEmail(payload.connection.externalEmail ?? null);
         setStatus('success');
-        setMessage(`${providerLabel} connection completed successfully.`);
+        setMessage(`${providerLabel} connected. Returning you to calendar integrations…`);
+        rememberRecentCalendarConnection({
+          provider,
+          email: payload.connection.externalEmail ?? null,
+        });
+        router.replace('/organizer/calendars');
       } catch (caught) {
         setStatus('error');
         setMessage(
@@ -98,7 +106,7 @@ export default function CalendarConnectCallback({
     };
 
     void run();
-  }, [apiBaseUrl, callbackPath, provider, providerLabel, ready, search, session]);
+  }, [apiBaseUrl, callbackPath, provider, providerLabel, ready, router, search, session]);
 
   if (!ready) {
     return (

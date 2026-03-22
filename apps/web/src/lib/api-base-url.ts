@@ -9,7 +9,8 @@ const resolvePreferredLocalHostname = (): string | null => {
     return window.location.hostname;
   }
 
-  const configuredAppBaseUrl = process.env.APP_BASE_URL?.trim();
+  const configuredAppBaseUrl =
+    process.env.NEXT_PUBLIC_APP_BASE_URL?.trim() || process.env.APP_BASE_URL?.trim();
   if (!configuredAppBaseUrl) {
     return null;
   }
@@ -47,6 +48,35 @@ const normalizeLocalApiBaseUrl = (configured: string): string => {
 
 export const normalizeLocalBrowserUrl = (value: string): string => {
   return rewriteLocalHostnameInUrl(value);
+};
+
+const toUrlOrigin = (value: string): string | null => {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+};
+
+export const resolveAppBaseUrl = (routeName: string): string => {
+  const configured =
+    process.env.NEXT_PUBLIC_APP_BASE_URL?.trim() || process.env.APP_BASE_URL?.trim();
+
+  if (configured) {
+    const origin = toUrlOrigin(configured);
+    if (origin) {
+      return normalizeLocalBrowserUrl(origin);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+
+  console.warn(
+    `Missing NEXT_PUBLIC_APP_BASE_URL or APP_BASE_URL for ${routeName}; falling back to http://localhost:3000.`,
+  );
+  return 'http://localhost:3000';
 };
 
 export const resolveApiBaseUrl = (routeName: string): string => {

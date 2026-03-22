@@ -4,6 +4,7 @@ import { LinkButton } from '../../components/ui';
 import type { CalendarProvider } from '../../lib/organizer-api';
 import { organizerApi } from '../../lib/organizer-api';
 import type { AuthSession } from '../../lib/auth-session';
+import { resolveAppBaseUrl } from '../../lib/api-base-url';
 import {
   buildCalendarConnectAvailabilityMessage,
   toCalendarProviderLabel,
@@ -48,7 +49,7 @@ export const CalendarConnectActions = ({
     setPanelError(null);
 
     try {
-      const redirectUri = `${window.location.origin}/settings/calendar/${provider}/callback`;
+      const redirectUri = `${resolveAppBaseUrl(`${provider} calendar connect`)}/settings/calendar/${provider}/callback`;
       const payload =
         provider === 'google'
           ? await organizerApi.startGoogleConnect(apiBaseUrl, session, { redirectUri })

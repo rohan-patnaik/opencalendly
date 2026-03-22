@@ -7,6 +7,7 @@ import {
 } from '@opencalendly/shared';
 
 import { createCalendarOAuthState, verifyCalendarOAuthState } from '../lib/calendar-oauth-state';
+import { isExpectedCalendarRedirectUri } from '../lib/calendar-oauth-redirect';
 import { encryptSecret } from '../lib/calendar-crypto';
 import {
   buildMicrosoftAuthorizationUrl,
@@ -51,6 +52,17 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           500,
           'Microsoft OAuth is not configured. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and SESSION_SECRET.',
         );
+      }
+
+      if (
+        !isExpectedCalendarRedirectUri({
+          env: context.env,
+          request: context.req.raw,
+          provider: MICROSOFT_CALENDAR_PROVIDER,
+          redirectUri: parsed.data.redirectUri,
+        })
+      ) {
+        return jsonError(context, 400, 'Invalid Microsoft Calendar redirect URI.');
       }
 
       const now = new Date();
@@ -98,6 +110,17 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           500,
           'Microsoft OAuth is not configured. Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and SESSION_SECRET.',
         );
+      }
+
+      if (
+        !isExpectedCalendarRedirectUri({
+          env: context.env,
+          request: context.req.raw,
+          provider: MICROSOFT_CALENDAR_PROVIDER,
+          redirectUri: parsed.data.redirectUri,
+        })
+      ) {
+        return jsonError(context, 400, 'Invalid Microsoft Calendar redirect URI.');
       }
 
       const state = verifyCalendarOAuthState({

@@ -27,6 +27,9 @@ const jetBrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'OpenCalendly',
   description: 'Open-source scheduling platform',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

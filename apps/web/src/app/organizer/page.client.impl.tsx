@@ -8,6 +8,10 @@ import { Card, PageShell } from '../../components/ui';
 import { useDemoQuota } from '../../lib/demo-quota';
 import { useAuthSession } from '../../lib/use-auth-session';
 import { OrganizerHero, OrganizerSidebar, OrganizerSignedOutState } from '../../features/organizer/overview';
+import {
+  buildCalendarConnectSuccessMessage,
+  consumeRecentCalendarConnection,
+} from '../../features/organizer/calendar-connect-feedback';
 import { OrganizerSectionContent } from '../../features/organizer/section-content';
 import type { OrganizerConsoleUser } from '../../features/organizer/types';
 import { useBusyActions } from '../../features/organizer/use-busy-actions';
@@ -33,6 +37,7 @@ export default function OrganizerConsolePageClient({
   const { signOut } = useClerk();
   const [panelMessage, setPanelMessage] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
+  const [recentCalendarConnection, setRecentCalendarConnection] = useState<ReturnType<typeof consumeRecentCalendarConnection>>(null);
   const { authChecking, authError, authedUser, setAuthedUser, handleSignOut } = useOrganizerSession({
     apiBaseUrl,
     ready,
@@ -81,6 +86,20 @@ export default function OrganizerConsolePageClient({
       router.replace('/onboarding');
     }
   }, [authedUser, router]);
+
+  useEffect(() => {
+    if (activeSection !== 'calendars') {
+      return;
+    }
+
+    const feedback = consumeRecentCalendarConnection();
+    if (!feedback) {
+      return;
+    }
+
+    setRecentCalendarConnection(feedback);
+    setPanelMessage(buildCalendarConnectSuccessMessage(feedback));
+  }, [activeSection]);
 
   const handleProfileUpdated = (nextUser: OrganizerConsoleUser) => {
     setAuthedUser(nextUser);
@@ -190,6 +209,7 @@ export default function OrganizerConsolePageClient({
             session={session}
             authedUser={authedUser}
             organizer={organizer}
+            recentCalendarConnection={recentCalendarConnection}
             teamDetails={teamDetails}
             notificationRules={notificationRules}
             busy={busy}

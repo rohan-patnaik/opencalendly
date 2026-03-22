@@ -231,6 +231,14 @@
   gap: 0.4rem;
 }
 
+.itemCardFresh {
+  border-color: var(--brand-primary);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 9%, transparent), transparent 60%),
+    var(--bg-elevated);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-primary) 28%, transparent);
+}
+
 .itemCard p {
   margin: 0;
   font-size: 0.9rem;
@@ -252,6 +260,12 @@
   white-space: nowrap;
 }
 
+.badgeSuccess {
+  border-color: color-mix(in srgb, var(--brand-primary) 72%, var(--border-strong));
+  background: color-mix(in srgb, var(--brand-primary) 16%, transparent);
+  color: var(--text-heading);
+}
+
 .form {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -266,6 +280,44 @@
 .form h4 {
   margin: 0;
   font-family: var(--font-space-grotesk);
+}
+
+.successPanel {
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 65%, var(--border-default));
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 14%, transparent), transparent 65%),
+    var(--bg-surface);
+  padding: var(--spacing-4);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--spacing-3);
+  align-items: start;
+}
+
+.successPanelIcon {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-primary);
+  color: var(--on-brand);
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.successPanelCopy {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.successPanelCopy strong {
+  color: var(--text-heading);
+}
+
+.successPanelCopy p {
+  color: var(--text-secondary);
 }
 
 .label {

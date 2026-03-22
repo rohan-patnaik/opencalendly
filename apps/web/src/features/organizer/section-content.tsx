@@ -10,6 +10,7 @@ import type {
 } from '../../lib/organizer-api';
 import { AvailabilityPanel } from './availability-panel';
 import { CalendarsPanel } from './calendars-panel';
+import type { RecentCalendarConnection } from './calendar-connect-feedback';
 import { EventTypesPanel } from './event-types-panel';
 import { NotificationRulesPanel } from './notification-rules-panel';
 import { ProfilePanel } from './profile-panel';
@@ -32,6 +33,7 @@ type OrganizerSectionContentProps = {
     refreshOrganizerState: () => Promise<void>;
     setSelectedTeamId: Dispatch<SetStateAction<string>>;
   };
+  recentCalendarConnection: RecentCalendarConnection | null;
   teamDetails: {
     teamMembers: TeamMember[];
     teamEventTypes: TeamEventType[];
@@ -65,6 +67,7 @@ export function OrganizerSectionContent({
   session,
   authedUser,
   organizer,
+  recentCalendarConnection,
   teamDetails,
   notificationRules,
   busy,
@@ -227,6 +230,7 @@ export function OrganizerSectionContent({
           session={session}
           calendarStatuses={organizer.state.calendarStatuses}
           availableCalendarProviders={organizer.state.availableCalendarProviders}
+          recentCalendarConnection={recentCalendarConnection}
           refreshOrganizerState={organizer.refreshOrganizerState}
           isBusy={busy.isBusy}
           beginBusy={busy.beginBusy}

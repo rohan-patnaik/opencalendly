@@ -7,6 +7,7 @@ import {
 } from '@opencalendly/shared';
 
 import { createCalendarOAuthState, verifyCalendarOAuthState } from '../lib/calendar-oauth-state';
+import { isExpectedCalendarRedirectUri } from '../lib/calendar-oauth-redirect';
 import { encryptSecret } from '../lib/calendar-crypto';
 import {
   buildGoogleAuthorizationUrl,
@@ -51,6 +52,17 @@ export const registerGoogleCalendarConnectRoutes = (app: ApiApp): void => {
           500,
           'Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and SESSION_SECRET.',
         );
+      }
+
+      if (
+        !isExpectedCalendarRedirectUri({
+          env: context.env,
+          request: context.req.raw,
+          provider: GOOGLE_CALENDAR_PROVIDER,
+          redirectUri: parsed.data.redirectUri,
+        })
+      ) {
+        return jsonError(context, 400, 'Invalid Google Calendar redirect URI.');
       }
 
       const now = new Date();
@@ -98,6 +110,17 @@ export const registerGoogleCalendarConnectRoutes = (app: ApiApp): void => {
           500,
           'Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and SESSION_SECRET.',
         );
+      }
+
+      if (
+        !isExpectedCalendarRedirectUri({
+          env: context.env,
+          request: context.req.raw,
+          provider: GOOGLE_CALENDAR_PROVIDER,
+          redirectUri: parsed.data.redirectUri,
+        })
+      ) {
+        return jsonError(context, 400, 'Invalid Google Calendar redirect URI.');
       }
 
       const state = verifyCalendarOAuthState({

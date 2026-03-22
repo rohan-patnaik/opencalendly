@@ -81,8 +81,21 @@ describe('next config security headers', () => {
 
     expect(nextConfigModule.default.env).toEqual(
       expect.objectContaining({
+        NEXT_PUBLIC_APP_BASE_URL: '',
         NEXT_PUBLIC_SENTRY_DSN_WEB: 'https://public@example.ingest.sentry.io/123',
         NEXT_PUBLIC_SENTRY_ENVIRONMENT: 'staging',
+      }),
+    );
+  });
+
+  it('maps APP_BASE_URL to a browser-safe public app base URL', async () => {
+    process.env.APP_BASE_URL = 'https://opencalendly.com';
+
+    const nextConfigModule = await import('./next.config.mjs');
+
+    expect(nextConfigModule.default.env).toEqual(
+      expect.objectContaining({
+        NEXT_PUBLIC_APP_BASE_URL: 'https://opencalendly.com',
       }),
     );
   });

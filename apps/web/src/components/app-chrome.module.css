@@ -31,15 +31,35 @@
 .brand {
   color: var(--text-heading);
   text-decoration: none;
-  font-family: var(--font-space-grotesk);
-  font-weight: 700;
-  font-size: 1.15rem;
-  letter-spacing: -0.02em;
   transition: color var(--motion-fast);
 }
 
 .brand:hover {
   color: var(--brand-primary);
+}
+
+.brand:hover .brandWordmark {
+  color: var(--brand-primary);
+}
+
+.brandLockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.brandMark {
+  width: 1.7rem;
+  height: 1.7rem;
+  flex: 0 0 auto;
+}
+
+.brandWordmark {
+  font-family: var(--font-space-grotesk);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.03em;
+  color: var(--text-heading);
 }
 
 .mobileMenuButton {
@@ -289,6 +309,15 @@
 
   .sessionChip {
     display: none;
+  }
+
+  .brandMark {
+    width: 1.45rem;
+    height: 1.45rem;
+  }
+
+  .brandWordmark {
+    font-size: 1rem;
   }
 }
 
