@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { resolveApiBaseUrl } from '../lib/api-base-url';
 import { revokeApiSession } from '../lib/api-client';
 import { useAuthSession } from '../lib/use-auth-session';
+import { BrandLockup } from './brand';
 import styles from './app-chrome.module.css';
 import { ThemeToggle } from './theme-toggle';
 
@@ -136,7 +137,11 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           </button>
 
           <Link className={styles.brand} href="/">
-            OpenCalendly
+            <BrandLockup
+              className={styles.brandLockup}
+              markClassName={styles.brandMark}
+              wordmarkClassName={styles.brandWordmark}
+            />
           </Link>
         </div>
 

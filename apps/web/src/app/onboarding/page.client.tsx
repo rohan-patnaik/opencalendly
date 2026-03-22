@@ -267,6 +267,7 @@ export default function OnboardingPageClient({ apiBaseUrl }: OnboardingPageClien
           session={session}
           calendarStatuses={calendarStatuses}
           availableCalendarProviders={availableCalendarProviders}
+          recentCalendarConnection={null}
           refreshOrganizerState={refreshOnboardingData}
           isBusy={busy.isBusy}
           beginBusy={busy.beginBusy}

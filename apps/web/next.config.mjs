@@ -13,6 +13,7 @@ const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: workspaceRoot,
   env: {
+    NEXT_PUBLIC_APP_BASE_URL: process.env.APP_BASE_URL ?? '',
     NEXT_PUBLIC_SENTRY_DSN_WEB: process.env.SENTRY_DSN_WEB ?? '',
     NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? 'development',
   },

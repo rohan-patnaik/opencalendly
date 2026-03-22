@@ -1,5 +1,51 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 83 (PR#TBD): Add brand assets and explicit calendar-connect success UX
+
+Scope:
+
+- Replace the plain-text shell branding with the new OpenCalendly logo mark and wordmark styling.
+- Add a browser-tab icon that matches the approved OpenCalendly logo mark.
+- Make calendar connect completion unmistakable by routing users back into the Calendars section with a strong success confirmation and visible connection highlight.
+- Keep the change scoped to web branding assets, organizer UX, focused tests, and minimal docs.
+
+Acceptance criteria:
+
+- The shared app chrome uses the OpenCalendly logo mark plus wordmark instead of plain text only.
+- The web app exposes a browser-tab icon that matches the approved OpenCalendly logo mark.
+- Successful Google or Microsoft calendar connect redirects users back to `/organizer/calendars`.
+- The Calendars section shows an explicit success confirmation for the newly connected provider and visually highlights the matching connection card.
+- The success confirmation is transient and does not persist on unrelated future visits.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run complexity:check:enforce`
+  - `git diff --check`
+
+## Feature 82 (PR#TBD): Fix calendar OAuth redirect URI mismatches
+
+Scope:
+
+- Fix the Google and Microsoft calendar connect flows when provider OAuth rejects the redirect URI.
+- Canonicalize calendar OAuth callbacks to the configured public app origin instead of whichever browser host the user happens to be on.
+- Keep the change scoped to calendar connect URL generation, redirect validation, focused tests, and production runbook/docs.
+
+Acceptance criteria:
+
+- The web app builds Google and Microsoft calendar callback URLs from the configured public app base URL, not `window.location.origin`.
+- Local development still rewrites local callback URLs to the active `localhost`/`127.0.0.1` hostname so cookie-based auth keeps working.
+- The API accepts only the expected calendar callback URL for each provider and rejects non-canonical redirect URIs.
+- Tests cover canonical app-base URL resolution and expected provider callback URL validation.
+- Production docs explicitly list the Google and Microsoft calendar callback URLs that must be registered with provider consoles.
+- Validation passes:
+  - `npm run env:check`
+  - `npm run lint`
+  - `npm run test`
+  - `npm run typecheck`
+  - `git diff --check`
+
 ## Feature 81 (PR#TBD): Verify and fix demo-account calendar connect flows
 
 Scope:

@@ -2,6 +2,10 @@
 
 import { organizerApi, type CalendarConnectionStatus, type CalendarProvider } from '../../lib/organizer-api';
 import type { AuthSession } from '../../lib/auth-session';
+import {
+  isRecentCalendarConnection,
+  type RecentCalendarConnection,
+} from './calendar-connect-feedback';
 import { CalendarConnectActions } from './calendar-connect-actions';
 
 type OrganizerStyles = Record<string, string>;
@@ -11,6 +15,7 @@ export const CalendarsPanel = ({
   session,
   calendarStatuses,
   availableCalendarProviders,
+  recentCalendarConnection,
   refreshOrganizerState,
   isBusy,
   beginBusy,
@@ -23,6 +28,7 @@ export const CalendarsPanel = ({
   session: AuthSession | null;
   calendarStatuses: CalendarConnectionStatus[];
   availableCalendarProviders: CalendarProvider[];
+  recentCalendarConnection: RecentCalendarConnection | null;
   refreshOrganizerState: () => Promise<void>;
   isBusy: (action: string) => boolean;
   beginBusy: (action: string) => void;
@@ -137,75 +143,107 @@ export const CalendarsPanel = ({
 
       <div className={styles.form}>
         <h3>Connected calendars</h3>
+        {recentCalendarConnection ? (
+          <div className={styles.successPanel}>
+            <div className={styles.successPanelIcon} aria-hidden="true">
+              ✓
+            </div>
+            <div className={styles.successPanelCopy}>
+              <strong>
+                {recentCalendarConnection.provider === 'google'
+                  ? 'Google Calendar connected'
+                  : 'Microsoft Calendar connected'}
+              </strong>
+              <p>
+                {recentCalendarConnection.email
+                  ? `${recentCalendarConnection.email} is now available below. Review conflict checks, writeback, or run a sync now.`
+                  : 'Your new calendar connection is now available below. Review conflict checks, writeback, or run a sync now.'}
+              </p>
+            </div>
+          </div>
+        ) : null}
         {calendarStatuses.length === 0 ? (
           <p className={styles.empty}>No calendars connected yet.</p>
         ) : (
           <div className={styles.listGrid}>
-            {calendarStatuses.map((status) => (
-              <article key={status.id} className={styles.itemCard}>
-                <div className={styles.itemHead}>
-                  <strong>
-                    {status.provider === 'google' ? 'Google Calendar' : 'Microsoft Calendar'}
-                  </strong>
-                  <span className={styles.badge}>connected</span>
-                </div>
-                <p>Email: {status.externalEmail ?? 'n/a'}</p>
-                <p>
-                  Last sync:{' '}
-                  {status.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleString() : 'never'}
-                </p>
-                <p>
-                  Next sync:{' '}
-                  {status.nextSyncAt ? new Date(status.nextSyncAt).toLocaleString() : 'not scheduled'}
-                </p>
-                {status.lastError ? <p className={styles.error}>{status.lastError}</p> : null}
-                <label className={styles.checkbox}>
-                  <input
-                    type="checkbox"
-                    checked={status.useForConflictChecks}
-                    onChange={() =>
-                      void handlePreferenceChange(status, {
-                        useForConflictChecks: !status.useForConflictChecks,
-                      })
-                    }
-                    disabled={isBusy(`calendarPreferences:${status.id}`)}
-                  />
-                  Use for conflict checks
-                </label>
-                <label className={styles.checkbox}>
-                  <input
-                    type="checkbox"
-                    checked={status.useForWriteback}
-                    onChange={() =>
-                      void handlePreferenceChange(status, { useForWriteback: !status.useForWriteback })
-                    }
-                    disabled={isBusy(`calendarPreferences:${status.id}`)}
-                  />
-                  Default writeback calendar
-                </label>
-                <p className={styles.helperText}>
-                  Only one connected calendar can be the default writeback target at a time.
-                </p>
-                <div className={styles.inlineActions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => void handleCalendarSync(status)}
-                    disabled={isBusy(`calendarSync:${status.id}`)}
-                  >
-                    {isBusy(`calendarSync:${status.id}`) ? 'Syncing…' : 'Sync now'}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.ghostButton}
-                    onClick={() => void handleCalendarDisconnect(status)}
-                    disabled={isBusy(`calendarDisconnect:${status.id}`)}
-                  >
-                    {isBusy(`calendarDisconnect:${status.id}`) ? 'Disconnecting…' : 'Disconnect'}
-                  </button>
-                </div>
-              </article>
-            ))}
+            {calendarStatuses.map((status) => {
+              const isFresh = isRecentCalendarConnection(status, recentCalendarConnection);
+
+              return (
+                <article
+                  key={status.id}
+                  className={`${styles.itemCard} ${isFresh ? styles.itemCardFresh : ''}`.trim()}
+                >
+                  <div className={styles.itemHead}>
+                    <strong>
+                      {status.provider === 'google' ? 'Google Calendar' : 'Microsoft Calendar'}
+                    </strong>
+                    <span
+                      className={`${styles.badge} ${isFresh ? styles.badgeSuccess : ''}`.trim()}
+                    >
+                      {isFresh ? 'just connected' : 'connected'}
+                    </span>
+                  </div>
+                  <p>Email: {status.externalEmail ?? 'n/a'}</p>
+                  <p>
+                    Last sync:{' '}
+                    {status.lastSyncedAt ? new Date(status.lastSyncedAt).toLocaleString() : 'never'}
+                  </p>
+                  <p>
+                    Next sync:{' '}
+                    {status.nextSyncAt ? new Date(status.nextSyncAt).toLocaleString() : 'not scheduled'}
+                  </p>
+                  {status.lastError ? <p className={styles.error}>{status.lastError}</p> : null}
+                  <label className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      checked={status.useForConflictChecks}
+                      onChange={() =>
+                        void handlePreferenceChange(status, {
+                          useForConflictChecks: !status.useForConflictChecks,
+                        })
+                      }
+                      disabled={isBusy(`calendarPreferences:${status.id}`)}
+                    />
+                    Use for conflict checks
+                  </label>
+                  <label className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      checked={status.useForWriteback}
+                      onChange={() =>
+                        void handlePreferenceChange(status, {
+                          useForWriteback: !status.useForWriteback,
+                        })
+                      }
+                      disabled={isBusy(`calendarPreferences:${status.id}`)}
+                    />
+                    Default writeback calendar
+                  </label>
+                  <p className={styles.helperText}>
+                    Only one connected calendar can be the default writeback target at a time.
+                  </p>
+                  <div className={styles.inlineActions}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void handleCalendarSync(status)}
+                      disabled={isBusy(`calendarSync:${status.id}`)}
+                    >
+                      {isBusy(`calendarSync:${status.id}`) ? 'Syncing…' : 'Sync now'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.ghostButton}
+                      onClick={() => void handleCalendarDisconnect(status)}
+                      disabled={isBusy(`calendarDisconnect:${status.id}`)}
+                    >
+                      {isBusy(`calendarDisconnect:${status.id}`) ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

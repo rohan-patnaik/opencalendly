@@ -43,7 +43,9 @@ Last updated: 19 Mar 2026 (IST)
 - [ ] Provider redirect URIs are reviewed against production domains:
   - Clerk social login/callback settings
   - Google OAuth callback
+    - `https://opencalendly.com/settings/calendar/google/callback`
   - Microsoft OAuth callback
+    - `https://opencalendly.com/settings/calendar/microsoft/callback`
 - [ ] Outbound egress assumptions are reviewed for production:
   - provider/auth APIs: Clerk, `oauth2.googleapis.com`, `openidconnect.googleapis.com`, `www.googleapis.com`, `login.microsoftonline.com`, `graph.microsoft.com`, `api.resend.com`
   - webhook safety checks can reach `cloudflare-dns.com`
