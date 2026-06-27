@@ -9,6 +9,7 @@ import { calendarConnections } from '@opencalendly/db';
 
 import { encryptSecret } from '../lib/calendar-crypto';
 import {
+  type CalendarConnectionSecretState,
   resolveGoogleAccessToken,
   resolveMicrosoftAccessToken,
 } from '../lib/calendar-sync';
@@ -56,32 +57,50 @@ export const buildCalendarWritebackProviderClient = ({
   googleConfig,
   microsoftConfig,
 }: ProviderClientInput): CalendarWritebackProviderClient => {
+  let connectionTokenState: CalendarConnectionSecretState = {
+    accessTokenEncrypted: connectionAccessTokenEncrypted,
+    refreshTokenEncrypted: connectionRefreshTokenEncrypted,
+    accessTokenExpiresAt: connectionAccessTokenExpiresAt,
+  };
+
+  const persistRefreshedToken = async (resolved: {
+    accessToken: string;
+    refreshToken: string;
+    accessTokenExpiresAt: Date;
+  }): Promise<void> => {
+    connectionTokenState = {
+      accessTokenEncrypted: encryptSecret(resolved.accessToken, encryptionSecret),
+      refreshTokenEncrypted: encryptSecret(resolved.refreshToken, encryptionSecret),
+      accessTokenExpiresAt: resolved.accessTokenExpiresAt,
+    };
+
+    await db
+      .update(calendarConnections)
+      .set({
+        accessTokenEncrypted: connectionTokenState.accessTokenEncrypted,
+        refreshTokenEncrypted: connectionTokenState.refreshTokenEncrypted,
+        accessTokenExpiresAt: connectionTokenState.accessTokenExpiresAt,
+        lastError: null,
+        updatedAt: now,
+      })
+      .where(eq(calendarConnections.id, connectionId));
+  };
+
   const getToken = async (): Promise<string> => {
     if (provider === GOOGLE_CALENDAR_PROVIDER) {
       if (!googleConfig) {
         throw new Error('Google OAuth is not configured for calendar writeback.');
       }
       const resolved = await resolveGoogleAccessToken({
-        connection: {
-          accessTokenEncrypted: connectionAccessTokenEncrypted,
-          refreshTokenEncrypted: connectionRefreshTokenEncrypted,
-          accessTokenExpiresAt: connectionAccessTokenExpiresAt,
-        },
+        connection: connectionTokenState,
         encryptionSecret,
         clientId: googleConfig.clientId,
         clientSecret: googleConfig.clientSecret,
         now,
       });
-      await db
-        .update(calendarConnections)
-        .set({
-          accessTokenEncrypted: encryptSecret(resolved.accessToken, encryptionSecret),
-          refreshTokenEncrypted: encryptSecret(resolved.refreshToken, encryptionSecret),
-          accessTokenExpiresAt: resolved.accessTokenExpiresAt,
-          lastError: null,
-          updatedAt: now,
-        })
-        .where(eq(calendarConnections.id, connectionId));
+      if (resolved.refreshed) {
+        await persistRefreshedToken(resolved);
+      }
       return resolved.accessToken;
     }
 
@@ -89,26 +108,15 @@ export const buildCalendarWritebackProviderClient = ({
       throw new Error('Microsoft OAuth is not configured for calendar writeback.');
     }
     const resolved = await resolveMicrosoftAccessToken({
-      connection: {
-        accessTokenEncrypted: connectionAccessTokenEncrypted,
-        refreshTokenEncrypted: connectionRefreshTokenEncrypted,
-        accessTokenExpiresAt: connectionAccessTokenExpiresAt,
-      },
+      connection: connectionTokenState,
       encryptionSecret,
       clientId: microsoftConfig.clientId,
       clientSecret: microsoftConfig.clientSecret,
       now,
     });
-    await db
-      .update(calendarConnections)
-      .set({
-        accessTokenEncrypted: encryptSecret(resolved.accessToken, encryptionSecret),
-        refreshTokenEncrypted: encryptSecret(resolved.refreshToken, encryptionSecret),
-        accessTokenExpiresAt: resolved.accessTokenExpiresAt,
-        lastError: null,
-        updatedAt: now,
-      })
-      .where(eq(calendarConnections.id, connectionId));
+    if (resolved.refreshed) {
+      await persistRefreshedToken(resolved);
+    }
     return resolved.accessToken;
   };
 
