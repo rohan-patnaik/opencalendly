@@ -262,7 +262,7 @@ export const rescheduleBooking = async (
         });
       insertedBooking = inserted ?? null;
     } catch (error) {
-      if (isUniqueViolation(error, 'bookings_unique_slot')) {
+      if (isUniqueViolation(error, ['bookings_confirmed_unique_slot', 'bookings_unique_slot'])) {
         throw new BookingConflictError('Selected slot is no longer available.');
       }
       throw error;
