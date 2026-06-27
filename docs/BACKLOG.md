@@ -1,5 +1,25 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 87 (PR#TBD): Fix calendar writeback token refresh reuse
+
+Scope:
+
+- Ensure calendar writeback provider clients reuse refreshed access and refresh tokens during a single writeback operation.
+- Avoid repeated refresh attempts from stale in-memory connection credentials when provider calls happen back to back.
+- Keep the change scoped to writeback provider token handling and focused regression tests.
+
+Acceptance criteria:
+
+- When a writeback provider call refreshes an expired token, later calls on the same provider client use the refreshed access token, refresh token, and expiry.
+- Refreshed credentials are persisted to the calendar connection and connection `lastError` is cleared.
+- Writeback operations do not perform an extra token refresh after a successful in-client refresh.
+- Regression tests cover the provider client refreshing once across lookup and create calls.
+- Validation passes:
+  - `npm run env:check`
+  - `npm test -- apps/api/src/server/calendar-writeback-provider.test.ts apps/api/src/lib/calendar-writeback.test.ts`
+  - `npm run typecheck -w apps/api`
+  - `git diff --check`
+
 ## Feature 86 (PR#TBD): Deprecate unsafe legacy calendar provider endpoints
 
 Scope:
