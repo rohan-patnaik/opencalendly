@@ -5,6 +5,7 @@ import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 
 import { authedGetJson, revokeApiSession } from '../../lib/api-client';
 import type { AuthSession } from '../../lib/auth-session';
+import { requestAuthSessionBridgeRetry } from '../../lib/auth-session-bridge-retry';
 import type { AuthMeResponse, OrganizerConsoleUser } from './types';
 
 type UseOrganizerSessionInput = {
@@ -77,8 +78,11 @@ export const useOrganizerSession = ({
         setAuthedUser(payload.user);
       } catch (caught) {
         setAuthedUser(null);
-        setAuthError(caught instanceof Error ? caught.message : 'Unable to restore organizer session.');
+        setAuthError(
+          caught instanceof Error ? caught.message : 'Unable to restore organizer session.',
+        );
         clear();
+        requestAuthSessionBridgeRetry();
       } finally {
         setAuthChecking(false);
       }

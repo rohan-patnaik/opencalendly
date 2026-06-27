@@ -68,10 +68,31 @@ describe('clerk session bridge helpers', () => {
     expect(decision.syncKey).toBe('sess_123:demo@example.com');
   });
 
+  it('skips duplicate exchange attempts for the same missing local session', () => {
+    const staleSyncKey = 'sess_123:demo@example.com';
+    const decision = shouldExchangeClerkSession({
+      isLoaded: true,
+      isSignedIn: true,
+      primaryEmail: 'demo@example.com',
+      existingSession: null,
+      lastSyncKey: staleSyncKey,
+      sessionId: 'sess_123',
+    });
+
+    expect(decision.shouldExchange).toBe(false);
+    expect(decision.syncKey).toBe(staleSyncKey);
+  });
+
   it('preserves manually bootstrapped sessions while clerk is signed out', () => {
-    expect(shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'legacy' })).toBe(true);
-    expect(shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'dev' })).toBe(true);
-    expect(shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'clerk' })).toBe(false);
+    expect(
+      shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'legacy' }),
+    ).toBe(true);
+    expect(
+      shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'dev' }),
+    ).toBe(true);
+    expect(
+      shouldPreserveSignedOutSession({ ...buildSession('demo@example.com'), issuer: 'clerk' }),
+    ).toBe(false);
     expect(shouldPreserveSignedOutSession(null)).toBe(false);
   });
 });
