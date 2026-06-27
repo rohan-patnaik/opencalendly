@@ -5,6 +5,7 @@ export {
   fetchMicrosoftUserProfile,
   refreshMicrosoftOAuthToken,
 } from './microsoft-oauth';
+export { hasRequiredMicrosoftCalendarScopes } from './microsoft-shared';
 export {
   cancelMicrosoftCalendarEvent,
   createMicrosoftCalendarEvent,

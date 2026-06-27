@@ -13,6 +13,7 @@ import {
   buildMicrosoftAuthorizationUrl,
   exchangeMicrosoftOAuthCode,
   fetchMicrosoftUserProfile,
+  hasRequiredMicrosoftCalendarScopes,
 } from '../lib/microsoft-calendar';
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
@@ -153,6 +154,13 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           code: parsed.data.code,
           redirectUri: parsed.data.redirectUri,
         });
+        if (!hasRequiredMicrosoftCalendarScopes(tokenPayload.scope)) {
+          return jsonError(
+            context,
+            400,
+            'Microsoft Calendar permission grant is incomplete. Reconnect and approve calendar read/write, offline access, and profile permissions.',
+          );
+        }
         const profile = await fetchMicrosoftUserProfile(tokenPayload.access_token);
         const [existingConnection] = await db
           .select({
