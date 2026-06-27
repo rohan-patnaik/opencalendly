@@ -4,7 +4,7 @@ import { jsonError } from './core';
 import { isNeonDatabaseUrl, resolveConnectionString } from './env';
 import type { ContextLike, Database } from './types';
 
-export const isUniqueViolation = (error: unknown, constraint?: string): boolean => {
+export const isUniqueViolation = (error: unknown, constraint?: string | string[]): boolean => {
   if (!error || typeof error !== 'object') {
     return false;
   }
@@ -13,7 +13,12 @@ export const isUniqueViolation = (error: unknown, constraint?: string): boolean 
   if (maybeError.code !== '23505') {
     return false;
   }
-  return constraint ? maybeError.constraint === constraint : true;
+  if (!constraint) {
+    return true;
+  }
+  return Array.isArray(constraint)
+    ? constraint.includes(maybeError.constraint ?? '')
+    : maybeError.constraint === constraint;
 };
 
 export const withDatabase = async (

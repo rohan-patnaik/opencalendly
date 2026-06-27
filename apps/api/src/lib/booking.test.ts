@@ -60,7 +60,8 @@ const buildDataAccess = (options?: {
         listRules: async () => weeklyRules,
         listOverrides: async () => options?.overrides ?? [],
         listExternalBusyWindows: async () => options?.externalBusyWindows ?? [],
-        listConfirmedBookings: async () => options?.existingBookings ?? [],
+        listConfirmedBookings: async () =>
+          (options?.existingBookings ?? []).filter((booking) => booking.status === 'confirmed'),
         countConfirmedEventTypeBookingsInWindow: async ({ startsAt, endsAt }) => {
           if (options?.eventTypeWindowBookings) {
             return options.eventTypeWindowBookings.filter(
@@ -158,6 +159,35 @@ describe('commitBooking', () => {
     ).rejects.toBeInstanceOf(BookingConflictError);
 
     expect(harness.getInsertCount()).toBe(0);
+  });
+
+  it('allows booking when matching historical slots are canceled or rescheduled', async () => {
+    const harness = buildDataAccess({
+      existingBookings: [
+        {
+          startsAt: new Date('2026-03-02T09:00:00.000Z'),
+          endsAt: new Date('2026-03-02T09:30:00.000Z'),
+          status: 'canceled',
+        },
+        {
+          startsAt: new Date('2026-03-02T09:00:00.000Z'),
+          endsAt: new Date('2026-03-02T09:30:00.000Z'),
+          status: 'rescheduled',
+        },
+      ],
+    });
+
+    const result = await commitBooking(harness.dataAccess, {
+      username: 'demo',
+      eventSlug: 'intro-call',
+      startsAt: '2026-03-02T09:00:00.000Z',
+      timezone: 'UTC',
+      inviteeName: 'Pat Lee',
+      inviteeEmail: 'pat@example.com',
+    });
+
+    expect(result.booking.id).toBe('booking-1');
+    expect(harness.getInsertCount()).toBe(1);
   });
 
   it('maps unique constraint collisions to booking conflict errors', async () => {

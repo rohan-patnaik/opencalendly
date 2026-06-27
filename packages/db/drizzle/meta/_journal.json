@@ -218,6 +218,13 @@
       "when": 1773920517033,
       "tag": "0030_exotic_toad",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1782546632078,
+      "tag": "0031_rainy_human_torch",
+      "breakpoints": true
     }
   ]
 }

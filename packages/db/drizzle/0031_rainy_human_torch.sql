@@ -1,0 +1,2 @@
+ALTER TABLE "bookings" DROP CONSTRAINT "bookings_unique_slot";--> statement-breakpoint
+CREATE UNIQUE INDEX "bookings_confirmed_unique_slot" ON "bookings" USING btree ("organizer_id","starts_at","ends_at") WHERE "bookings"."status" = 'confirmed';

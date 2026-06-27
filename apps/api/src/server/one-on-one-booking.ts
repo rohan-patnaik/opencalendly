@@ -180,7 +180,7 @@ export const createOneOnOneBooking = async (
                 }
                 return inserted;
               } catch (error) {
-                if (isUniqueViolation(error, 'bookings_unique_slot')) {
+                if (isUniqueViolation(error, ['bookings_confirmed_unique_slot', 'bookings_unique_slot'])) {
                   throw new BookingUniqueConstraintError('Slot already booked.');
                 }
                 throw error;

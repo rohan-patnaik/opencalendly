@@ -332,7 +332,9 @@ export const bookings = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    uniqueSlot: unique('bookings_unique_slot').on(table.organizerId, table.startsAt, table.endsAt),
+    uniqueConfirmedSlot: uniqueIndex('bookings_confirmed_unique_slot')
+      .on(table.organizerId, table.startsAt, table.endsAt)
+      .where(sql`${table.status} = 'confirmed'`),
     eventTypeStatusStartsAtIndex: index('bookings_event_type_status_starts_at_idx').on(
       table.eventTypeId,
       table.status,
