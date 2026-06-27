@@ -1,5 +1,23 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 86 (PR#TBD): Deprecate unsafe legacy calendar provider endpoints
+
+Scope:
+
+- Stop provider-level Google and Microsoft calendar sync/disconnect endpoints from mutating arbitrary calendar connections.
+- Direct API clients to the per-connection calendar sync/disconnect endpoints.
+- Keep the change scoped to legacy API route behavior, focused route tests, and API docs.
+
+Acceptance criteria:
+
+- `POST /v0/calendar/google/disconnect` returns `410` and does not delete any Google calendar connections.
+- `POST /v0/calendar/google/sync` returns `410` and does not pick an arbitrary Google calendar connection.
+- `POST /v0/calendar/microsoft/disconnect` returns `410` and does not delete any Microsoft calendar connections.
+- `POST /v0/calendar/microsoft/sync` returns `410` and does not pick an arbitrary Microsoft calendar connection
+  or use the authenticated user's email for an unrelated connected calendar.
+- `docs/API.md` documents the per-connection replacement endpoints and legacy `410` behavior.
+- Focused API route tests cover the legacy endpoint responses.
+
 ## Feature 85 (PR#TBD): Validate Microsoft Calendar OAuth granted scopes
 
 Scope:

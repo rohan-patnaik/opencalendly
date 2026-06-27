@@ -101,9 +101,10 @@ Authentication requirements for webhook operations:
    - `GET /v0/analytics/operator/health`
 2. If disconnected/expired:
    - reconnect provider via OAuth connect flow
-3. Trigger sync:
-   - Google: `POST /v0/calendar/google/sync`
-   - Microsoft: `POST /v0/calendar/microsoft/sync`
+3. Trigger sync for the affected connection:
+   - find the connection `id` from `GET /v0/calendar/sync/status`
+   - run `POST /v0/calendar/connections/:connectionId/sync`
+   - do not use provider-level `/v0/calendar/google/sync` or `/v0/calendar/microsoft/sync`; those legacy routes return `410`
 4. If writeback backlog exists:
    - `POST /v0/calendar/writeback/run`
 5. Verify conflict enforcement is restored by checking availability against known busy windows.

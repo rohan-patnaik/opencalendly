@@ -1750,6 +1750,65 @@ Notes:
 - `connections` lists the authenticated user’s existing connections, even if a provider is temporarily unavailable for new OAuth starts.
 - Runtime health for this feature depends on outbound HTTPS access from the API worker to Google and Microsoft OAuth/Calendar APIs.
 
+### `POST /v0/calendar/connections/:connectionId/disconnect`
+
+Disconnects one calendar connection and deletes only that connection's cached busy windows.
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "disconnected": true,
+  "connectionId": "conn_google"
+}
+```
+
+Error responses:
+
+- `404` calendar connection not found for the authenticated user.
+
+### `POST /v0/calendar/connections/:connectionId/sync`
+
+Fetches free/busy windows for one calendar connection and stores normalized busy blocks for conflict detection.
+
+Request:
+
+```json
+{
+  "start": "2026-03-01T00:00:00.000Z",
+  "end": "2026-03-08T00:00:00.000Z"
+}
+```
+
+Success response:
+
+```json
+{
+  "ok": true,
+  "provider": "google",
+  "busyWindowCount": 6,
+  "connection": {
+    "id": "conn_google",
+    "provider": "google",
+    "connected": true,
+    "externalEmail": "owner@example.com",
+    "useForConflictChecks": true,
+    "useForWriteback": true,
+    "lastSyncedAt": "2026-03-01T10:15:00.000Z",
+    "nextSyncAt": "2026-03-01T10:45:00.000Z",
+    "lastError": null
+  }
+}
+```
+
+Error responses:
+
+- `400` invalid body, unsupported provider, or invalid sync range.
+- `404` calendar connection not found for the authenticated user.
+- `500` provider OAuth or calendar encryption config missing.
+- `502` provider sync failure (also records `lastError` + `nextSyncAt` on the connection).
+
 ### `POST /v0/calendar/google/connect/start`
 
 Starts Google OAuth by minting a signed state token and returning the authorization URL.
@@ -1821,23 +1880,26 @@ Runtime note:
 
 ### `POST /v0/calendar/google/disconnect`
 
-Deletes Google connection(s) and associated cached busy windows for the authenticated user.
+Deprecated provider-level endpoint. It no longer disconnects calendars because it cannot safely identify one
+connection when a user has multiple calendars.
 
 Request body: empty object `{}` or omitted body.
 
-Success response:
+Response:
 
 ```json
 {
-  "ok": true,
-  "provider": "google",
-  "disconnected": true
+  "ok": false,
+  "error": "This provider-level Google calendar endpoint is deprecated. Use /v0/calendar/connections/:connectionId/sync or /v0/calendar/connections/:connectionId/disconnect."
 }
 ```
 
+- `410` use `POST /v0/calendar/connections/:connectionId/disconnect`.
+
 ### `POST /v0/calendar/google/sync`
 
-Fetches Google free/busy windows and stores normalized busy blocks for conflict detection.
+Deprecated provider-level endpoint. It no longer syncs calendars because it cannot safely identify one connection
+when a user has multiple calendars.
 
 Request:
 
@@ -1851,31 +1913,18 @@ Request:
 Request notes:
 
 - `start`/`end` are optional.
-- If omitted, API uses default rolling sync window.
+- The legacy endpoint always returns `410`; the body is not processed.
 
-Success response:
+Response:
 
 ```json
 {
-  "ok": true,
-  "provider": "google",
-  "syncWindow": {
-    "startIso": "2026-03-01T00:00:00.000Z",
-    "endIso": "2026-03-08T00:00:00.000Z"
-  },
-  "busyWindowCount": 6,
-  "refreshedAccessToken": false,
-  "lastSyncedAt": "2026-03-01T10:15:00.000Z",
-  "nextSyncAt": "2026-03-01T10:45:00.000Z"
+  "ok": false,
+  "error": "This provider-level Google calendar endpoint is deprecated. Use /v0/calendar/connections/:connectionId/sync or /v0/calendar/connections/:connectionId/disconnect."
 }
 ```
 
-Error responses:
-
-- `400` invalid body or invalid sync range.
-- `404` Google calendar not connected.
-- `500` Google OAuth env config missing.
-- `502` provider sync failure (also records `lastError` + `nextSyncAt`).
+- `410` use `POST /v0/calendar/connections/:connectionId/sync`.
 
 Runtime note:
 
@@ -1894,7 +1943,8 @@ Behavior:
 
 - Same auth model and encrypted credential handling as Google endpoints.
 - Same sync status representation under `GET /v0/calendar/sync/status`.
-- `/v0/calendar/microsoft/sync` response shape matches Google sync endpoint and returns `provider: "microsoft"`.
+- Provider-level `/v0/calendar/microsoft/disconnect` and `/v0/calendar/microsoft/sync` are deprecated and return `410`.
+  Use `/v0/calendar/connections/:connectionId/disconnect` and `/v0/calendar/connections/:connectionId/sync`.
 - Production must allow outbound HTTPS to `login.microsoftonline.com` and `graph.microsoft.com`.
 
 ### `GET /v0/calendar/writeback/status`
