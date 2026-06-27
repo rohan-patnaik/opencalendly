@@ -11,9 +11,13 @@ export const DEFAULT_MICROSOFT_SCOPES = [
   'email',
   'offline_access',
   'User.Read',
-  'Calendars.Read',
   'Calendars.ReadWrite',
 ];
+
+export const REQUIRED_MICROSOFT_CALENDAR_SCOPES = [
+  'User.Read',
+  'Calendars.ReadWrite',
+] as const;
 
 export type FetchLike = typeof fetch;
 
@@ -34,6 +38,28 @@ export type MicrosoftUserProfile = {
 export type MicrosoftBusyWindow = {
   start: string;
   end: string;
+};
+
+const normalizeMicrosoftScope = (scope: string): string => {
+  const trimmed = scope.trim().toLowerCase();
+  return trimmed.includes('/') ? trimmed.slice(trimmed.lastIndexOf('/') + 1) : trimmed;
+};
+
+export const hasRequiredMicrosoftCalendarScopes = (scope: string | undefined): boolean => {
+  if (!scope) {
+    return false;
+  }
+
+  const grantedScopes = new Set(
+    scope
+      .split(/\s+/)
+      .filter((value) => value.length > 0)
+      .map(normalizeMicrosoftScope),
+  );
+
+  return REQUIRED_MICROSOFT_CALENDAR_SCOPES.every((requiredScope) =>
+    grantedScopes.has(normalizeMicrosoftScope(requiredScope)),
+  );
 };
 
 export const readErrorPayload = async (response: Response): Promise<string> => {

@@ -14,6 +14,7 @@ import {
   exchangeMicrosoftOAuthCode,
   fetchMicrosoftUserProfile,
 } from '../lib/microsoft-calendar';
+import { hasRequiredMicrosoftCalendarScopes } from '../lib/microsoft-shared';
 import { resolveAuthenticatedUser } from '../server/auth-session';
 import { emitAuditEvent, sanitizeErrorForAudit } from '../server/audit';
 import { jsonError, logInternalError } from '../server/core';
@@ -153,6 +154,14 @@ export const registerMicrosoftCalendarConnectRoutes = (app: ApiApp): void => {
           code: parsed.data.code,
           redirectUri: parsed.data.redirectUri,
         });
+        if (!hasRequiredMicrosoftCalendarScopes(tokenPayload.scope)) {
+          return jsonError(
+            context,
+            400,
+            'Microsoft did not grant the required calendar permissions. Reconnect and approve profile access and calendar read/write access.',
+          );
+        }
+
         const profile = await fetchMicrosoftUserProfile(tokenPayload.access_token);
         const [existingConnection] = await db
           .select({
