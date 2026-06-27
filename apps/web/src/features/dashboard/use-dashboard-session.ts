@@ -5,6 +5,7 @@ import { isClerkAPIResponseError } from '@clerk/nextjs/errors';
 
 import { authedGetJson, revokeApiSession } from '../../lib/api-client';
 import type { AuthSession } from '../../lib/auth-session';
+import { requestAuthSessionBridgeRetry } from '../../lib/auth-session-bridge-retry';
 import type { AuthMeResponse, DashboardUser } from './types';
 
 type UseDashboardSessionInput = {
@@ -78,6 +79,7 @@ export const useDashboardSession = ({
         setAuthedUser(null);
         setAuthError(caught instanceof Error ? caught.message : 'Unable to restore session.');
         clear();
+        requestAuthSessionBridgeRetry();
       } finally {
         setAuthChecking(false);
       }
