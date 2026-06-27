@@ -1,5 +1,26 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 85 (PR#TBD): Validate Microsoft Calendar OAuth granted scopes
+
+Scope:
+
+- Reject Microsoft Calendar OAuth connections when the token response lacks the required profile and calendar scopes.
+- Request only the app capabilities needed for Microsoft sync and writeback: refresh access, profile access, and calendar read/write access.
+- Validate refresh access from the returned or previously stored refresh token, not the token response scope string.
+- Keep the change scoped to Microsoft OAuth scope validation, connect completion behavior, focused tests, and this backlog note.
+
+Acceptance criteria:
+
+- Microsoft Calendar connect requests `offline_access`, `User.Read`, and `Calendars.ReadWrite`.
+- Granted scopes must include `User.Read` and `Calendars.ReadWrite`.
+- `/v0/calendar/microsoft/connect/complete` returns a clear 400 response when Microsoft grants incomplete scopes.
+- Incomplete Microsoft grants are rejected before profile lookup or token persistence.
+- Focused tests cover the Microsoft scope checker and connect-completion rejection path.
+- Validation passes:
+  - `npm test -- apps/api/src/lib/microsoft-shared.test.ts apps/api/src/routes/calendar-microsoft-connect.test.ts`
+  - `npm run typecheck -w apps/api`
+  - `git diff --check`
+
 ## Feature 84 (PR#TBD): Allow rebooking canceled or rescheduled slots
 
 Scope:
