@@ -1,5 +1,25 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 84 (PR#TBD): Allow rebooking canceled or rescheduled slots
+
+Scope:
+
+- Replace the full booking slot uniqueness constraint with confirmed-only uniqueness.
+- Preserve canceled and rescheduled booking history without letting those rows block future confirmed bookings in the same slot.
+- Keep the change scoped to booking slot database constraints, conflict mapping, focused tests, and migration metadata.
+
+Acceptance criteria:
+
+- Only `confirmed` bookings are unique for the same organizer/start/end slot.
+- Canceled historical bookings do not prevent a fresh confirmed booking in the same slot.
+- Rescheduled historical bookings do not prevent a fresh confirmed booking in the same slot.
+- Duplicate confirmed bookings still map to booking conflict errors.
+- Validation passes:
+  - `npm run typecheck -w packages/db`
+  - `npm run typecheck -w apps/api`
+  - `npx vitest run apps/api/src/lib/booking.test.ts apps/api/src/server/database.test.ts`
+  - `git diff --check`
+
 ## Feature 83 (PR#TBD): Add brand assets and explicit calendar-connect success UX
 
 Scope:
