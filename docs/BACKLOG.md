@@ -1,5 +1,17 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 89 (PR#TBD): Preserve homepage license attribution
+
+Scope:
+
+- Finish the regression coverage from PR #88; the correct GPL license label already exists on main.
+- Keep production markup unchanged.
+
+Acceptance criteria:
+
+- A render test verifies the homepage shows `Open source · GPL-3.0-only` and does not show the stale `MIT License` label.
+- Environment validation, lint, complexity checks, tests, smoke tests, and typecheck pass using the repository CI test configuration.
+
 ## Feature 87 (PR#TBD): Fix calendar writeback token refresh reuse
 
 Scope:
