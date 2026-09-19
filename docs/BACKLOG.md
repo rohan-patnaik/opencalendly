@@ -1,5 +1,21 @@
 # Ordered Backlog (One Feature per PR)
 
+## Feature 88 (PR#TBD): Finish local-auth development startup safeguards
+
+Scope:
+
+- Complete the remaining startup safeguards from PR #83 without reintroducing database changes already on main.
+- Share port validation between web and API dev commands; pin web to 3000 and API to 8787.
+- Add regression coverage for occupied/invalid ports and existing request-scoped database cleanup.
+
+Acceptance criteria:
+
+- Invalid ports (including partial numbers, zero, and values over 65535) are rejected.
+- An occupied dev port fails clearly before deleting web build output or starting a server.
+- Both dev commands use the shared guard and explicitly select their expected auth origin port.
+- Request-scoped database clients close after successful and failed handlers; pool configuration respects timer capabilities.
+- Environment validation, lint, complexity checks, tests, smoke tests, and typecheck pass using the repository CI test configuration.
+
 ## Feature 87 (PR#TBD): Fix calendar writeback token refresh reuse
 
 Scope:
