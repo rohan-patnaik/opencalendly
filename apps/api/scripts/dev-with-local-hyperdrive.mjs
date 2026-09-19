@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { ensureDevPort } from '../../../scripts/ensure-dev-port.mjs';
+
 const parseEnvFile = (contents) => {
   const values = {};
 
@@ -65,7 +67,14 @@ if (!process.env.CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE) {
 }
 
 const wranglerCommand = process.platform === 'win32' ? 'wrangler.cmd' : 'wrangler';
-const wranglerArgs = ['dev', '--config', 'wrangler.toml'];
+try {
+  await ensureDevPort('8787');
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
+}
+
+const wranglerArgs = ['dev', '--config', 'wrangler.toml', '--port', '8787'];
 
 if (existsSync(API_DEV_VARS_PATH)) {
   wranglerArgs.push('--env-file', API_DEV_VARS_PATH);
