@@ -1,6 +1,6 @@
 # Ordered Backlog (One Feature per PR)
 
-## Feature 88 (PR#TBD): Finish local-auth development startup safeguards
+## Feature 88 (PR#101): Finish local-auth development startup safeguards
 
 Scope:
 
@@ -14,6 +14,18 @@ Acceptance criteria:
 - An occupied dev port fails clearly before deleting web build output or starting a server.
 - Both dev commands use the shared guard and explicitly select their expected auth origin port.
 - Request-scoped database clients close after successful and failed handlers; pool configuration respects timer capabilities.
+- Environment validation, lint, complexity checks, tests, smoke tests, and typecheck pass using the repository CI test configuration.
+
+## Feature 89 (PR#TBD): Preserve homepage license attribution
+
+Scope:
+
+- Finish the regression coverage from PR #88; the correct GPL license label already exists on main.
+- Keep production markup unchanged.
+
+Acceptance criteria:
+
+- A render test verifies the homepage shows `Open source · GPL-3.0-only` and does not show the stale `MIT License` label.
 - Environment validation, lint, complexity checks, tests, smoke tests, and typecheck pass using the repository CI test configuration.
 
 ## Feature 87 (PR#TBD): Fix calendar writeback token refresh reuse
